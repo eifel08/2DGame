@@ -10,6 +10,7 @@ func enter(params: Dictionary) -> void:
 	var knock_up: bool = params.get("knock_up", false)
 	p.velocity = Vector2(dir * 300.0, -640.0 if knock_up else -320.0)
 	p.is_jumping = false
+	p.wall_sliding = false
 	timer = 0.22
 
 

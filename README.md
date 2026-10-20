@@ -29,13 +29,13 @@ To pull later changes: `git pull` inside the `2DGame` folder, then reopen the pr
 | Drop through a platform | Down + Jump | Down + A |
 | Attack (directional) | J / X (hold Up or Down to aim; Down only in the air) | X |
 | Dash | K / C / Shift | RB |
-| Heal (hold, uses energy) | L / V (on the ground) | LB |
+| Heal (hold, chunk by chunk) | L / V (on the ground) | LB |
 | Ultimate slot 1 / 2 / 3 / 4 | 1 / 2 / 3 / 4 | Y / RT / LT / R3 |
-| Interact (talk, read, rest) | E / F | B |
+| Interact (talk, read, save) | E / F (checkpoints: also Down) | B |
 | Inventory | I / Tab / Esc | Back / Select |
-| Inventory: switch tab | Q / E (or PgUp / PgDn) | LB / RB |
-| Inventory: move / select | Arrow keys, Enter or Space | D-pad, A |
-| Inventory: clear a slot | Backspace / Delete | X |
+| Inventory: switch tab | Left / Right on the tab row (also Q / E, PgUp / PgDn) | D-pad, LB / RB |
+| Inventory: move / confirm | Arrows or WASD; Z / Enter / Space | D-pad, A |
+| Inventory: cancel slot choice | Backspace / Delete | X |
 | Debug overlay | F1 or ` / ~ | Start |
 | Debug overlay keyboard mode | F2 (pauses; arrows, Enter, Left/Right on sliders) | — |
 | Reset room | R | — |
@@ -47,7 +47,7 @@ Bindings live in **Project → Project Settings → Input Map**. Everything, inc
 ### Movement
 Crisp acceleration and stopping, dynamic jump height, double jump, dash with i-frames, coyote time and jump buffering. Gravity defaults to 2100, a little low, to give more reaction time for pogo chains.
 
-**Walls are jump-only.** There is no wall slide: you fall at full speed next to a wall. Press jump while touching a wall in mid-air to spring away from it. A wall jump refreshes your double jump and air dash, so you can climb narrow shafts wall to wall.
+**Walls:** press into a wall while falling and **wall friction** slows you to a slide. Press jump to wall-jump. Wall jumps have a fixed height (a quick tap is enough). Holding toward the wall as you jump makes a "climb jump" with a smaller push, so you swing back and can **climb a single wall** with consecutive wall jumps. A wall jump or slide refreshes your double jump and air dash.
 
 ### Combat
 Directional attacks (left, right, up, down) and the downward pogo bounce off enemies and spikes. Hits trigger hitstop and screen shake. Enemy contact deals damage, knocks you back and starts the i-frames.
@@ -55,8 +55,13 @@ Directional attacks (left, right, up, down) and the downward pogo bounce off ene
 ### Energy, healing and ultimates
 - **One shared energy meter.** Basic attacks fill it.
 - **Two ways to heal:**
-  1. **Channel:** hold L on the ground. Energy drains into health for as long as you hold it.
-  2. **Rest:** stand at a checkpoint flame and press E. Your health is fully restored. This needs no energy.
+  1. **Channel (risk and reward):** hold L on the ground. Healing comes in **chunks**.
+     - While a chunk channels, energy drains and the health it will give appears as a **white** segment on the health bar.
+     - When the chunk completes, the white segment turns **red**: that health is now yours. A short pause follows, so you can let go safely. Keep holding to start the next chunk.
+     - If you let go early, jump or get hit before the chunk completes, the drained energy is **lost** and no health returns.
+     - You cannot start without enough energy for a whole chunk.
+     - Chunk size, energy cost, duration and pause are in `Config.vitals` (`heal_chunk_*`) and in the debug overlay.
+  2. **Save at a checkpoint:** see below. Saving restores full health.
 - **Four hotkeys (1–4).** Each slot holds one ultimate, or nothing. You can equip 0 to 4 abilities. There is no switching.
   - Defaults: 1 Nova Burst, 2 Spirit Volley, 3 Ascendant Form, 4 Comet Dash.
 - **Color-coded energy bar, no numbers.** Each equipped slot puts a mark on the bar at the energy it needs. Under the bar, the hotkey strip shows slots 1, 2, 3 and 4 from left to right, each with its icon. A mark or slot is bright when there is enough energy.
@@ -66,9 +71,9 @@ Directional attacks (left, right, up, down) and the downward pogo bounce off ene
 
 ### Checkpoints, safe ground and death
 - **Spikes:** damage, then you reappear on the **last safe ground** you stood on, a few steps back. This happens even while invulnerable (but then without damage), so a damage loop is impossible.
-- **Death:** only when health reaches zero (from enemies or spikes) do you respawn at the **last lit checkpoint**.
-- **Checkpoints:** touching a flame lights it. Pressing E there ("Rest") fully heals you without showing any text. While you stand at a lit flame, you can change the loadout.
-- **Info tablets:** a tablet stands shortly before each later checkpoint. Reading it is optional; it explains checkpoints, resting and the loadout rule.
+- **Death:** only when health reaches zero (from enemies or spikes) do you respawn at the checkpoint where you **last saved**.
+- **Checkpoints save only on purpose.** Standing near a flame does nothing. Press **E** (or **Down** on the ground) to save: the flame lights, you snap to its exact center, and your health is fully restored. No text appears. Only at the flame where you saved can you change the loadout.
+- **Info tablets:** a tablet stands shortly before each later checkpoint. Reading it is optional; it explains saving, death respawn and the loadout rule.
 - The debug toggle *Spikes → Safe Ground* (on by default) can send spike hits to the checkpoint instead.
 
 Checkpoint art is modular. Replace the polygons under `Visual` in `world/objects/checkpoint.tscn`, and edit or replace its animations named `inactive`, `activate` and `active`.
@@ -89,10 +94,13 @@ Dialogue texts are `DialogueData` resources in `dialogue/`. Edit them in the Ins
 ### Inventory and loadout (I / Tab)
 The game pauses while the inventory is open. It has two tabs (switch with Q / E):
 - **Status:** shards (the only number), plus health and energy as bars. A bar's frame grows when its maximum increases (`max_health_bonus` / `max_energy_bonus`; the debug overlay has buttons to test this).
-- **Abilities:** the top row shows hotkey slots 1–4, left to right. The bottom grid shows every unlocked ability, plus an empty card.
+- **Abilities:** the top row shows hotkey slots 1–4, left to right. The bottom grid shows every unlocked ability with a normal, crisp icon. Equipped ones carry their key number.
   - Cards show **icons and energy gauges only**. The name and description appear below only for the focused card.
-  - **Keyboard flow:** use the arrows to reach a slot and press Enter, then pick an ability and press Enter. The empty card, or Backspace, clears the selected slot. If the ability already sits in another slot, the two slots swap.
-  - **Changes only work at a lit checkpoint.** Elsewhere you can browse but not change anything, and `UltimateManager.equip` / `unequip` enforce this in code too.
+  - **Keyboard flow:** Left / Right on the tab row switches tabs, and Down enters the cards.
+    - Confirm (Z / Enter / Space) on an **equipped** ability, in a slot or in the grid, **unequips** it.
+    - Confirm on a **free** ability, then choose slot 1–4. An empty slot takes it. An occupied slot has its ability **replaced**.
+    - Backspace cancels the slot choice.
+  - **Changes only work at the checkpoint where you saved.** Elsewhere you can browse but not change anything, and `UltimateManager.equip` / `unequip` enforce this in code too.
 
 ### Text direction
 The UI is always laid out left to right, even on a system set to a right-to-left language. This is set in `project.godot` (`root_node_layout_direction`) and on every panel. Dialogue text is laid out for the whole page before typing starts, so lines never shift or re-wrap while the letters appear.
@@ -104,14 +112,16 @@ The HUD is clean by default: health and energy bars, threshold marks, the hotkey
 
 | Feature | How |
 | --- | --- |
-| Spikes vs death | Walk into a spike pit: you reappear just before it. Let health run out (debug: *Take Damage*): you wake at the last flame. |
+| Wall friction | Fall next to a wall while holding toward it: you slide slowly. |
+| Single-wall climb | Central hanging wall: hold toward it and tap jump each time you touch it. You climb to the top. |
+| Chunk healing | Hold L with enough energy: the white segment grows, then turns red. Let go halfway: the energy is gone and no health returns. |
+| Explicit saving | Walk to the middle flame: nothing happens. Press E or Down: you snap to the flame and are fully healed. |
+| Spikes vs death | Walk into a spike pit: you reappear just before it. Let health run out (debug: *Take Damage*): you wake at the flame where you saved. |
 | Shards on spikes | Destroy the right-hand dummy near its pit so shards fly in: they vanish. |
-| Empty slots | At a flame, open the inventory, select a slot, press Backspace. Its mark leaves the energy bar and its strip box turns empty. |
-| Keyboard inventory | I, then Q/E for tabs, arrows to move, Enter to select and equip. No mouse. |
+| Loadout | At your saved flame: I, Right (Abilities), Down. Confirm on an equipped ability to remove it. Confirm on a free one, then pick a slot (an occupied slot is replaced). |
 | Icons and details | Move focus over ability cards: the name and description appear only for the focused one. |
 | Left to right | Slots read 1-2-3-4 left to right in the HUD and the inventory. Dialogue types from the left. |
-| Checkpoint tablets | Read the tablet before the middle or right flame. Resting at the flame shows no text. |
-| No wall slide | Fall next to a wall while holding toward it: you do not slow down. Jump to wall-jump. |
+| Checkpoint tablets | Read the tablet before the middle or right flame. Saving at the flame shows no text. |
 | Dialogue | Walk to the robed NPC right of the start, press E. |
 | Debug, keyboard only | F1, then F2: arrows, Enter, Left/Right on sliders. F2 again resumes. |
 
@@ -137,7 +147,7 @@ world/
 dialogue/                DialogueData resources (NPC + lore texts)
 ui/                      HUD, dialogue box, inventory, debug overlay, background
 tools/build_assets.gd    regenerates rigs, animations, TileSet, room and input map
-tests/smoke_test.tscn    automated headless test (86 checks)
+tests/smoke_test.tscn    automated headless test (101 checks)
 ```
 
 ## Extending
@@ -157,4 +167,4 @@ tests/smoke_test.tscn    automated headless test (86 checks)
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It plays the game through real input actions and checks 86 behaviors. These include movement and combat, healing, safe-ground versus checkpoint respawn, shards and enemies on spikes, empty slots, number-free ability UI, keyboard-only inventory and debug use, left-to-right layout and text, dialogue, currency and checkpoints. Exit code 0 means everything passed.
+It plays the game through real input actions and checks 101 behaviors. These include wall friction and single-wall climbing, chunk healing (pending white bar, loss on interruption, pause window), explicit checkpoint saving (E and Down, centering, full heal), death versus spike respawn, the keyboard-only loadout flow (unequip, equip, replace, cancel), number-free UI, left-to-right layout, hazards, currency and dialogue. Exit code 0 means everything passed.

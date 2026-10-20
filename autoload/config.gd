@@ -31,7 +31,10 @@ class Movement:
 	var coyote_time := 0.1
 	var jump_buffer_time := 0.12
 
+	var wall_slide_speed := 130.0 ## Wall friction: max fall speed while pressing into a wall.
 	var wall_jump_vel_x := 380.0
+	var wall_climb_jump_vel_x := 210.0 ## Smaller push when holding toward the wall (climbing).
+	var wall_climb_lock_time := 0.06
 	var wall_jump_vel_y := 700.0
 	var wall_jump_lock_time := 0.16 ## Reduced air control right after a wall jump.
 	var wall_coyote_time := 0.1
@@ -68,9 +71,13 @@ class Vitals:
 	var energy_per_hit := 11.0
 	var energy_gain_mul := 1.0
 	var iframe_duration := 1.0
-	var heal_windup := 0.25 ## Channel delay before energy starts draining.
-	var heal_energy_per_second := 40.0
-	var health_per_energy := 0.75
+	var heal_windup := 0.2 ## Channel delay before energy starts draining.
+	## Chunk healing: each chunk drains heal_chunk_energy over heal_chunk_time
+	## and restores heal_chunk_health only when it completes.
+	var heal_chunk_health := 25.0
+	var heal_chunk_energy := 33.0
+	var heal_chunk_time := 0.9
+	var heal_chunk_pause := 0.4 ## Safe window after a chunk before the next one starts.
 
 
 class DebugFlags:

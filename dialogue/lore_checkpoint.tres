@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_data")
 speaker = "Tablet of the Flames"
-pages = PackedStringArray("\"Ahead burns a flame of rest. Walk into it and it will light.\"", "\"If you fall in battle, you wake at the last flame you lit. Spikes only send you back a few steps.\"", "\"Stand at the flame and press E to rest. Your wounds close completely.\"", "\"Only beside a lit flame can you change, or clear, the arts on your number keys. Open the inventory there (I or Tab).\"")
+pages = PackedStringArray("\"Ahead burns a flame of rest. It does not claim you on its own.\"", "\"Stand before it and press E, or Down, to save. The flame draws you to its centre and closes every wound.\"", "\"If you fall in battle, you wake at the flame where you last saved. Spikes only send you back a few steps.\"", "\"Only beside that flame can you change the arts on your number keys. Open the inventory there (I or Tab).\"")

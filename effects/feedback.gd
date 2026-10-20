@@ -51,7 +51,7 @@ func step(delta: float, player: Player) -> void:
 	if fast and _ghost_timer <= 0.0:
 		effects.ghost(player.get_rect())
 		_ghost_timer = 0.025
-	if _heal_sparkle and randf() < 0.5:
+	if (_heal_sparkle or player.is_channeling_heal) and randf() < 0.5:
 		effects.burst(player.global_position + Vector2(randf_range(-12, 12), 0), {
 			"count": 1, "color": Color("#8dffb0"), "speed": 60.0, "angle": -PI / 2.0,
 			"spread": 0.6, "gravity": -200.0, "life": 0.5, "size": 3.0,

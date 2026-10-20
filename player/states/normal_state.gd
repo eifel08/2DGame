@@ -1,8 +1,8 @@
 class_name NormalState
 extends PlayerState
-## Ground and air locomotion share one state because the player moves between
-## them every few frames and the rules overlap. Walls are jump-only: there is
-## no wall slide, touching a wall in the air just enables a wall jump.
+## Ground, air and wall locomotion share one state because the player moves
+## between them every few frames and the rules overlap. Pressing into a wall
+## while falling slides slowly (wall friction); jumping off it is a wall jump.
 
 
 func step(delta: float) -> void:
@@ -31,6 +31,13 @@ func step(delta: float) -> void:
 	if up.wall_jump and not p.grounded and p.wall_dir != 0:
 		p.last_wall_dir = p.wall_dir
 		p.wall_coyote_timer = m.wall_coyote_time
+	p.wall_sliding = up.wall_jump and not p.grounded and p.wall_dir != 0 \
+		and ix == p.wall_dir and p.velocity.y > 0.0
+	if p.wall_sliding:
+		p.air_jumps_used = 0
+		p.air_dash_used = false
+		if not p.facing_locked:
+			p.facing = -p.wall_dir # Face away from the wall.
 
 	# --- Drop through one-way platforms (down + jump) ---
 	if p.jump_buffer_timer > 0.0 and p.grounded and input.is_down(&"move_down") \
@@ -55,13 +62,13 @@ func step(delta: float) -> void:
 	if p.velocity.y >= 0.0:
 		p.is_jumping = false
 
-	p.apply_gravity(delta, m.max_fall_speed)
+	p.apply_gravity(delta, m.wall_slide_speed if p.wall_sliding else m.max_fall_speed)
 
 	# --- Transitions ---
 	if up.dash and input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
 		p.fsm.change("dash")
 		return
-	if p.grounded and input.is_down(&"heal") and p.health.can_heal():
+	if p.grounded and input.is_down(&"heal") and p.health.can_start_heal_chunk():
 		p.fsm.change("heal")
 		return
 

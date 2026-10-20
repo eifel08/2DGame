@@ -11,6 +11,7 @@ func enter(params: Dictionary) -> void:
 	timer = params.get("duration", 0.0)
 	on_release = params.get("on_release", Callable())
 	p.is_jumping = false
+	p.wall_sliding = false
 	p.velocity.y = 0.0
 	p.health.set_invulnerable("cast", true)
 

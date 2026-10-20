@@ -8,7 +8,11 @@ var timer := 0.0
 
 func enter(_params: Dictionary) -> void:
 	var ix := p.input.axis_x()
-	dir = ix if ix != 0 else p.facing
+	if p.wall_sliding:
+		dir = -p.wall_dir
+	else:
+		dir = ix if ix != 0 else p.facing
+	p.wall_sliding = false
 	timer = Config.movement.dash_duration
 	p.air_dash_used = not p.grounded
 	p.is_jumping = false

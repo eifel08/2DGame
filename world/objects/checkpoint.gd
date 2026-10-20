@@ -1,9 +1,9 @@
 class_name Checkpoint
 extends Interactable
-## Respawn point. Touching it activates it: after death or a hazard hit the
-## player returns to the last activated checkpoint. Interacting ("Rest")
-## fully restores health. While standing at the active checkpoint the
-## ultimate loadout can be changed in the inventory.
+## Respawn point. It never saves passively: the player saves by interacting
+## (E, or Down on the ground). Saving centers the player on the checkpoint,
+## restores full health and makes it the respawn point after death. While
+## standing at the saved checkpoint the ultimate loadout can be changed.
 ##
 ## Art is modular: put any visuals under "Visual" and give the optional
 ## AnimationPlayer animations named "inactive", "activate" and "active".
@@ -37,7 +37,7 @@ func set_lit(on: bool, animate := true) -> void:
 
 
 func interact(game: Node) -> void:
-	game.rest_at_checkpoint(self)
+	game.save_at_checkpoint(self)
 
 
 func _has(anim_name: String) -> bool:

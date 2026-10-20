@@ -136,14 +136,11 @@ func _handle_meta_input() -> void:
 
 # ---------- Checkpoints ----------
 
+## Checkpoints never save passively. `at_checkpoint` (loadout changes) is
+## only true while standing at the checkpoint the player has saved at.
 func _update_checkpoints() -> void:
-	player.at_checkpoint = false
-	var pr := player.get_rect()
-	for cp in checkpoints:
-		if cp.get_interact_rect().intersects(pr):
-			if cp != current_checkpoint:
-				activate_checkpoint(cp, true)
-			player.at_checkpoint = true
+	player.at_checkpoint = current_checkpoint != null \
+		and current_checkpoint.get_interact_rect().intersects(player.get_rect())
 
 
 ## Makes `cp` the respawn point for deaths.
@@ -157,12 +154,16 @@ func activate_checkpoint(cp: Checkpoint, announce := true) -> void:
 		Events.checkpoint_activated.emit(cp)
 
 
-## Dedicated healing: resting at a checkpoint fully restores health.
+## Explicit save (E or Down at a flame): the checkpoint becomes the respawn
+## point, the player snaps to its exact center and health is fully restored.
 ## No text is shown; the optional tablet before each flame explains it.
-func rest_at_checkpoint(cp: Checkpoint) -> void:
+func save_at_checkpoint(cp: Checkpoint) -> void:
 	activate_checkpoint(cp, cp != current_checkpoint)
+	player.global_position = cp.get_respawn_position()
+	player.velocity = Vector2.ZERO
+	player.safe_point = cp.get_respawn_position()
 	player.health.full_heal()
-	player.velocity.x = 0.0
+	player.at_checkpoint = true
 	Events.player_rested.emit(cp)
 
 
@@ -181,7 +182,11 @@ func _update_interaction() -> void:
 	for it in interactables:
 		it.highlighted = it == best
 	focused_interactable = best
-	if best and input.was_pressed(&"interact") and player.can_attack():
+	if best == null or not player.can_attack():
+		return
+	# Checkpoints also save with Down while standing on the ground.
+	var down_save := best is Checkpoint and player.grounded and input.was_pressed(&"move_down")
+	if input.was_pressed(&"interact") or down_save:
 		best.interact(self)
 
 

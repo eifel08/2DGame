@@ -10,6 +10,7 @@ var controller: Object
 func enter(params: Dictionary) -> void:
 	controller = params["controller"]
 	p.is_jumping = false
+	p.wall_sliding = false
 	if controller.get("invulnerable"):
 		p.health.set_invulnerable("ability", true)
 	controller.control_start(p)

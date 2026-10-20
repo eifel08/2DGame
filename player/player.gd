@@ -30,7 +30,8 @@ var fsm := StateMachine.new()
 var facing := 1
 var grounded := false
 var wall_dir := 0
-var at_checkpoint := false ## True while standing at the active checkpoint (loadout swaps allowed).
+var at_checkpoint := false ## True while standing at the saved checkpoint (loadout swaps allowed).
+var wall_sliding := false
 var is_channeling_heal := false
 var attack_dir := "" ## Written by CombatManager: "", "left", "right", "up", "down".
 var facing_locked := false ## Written by CombatManager during attacks.
@@ -76,6 +77,7 @@ func reset() -> void:
 	grounded = false
 	wall_dir = 0
 	at_checkpoint = false
+	wall_sliding = false
 	is_channeling_heal = false
 	attack_dir = ""
 	facing_locked = false
@@ -202,16 +204,23 @@ func jump(jump_velocity: float, kind: String) -> void:
 	Events.player_jumped.emit(self, kind)
 
 
+## Wall jumps have a fixed height (a quick tap is not cut short), so walls
+## feel crisp. Holding toward the wall gives a "climb jump": a smaller push
+## and a shorter control lock, so the player can steer straight back into
+## the same wall and climb it with consecutive wall jumps.
 func wall_jump(from_wall_dir: int) -> void:
 	var m = Config.movement
-	velocity = Vector2(-from_wall_dir * m.wall_jump_vel_x, -m.wall_jump_vel_y)
+	var climbing := input.axis_x() == from_wall_dir
+	var push: float = m.wall_climb_jump_vel_x if climbing else m.wall_jump_vel_x
+	velocity = Vector2(-from_wall_dir * push, -m.wall_jump_vel_y)
 	facing = -from_wall_dir
-	is_jumping = true
+	wall_sliding = false
+	is_jumping = false
 	air_jumps_used = 0 # A wall jump refreshes air resources.
 	air_dash_used = false
 	jump_buffer_timer = 0.0
 	wall_coyote_timer = 0.0
-	wall_jump_lock_timer = m.wall_jump_lock_time
+	wall_jump_lock_timer = m.wall_climb_lock_time if climbing else m.wall_jump_lock_time
 	Events.player_jumped.emit(self, "wall")
 
 

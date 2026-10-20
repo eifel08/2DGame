@@ -58,10 +58,20 @@ func _draw() -> void:
 
 	# Health
 	_label(font, "HP", Vector2(x, y + 12))
+	var max_hp := h.get_max_health()
 	_bar(Rect2(bx, y, BAR_W, 14), [
-		[ghost_health / h.get_max_health(), Color(1, 1, 1, 0.33)],
-		[smooth_health / h.get_max_health(), Color.WHITE if damage_flash > 0.0 else Color("#ff5e6c")],
+		[ghost_health / max_hp, Color(1.0, 0.37, 0.42, 0.35)],
+		[smooth_health / max_hp, Color("#ffc2c8") if damage_flash > 0.0 else Color("#ff5e6c")],
 	])
+	# Pending heal: the chunk being channeled, in white. It only becomes red
+	# health when the chunk completes; an interrupted chunk makes it vanish.
+	var red_end := minf(smooth_health, h.health)
+	var pending_end := h.health + h.pending_heal
+	if pending_end > red_end + 0.01:
+		var x0 := bx + BAR_W * clampf(red_end / max_hp, 0.0, 1.0)
+		var x1 := bx + BAR_W * clampf(pending_end / max_hp, 0.0, 1.0)
+		var pulse := 0.75 + 0.25 * sin(Time.get_ticks_msec() / 80.0)
+		draw_rect(Rect2(x0, y, x1 - x0, 14), Color(1, 1, 1, pulse))
 	if stats:
 		draw_string(font, Vector2(bx + BAR_W + 8, y + 12), "%.1f / %.0f" % [h.health, h.get_max_health()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd0d0"))

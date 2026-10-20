@@ -1,6 +1,6 @@
-[gd_resource type="AnimationLibrary" load_steps=12 format=3]
+[gd_resource type="AnimationLibrary" load_steps=13 format=3]
 
-[sub_resource type="Animation" id="Animation_cufg3"]
+[sub_resource type="Animation" id="Animation_6pnll"]
 length = 0.8
 loop_mode = 1
 tracks/0/type = "value"
@@ -64,7 +64,7 @@ tracks/4/keys = {
 "values": [0.6]
 }
 
-[sub_resource type="Animation" id="Animation_w78dw"]
+[sub_resource type="Animation" id="Animation_5g6lh"]
 length = 0.571429
 loop_mode = 1
 tracks/0/type = "value"
@@ -145,7 +145,7 @@ tracks/5/keys = {
 }]
 }
 
-[sub_resource type="Animation" id="Animation_amjp7"]
+[sub_resource type="Animation" id="Animation_rpl7m"]
 length = 0.2
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -208,7 +208,7 @@ tracks/4/keys = {
 "values": [0.6]
 }
 
-[sub_resource type="Animation" id="Animation_u0n3t"]
+[sub_resource type="Animation" id="Animation_p167m"]
 length = 0.25
 loop_mode = 1
 tracks/0/type = "value"
@@ -272,7 +272,71 @@ tracks/4/keys = {
 "values": [0.6]
 }
 
-[sub_resource type="Animation" id="Animation_hwwdh"]
+[sub_resource type="Animation" id="Animation_5v6lb"]
+length = 0.333333
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Flip/Rig:scale")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [Vector2(0.9, 1.04)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Flip/Rig:skew")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.1]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("Flip/Rig/Body:color")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [Color(0.435294, 0.721569, 0.878431, 1)]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("Flip/Rig/Arm:visible")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [false]
+}
+tracks/4/type = "value"
+tracks/4/imported = false
+tracks/4/enabled = true
+tracks/4/path = NodePath("Flip/Rig/Arm:rotation")
+tracks/4/interp = 1
+tracks/4/loop_wrap = true
+tracks/4/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 0,
+"values": [0.6]
+}
+
+[sub_resource type="Animation" id="Animation_e171n"]
 length = 0.15
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -335,7 +399,7 @@ tracks/4/keys = {
 "values": [0.6]
 }
 
-[sub_resource type="Animation" id="Animation_wcjnq"]
+[sub_resource type="Animation" id="Animation_fccmv"]
 length = 0.222222
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -412,7 +476,7 @@ tracks/5/keys = {
 }]
 }
 
-[sub_resource type="Animation" id="Animation_eaow7"]
+[sub_resource type="Animation" id="Animation_7pu7c"]
 length = 0.222222
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -489,7 +553,7 @@ tracks/5/keys = {
 }]
 }
 
-[sub_resource type="Animation" id="Animation_bmagi"]
+[sub_resource type="Animation" id="Animation_31kpo"]
 length = 0.222222
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -566,7 +630,7 @@ tracks/5/keys = {
 }]
 }
 
-[sub_resource type="Animation" id="Animation_u8ggx"]
+[sub_resource type="Animation" id="Animation_ydhvj"]
 length = 0.5
 loop_mode = 1
 tracks/0/type = "value"
@@ -630,7 +694,7 @@ tracks/4/keys = {
 "values": [0.6]
 }
 
-[sub_resource type="Animation" id="Animation_trrf2"]
+[sub_resource type="Animation" id="Animation_lsoij"]
 length = 0.416667
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -693,7 +757,7 @@ tracks/4/keys = {
 "values": [0.6]
 }
 
-[sub_resource type="Animation" id="Animation_ie1qy"]
+[sub_resource type="Animation" id="Animation_nlh88"]
 length = 0.166667
 tracks/0/type = "value"
 tracks/0/imported = false
@@ -758,15 +822,16 @@ tracks/4/keys = {
 
 [resource]
 _data = {
-"attack_down": SubResource("Animation_bmagi"),
-"attack_side": SubResource("Animation_wcjnq"),
-"attack_up": SubResource("Animation_eaow7"),
-"cast": SubResource("Animation_trrf2"),
-"dash": SubResource("Animation_hwwdh"),
-"fall": SubResource("Animation_u0n3t"),
-"heal": SubResource("Animation_u8ggx"),
-"hurt": SubResource("Animation_ie1qy"),
-"idle": SubResource("Animation_cufg3"),
-"jump": SubResource("Animation_amjp7"),
-"run": SubResource("Animation_w78dw")
+"attack_down": SubResource("Animation_31kpo"),
+"attack_side": SubResource("Animation_fccmv"),
+"attack_up": SubResource("Animation_7pu7c"),
+"cast": SubResource("Animation_lsoij"),
+"dash": SubResource("Animation_e171n"),
+"fall": SubResource("Animation_p167m"),
+"heal": SubResource("Animation_ydhvj"),
+"hurt": SubResource("Animation_nlh88"),
+"idle": SubResource("Animation_6pnll"),
+"jump": SubResource("Animation_rpl7m"),
+"run": SubResource("Animation_5g6lh"),
+"wall_slide": SubResource("Animation_5v6lb")
 }

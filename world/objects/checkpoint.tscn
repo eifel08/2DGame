@@ -6,7 +6,7 @@
 [node name="Checkpoint" type="Node2D"]
 z_index = 1
 script = ExtResource("1_checkpoint")
-prompt = "Rest"
+prompt = "Save"
 interact_size = Vector2(56, 64)
 
 [node name="Visual" type="Node2D" parent="."]

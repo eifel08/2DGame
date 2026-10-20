@@ -5,33 +5,36 @@ extends CanvasLayer
 ##   Abilities - the 4 hotkey slots (top) and every unlocked ability (bottom)
 ##
 ## Keyboard only, no mouse needed:
-##   Q / E (or PgUp / PgDn)  switch tab
-##   Arrow keys              move between cards
-##   Enter / Space           on a slot: select it, then pick an ability below
-##                           on an ability: equip it into the selected slot
-##                           on the empty card: clear the selected slot
-##   Backspace / Delete      clear the selected slot
-## Loadout changes only work while standing at a checkpoint.
+##   Left / Right on the tab row      switch tab (also Q / E, PgUp / PgDn)
+##   Down / Up                        move between the tab row and the cards
+##   Arrow keys                       move between cards
+##   Z / Enter / Space (confirm)
+##     on an equipped ability (slot or grid)  unequip it
+##     on an unequipped ability (grid)        then choose slot 1-4; an occupied
+##                                            slot is replaced
+##   Backspace / Delete               cancel the slot choice, or clear the focused slot
+## Loadout changes only work while standing at the saved checkpoint.
 ## The game simulation is paused while the window is open.
 
+const STATUS_TAB := 0
 const ABILITIES_TAB := 1
 
 var game: Node
 var panel: PanelContainer
 var tabs: TabContainer
+var tab_bar: TabBar
 var shards_label: Label
 var health_bar: StatBar
 var energy_bar: StatBar
 var slot_cards: Array[AbilityCard] = []
 var pool_cards: Array[AbilityCard] = []
-var empty_card: AbilityCard
 var pool_grid: GridContainer
 var detail_icon: AbilityIcon
 var detail_name: Label
 var detail_desc: Label
 var detail_gauge: EnergyGauge
 var notice_label: Label
-var selected_slot := 0
+var pending_ability_id := "" ## Ability waiting for a slot choice.
 
 
 func setup(p_game: Node) -> void:
@@ -49,10 +52,11 @@ func is_open() -> bool:
 
 func toggle() -> void:
 	panel.visible = not panel.visible
+	pending_ability_id = ""
 	if panel.visible:
 		_rebuild_pool()
 		refresh()
-		_focus_default()
+		tab_bar.grab_focus() # Left / Right switches tabs right away.
 	else:
 		get_viewport().gui_release_focus()
 
@@ -67,7 +71,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"menu_next_tab"):
 		switch_tab(1)
 	elif event.is_action_pressed(&"menu_clear") and tabs.current_tab == ABILITIES_TAB:
-		clear_selected_slot()
+		_on_clear_pressed()
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -75,48 +79,60 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func switch_tab(step: int) -> void:
 	tabs.current_tab = posmod(tabs.current_tab + step, tabs.get_tab_count())
-	_focus_default()
+	tab_bar.grab_focus()
 
 
-func _focus_default() -> void:
-	if tabs.current_tab == ABILITIES_TAB:
-		slot_cards[selected_slot].grab_focus()
-	else:
-		get_viewport().gui_release_focus()
+func _on_tab_changed(_tab: int) -> void:
+	pending_ability_id = ""
+	if is_open():
+		refresh()
 
 
-# ---------- Actions ----------
+# ---------- Loadout actions ----------
 
-func select_slot(slot: int) -> void:
-	selected_slot = slot
+## Confirm on a top slot.
+func press_slot(slot: int) -> void:
+	var manager: UltimateManager = game.ultimates
+	if pending_ability_id != "":
+		# Assign the chosen ability here (an occupied slot is replaced).
+		if manager.equip(slot, pending_ability_id):
+			pending_ability_id = ""
+		else:
+			_flash_notice()
+	elif manager.get_slot(slot) != null:
+		if not manager.unequip(slot): # Confirm on an equipped slot unequips it.
+			_flash_notice()
 	refresh()
-	if not game.ultimates.can_change_loadout():
+
+
+## Confirm on an ability in the lower grid.
+func press_pool(ability: UltimateAbility) -> void:
+	var manager: UltimateManager = game.ultimates
+	if not manager.can_change_loadout():
+		_flash_notice()
 		return
-	# Jump to the ability currently in this slot (or the first card).
-	var current: UltimateAbility = game.ultimates.get_slot(slot)
-	for card in pool_cards:
-		if card.ability == current:
-			card.grab_focus()
-			return
-	(pool_cards[0] if not pool_cards.is_empty() else empty_card).grab_focus()
-
-
-func equip_ability(ability_id: String) -> bool:
-	if not game.ultimates.equip(selected_slot, ability_id):
-		_flash_notice()
-		return false
+	var slot := manager.slot_of(ability.id)
+	if slot >= 0:
+		manager.unequip(slot) # Equipped -> unequip.
+		pending_ability_id = ""
+		refresh()
+		return
+	# Unequipped -> choose a slot: focus the first empty slot (or slot 1).
+	pending_ability_id = ability.id
 	refresh()
-	slot_cards[selected_slot].grab_focus()
-	return true
+	var target: int = game.player_data.equipped.find("")
+	slot_cards[target if target >= 0 else 0].grab_focus()
 
 
-func clear_selected_slot() -> bool:
-	if not game.ultimates.unequip(selected_slot):
-		_flash_notice()
-		return false
-	refresh()
-	slot_cards[selected_slot].grab_focus()
-	return true
+func _on_clear_pressed() -> void:
+	if pending_ability_id != "":
+		pending_ability_id = ""
+		refresh()
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	var slot := slot_cards.find(focus)
+	if slot >= 0:
+		press_slot(slot)
 
 
 func _flash_notice() -> void:
@@ -132,35 +148,44 @@ func refresh() -> void:
 	var h := p.health
 	var manager: UltimateManager = game.ultimates
 	var max_energy := h.get_max_energy()
-	var can_swap := manager.can_change_loadout()
 
 	shards_label.text = str(game.player_data.currency)
 	health_bar.set_values(h.health, h.get_max_health(), Config.vitals.max_health, Color("#ff5e6c"))
 	energy_bar.set_values(h.energy, max_energy, Config.vitals.max_energy, Color("#4fd1ff"))
 
 	for slot in slot_cards.size():
-		var card := slot_cards[slot]
-		card.show_ability(manager.get_slot(slot), max_energy, slot + 1)
-		card.button_pressed = slot == selected_slot
+		slot_cards[slot].show_ability(manager.get_slot(slot), max_energy, slot + 1)
+	# Every unlocked ability keeps a crisp icon; equipped ones show their key.
 	for card in pool_cards:
-		card.show_ability(card.ability, max_energy, 0, not can_swap)
-	empty_card.show_ability(null, max_energy, 0, not can_swap)
+		var slot := manager.slot_of(card.ability.id)
+		card.show_ability(card.ability, max_energy, slot + 1 if slot >= 0 else 0)
+		card.button_pressed = card.ability.id == pending_ability_id
 
-	if can_swap:
-		notice_label.text = "At a checkpoint: choose a slot, then an ability. The empty card clears the slot."
-		notice_label.add_theme_color_override("font_color", Color("#8dffb0"))
-	else:
-		notice_label.text = "Abilities can only be changed at a checkpoint."
+	if not manager.can_change_loadout():
+		notice_label.text = "Abilities can only be changed at your saved checkpoint."
 		notice_label.add_theme_color_override("font_color", Color("#ffb3b3"))
-	_show_details(manager.get_slot(selected_slot))
+	elif pending_ability_id != "":
+		notice_label.text = "Choose a key slot for %s. An occupied slot is replaced. Backspace cancels." \
+			% manager.get_ability(pending_ability_id).display_name
+		notice_label.add_theme_color_override("font_color", Color("#ffd36b"))
+	else:
+		notice_label.text = "Confirm an equipped ability to remove it. Confirm a free one, then pick its slot."
+		notice_label.add_theme_color_override("font_color", Color("#8dffb0"))
+	var focus := get_viewport().gui_get_focus_owner() if get_viewport() else null
+	if focus is AbilityCard:
+		_show_details(focus.ability)
+	elif pending_ability_id != "":
+		_show_details(manager.get_ability(pending_ability_id))
+	else:
+		_show_details(manager.get_slot(0))
 
 
-## Name + description are only shown for the focused/selected ability.
+## Name + description are only shown for the focused ability.
 func _show_details(ability: UltimateAbility) -> void:
 	if ability == null:
 		detail_icon.set_icon("empty", Color.WHITE)
-		detail_name.text = "Empty slot"
-		detail_desc.text = "No ability is assigned to this key."
+		detail_name.text = "Free slot"
+		detail_desc.text = "Choose an ability below to place it on this key."
 		detail_gauge.visible = false
 		return
 	detail_icon.set_icon(ability.icon, ability.color)
@@ -182,11 +207,11 @@ func _rebuild_pool() -> void:
 	for ability in abilities:
 		var card := AbilityCard.new()
 		card.ability = ability
-		card.pressed.connect(func() -> void: equip_ability(card.ability.id))
+		card.toggle_mode = true
+		card.pressed.connect(func() -> void: press_pool(card.ability))
 		card.focus_entered.connect(func() -> void: _show_details(card.ability))
 		pool_grid.add_child(card)
 		pool_cards.append(card)
-	pool_grid.move_child(empty_card, -1)
 
 
 # ---------- Construction ----------
@@ -223,13 +248,15 @@ func _build() -> void:
 
 	tabs = TabContainer.new()
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	tabs.get_tab_bar().focus_mode = Control.FOCUS_NONE
+	tab_bar = tabs.get_tab_bar()
+	tab_bar.focus_mode = Control.FOCUS_ALL # Left / Right on the tab row switches tabs.
 	root.add_child(tabs)
 	tabs.add_child(_build_status_tab())
 	tabs.add_child(_build_abilities_tab())
+	tabs.tab_changed.connect(_on_tab_changed) # After the tabs exist.
 
 	var keys := Label.new()
-	keys.text = "Q / E  tab    Arrows  move    Enter  select    Backspace  clear slot    I / Tab / Esc  close"
+	keys.text = "Left / Right  tab    Down / Up  move    Z / Enter  confirm    Backspace  cancel    I / Tab / Esc  close"
 	keys.add_theme_font_size_override("font_size", 10)
 	keys.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	root.add_child(keys)
@@ -276,10 +303,11 @@ func _build_abilities_tab() -> Control:
 	box.add_child(slots)
 	for slot in PlayerData.SLOT_COUNT: # Left to right: keys 1, 2, 3, 4.
 		var card := AbilityCard.new()
-		card.toggle_mode = true
 		var s := slot
-		card.pressed.connect(func() -> void: select_slot(s))
-		card.focus_entered.connect(func() -> void: _show_details(game.ultimates.get_slot(s)))
+		card.pressed.connect(func() -> void: press_slot(s))
+		card.focus_entered.connect(func() -> void:
+			if pending_ability_id == "":
+				_show_details(game.ultimates.get_slot(s)))
 		slots.add_child(card)
 		slot_cards.append(card)
 
@@ -288,10 +316,6 @@ func _build_abilities_tab() -> Control:
 	pool_grid.columns = 6
 	pool_grid.add_theme_constant_override("h_separation", 8)
 	box.add_child(pool_grid)
-	empty_card = AbilityCard.new()
-	empty_card.pressed.connect(func() -> void: clear_selected_slot())
-	empty_card.focus_entered.connect(func() -> void: _show_details(null))
-	pool_grid.add_child(empty_card)
 
 	# Detail area: enough fixed height that the last line is never clipped.
 	var detail := HBoxContainer.new()

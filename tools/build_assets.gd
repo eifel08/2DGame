@@ -78,6 +78,7 @@ const PLAYER_ANIMS := {
 	"run": {"frames": 8, "fps": 14, "loop": true, "color": "#7fd1ff", "sx": 1.02, "sy": 0.98, "bob": 3.0, "lean": 0.12, "events": {2: "footstep", 6: "footstep"}},
 	"jump": {"frames": 2, "fps": 10, "loop": false, "color": "#9fe0ff", "sx": 0.82, "sy": 1.14},
 	"fall": {"frames": 2, "fps": 8, "loop": true, "color": "#9fe0ff", "sx": 0.92, "sy": 1.06, "bob": 1.0},
+	"wall_slide": {"frames": 2, "fps": 6, "loop": true, "color": "#6fb8e0", "sx": 0.9, "sy": 1.04, "lean": -0.1},
 	"dash": {"frames": 3, "fps": 20, "loop": false, "color": "#ffffff", "sx": 1.45, "sy": 0.72, "lean": 0.25},
 	"attack_side": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 1.12, "sy": 0.94, "lean": 0.18, "arm": [-1.6, 0.9], "events": {1: "swing"}},
 	"attack_up": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 0.88, "sy": 1.12, "arm": [-0.3, -2.8], "events": {1: "swing"}},
@@ -176,6 +177,12 @@ func _build_input_map() -> void:
 		"menu_prev_tab": [_key(KEY_Q), _key(KEY_PAGEUP), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
 		"menu_next_tab": [_key(KEY_E), _key(KEY_PAGEDOWN), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
 		"menu_clear": [_key(KEY_BACKSPACE), _key(KEY_DELETE), _joy_button(JOY_BUTTON_X)],
+		# Built-in UI actions, extended so menus also work with WASD and Z.
+		"ui_accept": [_key(KEY_ENTER), _key(KEY_KP_ENTER), _key(KEY_SPACE), _key(KEY_Z), _joy_button(JOY_BUTTON_A)],
+		"ui_left": [_key(KEY_LEFT), _key(KEY_A), _joy_button(JOY_BUTTON_DPAD_LEFT), _joy_axis(JOY_AXIS_LEFT_X, -1.0)],
+		"ui_right": [_key(KEY_RIGHT), _key(KEY_D), _joy_button(JOY_BUTTON_DPAD_RIGHT), _joy_axis(JOY_AXIS_LEFT_X, 1.0)],
+		"ui_up": [_key(KEY_UP), _key(KEY_W), _joy_button(JOY_BUTTON_DPAD_UP), _joy_axis(JOY_AXIS_LEFT_Y, -1.0)],
+		"ui_down": [_key(KEY_DOWN), _key(KEY_S), _joy_button(JOY_BUTTON_DPAD_DOWN), _joy_axis(JOY_AXIS_LEFT_Y, 1.0)],
 	}
 	for obsolete in ["ultimate", "cycle_ultimate"]:
 		if ProjectSettings.has_setting("input/" + obsolete):

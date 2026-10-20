@@ -2,7 +2,7 @@ class_name HealthEnergy
 extends Node
 ## Owns health, the single shared energy meter and invulnerability.
 ## It knows nothing about combat or input: other systems call its methods
-## (gain_energy_from_hit, spend_energy, channel_heal...) and listen to Events.
+## (gain_energy_from_hit, spend_energy, channel_heal_chunk...) and listen to Events.
 
 var health := 100.0
 var energy := 0.0
@@ -29,6 +29,7 @@ func reset() -> void:
 	energy = 0.0
 	iframe_timer = 0.0
 	invuln_flags.clear()
+	pending_heal = 0.0
 	Events.energy_changed.emit(energy)
 
 
@@ -80,19 +81,48 @@ func full_heal() -> void:
 	heal(get_max_health())
 
 
-func can_heal() -> bool:
-	return health < get_max_health() and energy > 0.0
+# ---------- Chunk healing ----------
+# Healing comes in whole chunks. While a chunk channels, energy drains and the
+# health it will give shows as `pending_heal` (the white segment on the bar).
+# Only a completed chunk turns pending health into real health; an
+# interrupted chunk loses the drained energy and restores nothing.
+
+var pending_heal := 0.0 ## Health shown in white while a chunk is channeling.
+var _chunk_drained := 0.0
 
 
-## Converts energy into health for one frame of channeling.
-## Returns false when channeling must stop (full health or empty meter).
-func channel_heal(delta: float) -> bool:
-	if not can_heal():
-		return false
-	var spent := minf(energy, Config.vitals.heal_energy_per_second * delta)
-	set_energy(energy - spent)
-	heal(spent * Config.vitals.health_per_energy)
-	return can_heal()
+func can_start_heal_chunk() -> bool:
+	return health < get_max_health() and energy >= Config.vitals.heal_chunk_energy - 0.0001
+
+
+func start_heal_chunk() -> void:
+	pending_heal = 0.0
+	_chunk_drained = 0.0
+
+
+## Advances the current chunk to `progress` (0..1), draining energy in step.
+func channel_heal_chunk(progress: float) -> void:
+	var v = Config.vitals
+	var target_drain: float = v.heal_chunk_energy * clampf(progress, 0.0, 1.0)
+	var drain := minf(target_drain - _chunk_drained, energy)
+	if drain > 0.0:
+		_chunk_drained += drain
+		set_energy(energy - drain)
+	pending_heal = minf(v.heal_chunk_health * clampf(progress, 0.0, 1.0), get_max_health() - health)
+
+
+## The chunk finished: pending health becomes real health.
+func complete_heal_chunk() -> float:
+	var amount := heal(Config.vitals.heal_chunk_health)
+	pending_heal = 0.0
+	_chunk_drained = 0.0
+	return amount
+
+
+## The chunk was interrupted: the energy is gone and nothing is restored.
+func cancel_heal_chunk() -> void:
+	pending_heal = 0.0
+	_chunk_drained = 0.0
 
 
 # ---------- Energy ----------
