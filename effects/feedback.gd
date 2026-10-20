@@ -16,6 +16,7 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.hit_landed.connect(_on_hit)
 	Events.pogo_bounced.connect(_on_pogo)
 	Events.player_hurt.connect(_on_player_hurt)
+	Events.player_hazard_respawn.connect(_on_hazard_respawn)
 	Events.player_jumped.connect(_on_player_jumped)
 	Events.player_landed.connect(_on_player_landed)
 	Events.player_dashed.connect(_on_player_dashed)
@@ -63,8 +64,10 @@ func _on_hit(info: Dictionary) -> void:
 	freeze(c.hitstop_on_hit * s)
 	camera.add_trauma(c.shake_on_hit * s)
 	effects.burst(info.position, {"count": 8 + int(round(6 * s)), "color": Color("#fff3c4"), "speed": 320.0, "life": 0.3})
-	var col := Color.WHITE if info.source == "melee" else Color("#ffd36b")
-	effects.float_text(info.position + Vector2(0, -18), str(roundi(info.damage)), col)
+	# Exact damage numbers are debug data (see Config.stats_visible()).
+	if Config.stats_visible():
+		var col := Color.WHITE if info.source == "melee" else Color("#ffd36b")
+		effects.float_text(info.position + Vector2(0, -18), "%.1f" % info.damage if fmod(info.damage, 1.0) != 0.0 else str(int(info.damage)), col)
 
 
 func _on_pogo(pos: Vector2, on_hazard: bool) -> void:
@@ -81,6 +84,13 @@ func _on_player_hurt(player: Node, _damage: float) -> void:
 	freeze(Config.combat.hitstop_on_hurt)
 	camera.add_trauma(Config.combat.shake_on_hurt)
 	effects.burst(player.get_center(), {"count": 16, "color": Color("#ff6b6b"), "speed": 300.0, "size": 5.0})
+
+
+func _on_hazard_respawn(_player: Node, from_position: Vector2, to_position: Vector2) -> void:
+	freeze(Config.combat.hitstop_on_hurt)
+	camera.add_trauma(Config.combat.shake_on_hurt)
+	effects.burst(from_position + Vector2(0, -20), {"count": 18, "color": Color("#ff6b6b"), "speed": 280.0, "size": 5.0})
+	effects.ring(to_position + Vector2(0, -20), {"radius": 40.0, "color": Color("#bff6ff"), "width": 4.0, "life": 0.4})
 
 
 func _on_player_jumped(player: Node, kind: String) -> void:

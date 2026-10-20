@@ -163,3 +163,6 @@ func _draw() -> void:
 	var bar := Rect2(-w / 2.0, -size.y - 10.0, w, 4.0)
 	draw_rect(bar, Color(0, 0, 0, 0.6))
 	draw_rect(Rect2(bar.position, Vector2(w * health / max_health, 4.0)), Color("#ff6b6b"))
+	if Config.stats_visible():
+		draw_string(ThemeDB.fallback_font, bar.position + Vector2(-20, -3), "%d/%d" % [ceili(health), roundi(max_health)],
+			HORIZONTAL_ALIGNMENT_CENTER, w + 40, 10, Color("#ffd0d0"))

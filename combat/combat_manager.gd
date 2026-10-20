@@ -215,7 +215,7 @@ func _resolve_hazards() -> void:
 	var p := get_player()
 	var r := p.get_rect().grow_individual(-2.0, -4.0, -2.0, 0.0)
 	if get_room().find_hazard(r).has_area():
-		p.receive_hit(Config.combat.hazard_damage, p.global_position.x - p.facing, true)
+		p.hazard_respawn(Config.combat.hazard_damage)
 
 
 # ---------- Drawing ----------
@@ -254,6 +254,11 @@ func _draw_hitboxes() -> void:
 	draw_rect(p.get_rect(), Color("#4dabf7") if p.health.is_invulnerable() else Color("#69db7c"), false, 1.0)
 	for enemy in get_enemies():
 		draw_rect(enemy.get_rect(), Color("#ffa94d"), false, 1.0)
+	# Hazard respawn target.
+	var sp := p.safe_point
+	draw_line(sp + Vector2(-8, 0), sp + Vector2(8, 0), Color("#69db7c"), 2.0)
+	draw_line(sp, sp + Vector2(0, -20), Color("#69db7c"), 1.0)
+	draw_string(ThemeDB.fallback_font, sp + Vector2(-30, -24), "safe point", HORIZONTAL_ALIGNMENT_CENTER, 60, 9, Color("#69db7c"))
 	if not attack.is_empty():
 		var active: bool = attack.t >= c.attack_active_start and attack.t <= c.attack_active_end
 		draw_rect(get_attack_hitbox(attack.dir), Color("#ff3b3b") if active else Color(1, 1, 1, 0.4), false, 1.0)

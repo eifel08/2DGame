@@ -10,7 +10,7 @@ const TOGGLES := [
 	["upgrades.dash", "Dash"],
 	["upgrades.wall_jump", "Wall Slide / Jump"],
 	["upgrades.god_mode", "God Mode"],
-	["debug.show_hitboxes", "Show Hitboxes"],
+	["debug.show_hitboxes", "Hitboxes & Stats"],
 	["debug.show_anim_labels", "Anim States"],
 	["debug.screen_shake", "Screen Shake"],
 	["debug.paused", "Pause"],
@@ -62,6 +62,7 @@ func setup(p_game: Node) -> void:
 
 func toggle() -> void:
 	panel.visible = not panel.visible
+	Config.debug.overlay_open = panel.visible
 	if panel.visible:
 		refresh()
 
@@ -220,6 +221,7 @@ func _slider(def: Dictionary) -> HBoxContainer:
 
 ## Pulls current Config values into the controls.
 func refresh() -> void:
+	Config.debug.overlay_open = panel.visible
 	for b in _bindings:
 		var v: Variant = Config.get_value(b.path)
 		if b.control is CheckBox:

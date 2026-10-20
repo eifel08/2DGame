@@ -1,13 +1,15 @@
 class_name Hud
 extends Control
-## Screen-space HUD: health, the shared energy meter with a cost marker for
-## every ultimate, the equipped ultimate, dash cooldown and control hints.
+## Screen-space HUD: a smooth health bar, the shared energy meter with a cost
+## marker for every ultimate, the equipped ultimate, dash cooldown and hints.
+## Exact numbers (health, energy) appear only when Config.stats_visible().
 
 const BAR_W := 260.0
 
 var player: Player
 var ultimates: UltimateManager
-var display_health := -1.0 ## Trailing "ghost" bar that shows recent damage.
+var smooth_health := -1.0 ## Main bar: eases toward the real value.
+var ghost_health := -1.0 ## Trailing bar that shows recent damage.
 var denied_flash := 0.0
 var damage_flash := 0.0
 
@@ -25,10 +27,11 @@ func _process(delta: float) -> void:
 	denied_flash -= delta
 	damage_flash -= delta
 	var hp := player.health.health
-	if display_health < hp:
-		display_health = hp
-	else:
-		display_health = lerpf(display_health, hp, minf(1.0, delta * 4.0))
+	if smooth_health < 0.0:
+		smooth_health = hp
+		ghost_health = hp
+	smooth_health = lerpf(smooth_health, hp, minf(1.0, delta * 14.0))
+	ghost_health = hp if ghost_health < hp else lerpf(ghost_health, hp, minf(1.0, delta * 3.0))
 	queue_redraw()
 
 
@@ -43,11 +46,13 @@ func _draw() -> void:
 	# Health
 	_label(font, "HP", Vector2(x, y + 12))
 	_bar(Rect2(x + 28, y, BAR_W, 14), [
-		[display_health / h.get_max_health(), Color(1, 1, 1, 0.33)],
-		[h.health / h.get_max_health(), Color.WHITE if damage_flash > 0.0 else Color("#ff5e6c")],
+		[ghost_health / h.get_max_health(), Color(1, 1, 1, 0.33)],
+		[smooth_health / h.get_max_health(), Color.WHITE if damage_flash > 0.0 else Color("#ff5e6c")],
 	])
-	draw_string(font, Vector2(x + 28, y + 12), "%d/%d" % [ceili(h.health), roundi(h.get_max_health())],
-		HORIZONTAL_ALIGNMENT_RIGHT, BAR_W - 4, 11)
+	var stats := Config.stats_visible()
+	if stats:
+		draw_string(font, Vector2(x + 28 + BAR_W + 8, y + 12), "%.1f / %.0f" % [h.health, h.get_max_health()],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd0d0"))
 
 	# Energy
 	var ey := y + 22.0
@@ -60,6 +65,9 @@ func _draw() -> void:
 		energy_col = Color("#8dffb0")
 	_label(font, "EN", Vector2(x, ey + 12))
 	_bar(Rect2(x + 28, ey, BAR_W, 14), [[h.energy / h.get_max_energy(), energy_col]])
+	if stats:
+		draw_string(font, Vector2(x + 28 + BAR_W + 8, ey + 12), "%.1f / %.0f" % [h.energy, h.get_max_energy()],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c8f4ff"))
 	# Cost markers for every ultimate; the equipped one is highlighted.
 	for ability in ultimates.abilities:
 		var mx := x + 28.0 + BAR_W * minf(1.0, ability.get_cost() / h.get_max_energy())

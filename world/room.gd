@@ -61,6 +61,17 @@ func standing_on_one_way_only(rect: Rect2) -> bool:
 	return any_one_way
 
 
+## Safe ground for hazard respawns: both feet supported by real floor and no
+## hazard within ~1.5 tiles to either side or just below.
+func is_safe_ground(rect: Rect2) -> bool:
+	var y := rect.end.y + 2.0
+	if not is_ground_at(Vector2(rect.position.x + 1.0, y)) or not is_ground_at(Vector2(rect.end.x - 1.0, y)):
+		return false
+	var margin := float(tiles.tile_set.tile_size.x) * 1.5
+	var probe := Rect2(rect.position.x - margin, rect.end.y - 4.0, rect.size.x + margin * 2.0, 40.0)
+	return not find_hazard(probe).has_area()
+
+
 ## Spikes only occupy the lower part of their tile.
 func hazard_rect_for_cell(cell: Vector2i) -> Rect2:
 	var ts := Vector2(tiles.tile_set.tile_size)

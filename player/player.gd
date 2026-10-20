@@ -23,6 +23,7 @@ const ONE_WAY_LAYER := 3 ## Physics layer number used by one-way platforms.
 var input: InputState
 var room: Room
 var spawn_position := Vector2.ZERO
+var safe_point := Vector2.ZERO ## Last safe ground position (hazard respawn target).
 var fsm := StateMachine.new()
 
 # Public state read by combat, animation, HUD and debug.
@@ -69,6 +70,7 @@ func setup(p_input: InputState, p_room: Room, p_spawn: Vector2) -> void:
 
 func reset() -> void:
 	global_position = spawn_position
+	safe_point = spawn_position
 	velocity = Vector2.ZERO
 	facing = 1
 	grounded = false
@@ -171,6 +173,8 @@ func move(delta: float) -> void:
 		air_dash_used = false
 		if not was_grounded:
 			Events.player_landed.emit(self, fall_speed)
+		if room.is_safe_ground(get_rect()):
+			safe_point = global_position
 	else:
 		coyote_timer -= delta
 
@@ -254,6 +258,30 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 	if health.health <= 0.0:
 		Events.player_died.emit(self)
 	return true
+
+
+## Touching a hazard: take damage (unless invulnerable) and teleport back to
+## the last safe ground. Teleporting even when invulnerable (dash, god mode,
+## i-frames) guarantees the player can never get stuck inside a hazard.
+func hazard_respawn(damage: float) -> void:
+	var from := global_position
+	var took_damage := not health.is_invulnerable()
+	if took_damage:
+		health.take_damage(damage)
+	else:
+		health.iframe_timer = maxf(health.iframe_timer, 0.4)
+	global_position = safe_point
+	velocity = Vector2.ZERO
+	grounded = false
+	is_jumping = false
+	set_collision_mask_value(ONE_WAY_LAYER, true)
+	drop_through_timer = 0.0
+	fsm.change("normal")
+	Events.player_hazard_respawn.emit(self, from, safe_point)
+	if took_damage:
+		Events.player_hurt.emit(self, damage)
+		if health.health <= 0.0:
+			Events.player_died.emit(self)
 
 
 ## Called by method tracks in the AnimationPlayer (e.g. "footstep", "swing").

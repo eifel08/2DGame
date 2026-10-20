@@ -19,7 +19,7 @@ class Movement:
 	var air_decel := 1100.0
 	var turn_boost := 1.6 ## Extra acceleration when reversing direction.
 
-	var gravity := 2300.0
+	var gravity := 2100.0 ## Slightly low: more reaction time for pogo chains.
 	var fall_gravity_mul := 1.55 ## Heavier fall = less floaty arc.
 	var max_fall_speed := 760.0
 	var apex_threshold := 70.0 ## |vy| under this while holding jump = hang time.
@@ -77,6 +77,7 @@ class DebugFlags:
 	var screen_shake := true
 	var paused := false
 	var time_scale := 1.0
+	var overlay_open := false ## Set by the debug overlay while it is visible.
 
 
 var upgrades: Upgrades
@@ -104,6 +105,12 @@ func restore_defaults() -> void:
 		"ascendant_form": {"cost": 100.0, "cast_time": 0.6, "duration": 8.0, "damage_mul": 2.0, "speed_mul": 1.25, "range_mul": 1.45},
 		"comet_dash": {"cost": 25.0, "cast_time": 0.08, "speed": 1150.0, "duration": 0.3, "damage": 30.0, "burst_damage": 18.0, "burst_radius": 100.0},
 	}
+
+
+## Exact numbers (health, energy, damage) are shown only in debug mode:
+## when hitboxes/stats are toggled on, or while the debug overlay is open.
+func stats_visible() -> bool:
+	return debug.show_hitboxes or debug.overlay_open
 
 
 ## Reads a dotted path such as "movement.jump_velocity" or "ultimates.nova_burst.cost".

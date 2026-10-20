@@ -35,7 +35,7 @@ godot --path 2DGame
 | Heal (hold) | L / V (on the ground) | LB |
 | Ultimate | U / Q | Y |
 | Switch ultimate | Tab | Back / Select |
-| Debug overlay | F1 or ` (backquote) | Start |
+| Debug overlay | F1 or ` / ~ (backquote key) | Start |
 | Reset room | R | — |
 
 Bindings live in **Project → Project Settings → Input Map**.
@@ -51,13 +51,19 @@ Bindings live in **Project → Project Settings → Input Map**.
 | Wall slide / jump | Far-left shaft or the narrow right shaft. Hold toward the wall while falling, then jump. |
 | Dash + i-frames | Dash through a dummy. With *Show Hitboxes* on, the player box turns blue while invulnerable. |
 | Directional attacks | Attack sideways, with Up held, and with Down held in the air. |
-| Pogo | Down-attack the flying dummy above the spikes, or the spikes themselves. |
+| Pogo | Down-attack the flying dummy above the right spike pit, or the spikes themselves. Gravity is 2100 (slightly low) to give more reaction time. |
+| Hazards | Walk into a spike pit. You take damage and reappear on the last safe ground. With God Mode or i-frames you still reappear, without damage. |
 | Hitstop / shake | Hit anything. Tune both in the debug overlay. |
-| Contact damage + i-frames | Walk into a dummy. The player flickers for the i-frame time. |
+| Contact damage + i-frames | Walk into a dummy. You take damage, get knocked back and flicker for the i-frame time. |
+| Stats display | The HUD shows bars only. Turn on *Hitboxes & Stats* (or open the debug overlay) to see exact health, energy, enemy health, damage numbers and the safe point. |
 | Energy + heal | Hit dummies to fill EN. Hold L on the ground to turn energy into HP. |
 | Ultimates | Fill the meter (or *Max Energy*), press U. Tab switches. Ticks on the EN bar show each cost. |
 
 Dummies respawn 2.5 s after being destroyed. Dying respawns the player at the start.
+
+## Hazards and safe points
+
+While you stand on solid ground away from hazards, the game records that spot as your **safe point**. Touching spikes deals damage and moves you straight back to it, so you can never get stuck in a damage loop. Regular enemies work differently: they deal damage, knock you back and start the i-frames. The rule for safe ground is in `world/room.gd` (`is_safe_ground`).
 
 ## The four ultimates
 
@@ -104,8 +110,8 @@ effects/
   effects.gd           particles, rings, damage numbers, afterimages
 ui/                    HUD, debug overlay, parallax background
 world/
-  room.gd              world queries (solid, one-way, hazard, ground)
-  test_room.tscn       the test room (TileMapLayer + spawn markers)
+  room.gd              world queries (solid, one-way, hazard, ground, safe ground)
+  test_room.tscn       the test room (TileMapLayer, two spike pits, spawn markers)
   tiles/               tile atlas and TileSet
 scenes/main.tscn       main scene
 tools/build_assets.gd  regenerates rigs, animations, TileSet, room and input map
@@ -143,4 +149,4 @@ It then appears in the HUD, the Tab cycle and the debug overlay.
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It drives the game through real input actions and checks 31 behaviors: movement, jumps, dash, wall slide/jump, attacks, pogo, healing, all four ultimates, contact damage, i-frames and the debug toggles. Exit code 0 means all passed.
+It drives the game through real input actions and checks 43 behaviors: movement, jumps, dash, wall slide/jump, attacks, pogo (on enemies and spikes), healing, all four ultimates, contact damage, i-frames, hazard respawn, the stats display and the debug toggles. Exit code 0 means all passed.

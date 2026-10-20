@@ -164,11 +164,80 @@ func _run() -> void:
 	_check("contact damage", p.health.health < p.health.get_max_health(), p.health.health)
 	_check("i-frames after hit", p.health.has_iframes(), p.health.iframe_timer)
 
+	# --- Gravity default ---
+	_check("gravity default is 2100", is_equal_approx(Config.movement.gravity, 2100.0), Config.movement.gravity)
+
+	# --- Hazard: damage + respawn at the last safe ground (left pit, columns 18-21) ---
+	await _reset()
+	var pit_left := 18.0 * 32.0
+	p.global_position = Vector2(pit_left - 100.0, p.global_position.y) # Safe floor before the pit.
+	await _frames(10)
+	var safe_before := p.safe_point
+	_check("safe point recorded on solid ground", safe_before.x < pit_left - 40.0, safe_before)
+	var hp_full := p.health.health
+	Input.action_press(&"move_right")
+	var respawn := {}
+	var on_respawn := func(_pl: Node, from_pos: Vector2, to_pos: Vector2) -> void:
+		respawn["from"] = from_pos
+		respawn["to"] = to_pos
+	Events.player_hazard_respawn.connect(on_respawn)
+	for i in 120:
+		await _frames(1)
+		if not respawn.is_empty():
+			break
+	Input.action_release(&"move_right")
+	Events.player_hazard_respawn.disconnect(on_respawn)
+	_check("hazard deals damage", p.health.health < hp_full, p.health.health)
+	_check("hazard respawns player at safe point",
+		not respawn.is_empty() and respawn.from.x >= pit_left - Player.WIDTH and respawn.to.x < pit_left - 40.0
+		and p.global_position.distance_to(respawn.to) < 1.0, [respawn, p.global_position])
+	await _frames(30)
+	_check("player is not stuck in the hazard", not game.room.find_hazard(p.get_rect()).has_area() and p.global_position.x < pit_left, p.global_position)
+	_check("hazard hit grants i-frames", p.health.has_iframes() or p.health.health < hp_full)
+
+	# --- Hazard while invulnerable: still teleports, no damage ---
+	await _reset()
+	Config.upgrades.god_mode = true
+	p.global_position = Vector2(pit_left - 100.0, p.global_position.y)
+	await _frames(10)
+	var hp_god := p.health.health
+	p.global_position = Vector2(pit_left + 40.0, 22.0 * 32.0 - 2.0) # Drop straight into the spikes.
+	await _frames(20)
+	_check("invulnerable hazard touch teleports out", p.global_position.x < pit_left, p.global_position)
+	_check("invulnerable hazard touch deals no damage", is_equal_approx(p.health.health, hp_god), p.health.health)
+	Config.upgrades.god_mode = false
+
+	# --- Pogo off spikes does not trigger the hazard ---
+	await _reset()
+	var pit_right := 46.0 * 32.0
+	p.global_position = Vector2(pit_right + 80.0, 22.0 * 32.0 - 70.0)
+	p.velocity = Vector2(0, 200)
+	var hp_pogo := p.health.health
+	Input.action_press(&"move_down")
+	Input.action_press(&"attack")
+	var bounced := false
+	for i in 30:
+		await _frames(1)
+		if p.velocity.y < -400.0:
+			bounced = true
+			break
+	Input.action_release(&"attack")
+	Input.action_release(&"move_down")
+	_check("pogo off spikes", bounced and is_equal_approx(p.health.health, hp_pogo), [p.velocity.y, p.health.health])
+	await _frames(60)
+
+	# --- Numbers are hidden by default, shown with Hitboxes & Stats ---
+	_check("stats hidden by default", not Config.stats_visible())
+	Config.debug.show_hitboxes = true
+	_check("stats visible with hitbox toggle", Config.stats_visible())
+	Config.debug.show_hitboxes = false
+
 	# --- Debug overlay and toggles ---
 	Input.action_press(&"toggle_debug")
 	await _frames(2)
 	Input.action_release(&"toggle_debug")
 	_check("debug overlay opens", game.debug_overlay.panel.visible)
+	_check("stats visible while debug overlay is open", Config.stats_visible())
 	Config.upgrades.double_jump = false
 	await _reset()
 	Input.action_press(&"jump")
