@@ -262,14 +262,19 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 
 
 ## Touching a hazard: take damage (unless invulnerable) and teleport back to
-## the last checkpoint (or the last safe ground, see Config.combat).
-## Teleporting even when invulnerable (dash, god mode, i-frames) guarantees
-## the player can never get stuck inside a hazard.
+## the last safe ground (or the checkpoint, see Config.combat). If the damage
+## is lethal there is no teleport: the death respawns the player at the
+## active checkpoint instead. Teleporting even when invulnerable (dash, god
+## mode, i-frames) guarantees the player can never get stuck in a hazard.
 func hazard_respawn(damage: float) -> void:
 	var from := global_position
 	var took_damage := not health.is_invulnerable()
 	if took_damage:
 		health.take_damage(damage)
+		if health.health <= 0.0:
+			Events.player_hurt.emit(self, damage)
+			Events.player_died.emit(self)
+			return
 	else:
 		health.iframe_timer = maxf(health.iframe_timer, 0.4)
 	var target := safe_point if Config.combat.hazard_to_safe_ground else spawn_position
@@ -283,8 +288,6 @@ func hazard_respawn(damage: float) -> void:
 	Events.player_hazard_respawn.emit(self, from, target)
 	if took_damage:
 		Events.player_hurt.emit(self, damage)
-		if health.health <= 0.0:
-			Events.player_died.emit(self)
 
 
 ## Called by method tracks in the AnimationPlayer (e.g. "footstep", "swing").

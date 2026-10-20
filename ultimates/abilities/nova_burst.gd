@@ -14,6 +14,7 @@ func _init() -> void:
 	display_name = "Nova Burst"
 	kind = "AoE Blast"
 	color = Color("#ffb347")
+	icon = "nova"
 	description = "Expanding shockwave that damages and repels everything nearby."
 
 

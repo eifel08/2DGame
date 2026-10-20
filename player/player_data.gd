@@ -31,6 +31,14 @@ func is_unlocked(ability_id: String) -> bool:
 	return unlocked.has(ability_id)
 
 
+func unequip(slot: int) -> void:
+	equipped[slot] = ""
+
+
+func equipped_count() -> int:
+	return equipped.filter(func(id: String) -> bool: return id != "").size()
+
+
 ## Puts an ability into a slot. If it is already in another slot, the two
 ## slots swap so an ability is never equipped twice.
 func equip(slot: int, ability_id: String) -> void:

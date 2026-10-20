@@ -71,6 +71,9 @@ func _ready() -> void:
 	for cp in checkpoints:
 		if cp.is_start:
 			activate_checkpoint(cp, false)
+	# UI is always laid out left-to-right, even with an RTL system locale:
+	# see project.godot (root_node_layout_direction) and the LTR panels.
+	hud.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	reset_enemies()
 	camera.snap_to(player)
 
@@ -85,7 +88,7 @@ func _physics_process(delta: float) -> void:
 		dialogue.step(delta, input)
 		input.end_step()
 		return
-	if inventory.is_open() or Config.debug.paused:
+	if inventory.is_open() or debug_overlay.navigating or Config.debug.paused:
 		input.end_step()
 		return
 
@@ -118,13 +121,16 @@ func _handle_meta_input() -> void:
 	if input.was_pressed(&"toggle_debug"):
 		input.consume(&"toggle_debug")
 		debug_overlay.toggle()
+	if input.was_pressed(&"debug_navigate"):
+		input.consume(&"debug_navigate")
+		debug_overlay.set_navigating(not debug_overlay.navigating)
 	if input.was_pressed(&"inventory"):
 		input.consume(&"inventory")
-		if not dialogue.is_open():
+		if not dialogue.is_open() and not debug_overlay.navigating:
 			inventory.toggle()
 	if input.was_pressed(&"reset_room"):
 		input.consume(&"reset_room")
-		if not inventory.is_open() and not dialogue.is_open():
+		if not inventory.is_open() and not dialogue.is_open() and not debug_overlay.navigating:
 			reset_room()
 
 
@@ -140,7 +146,7 @@ func _update_checkpoints() -> void:
 			player.at_checkpoint = true
 
 
-## Makes `cp` the respawn point for deaths and hazard hits.
+## Makes `cp` the respawn point for deaths.
 func activate_checkpoint(cp: Checkpoint, announce := true) -> void:
 	if current_checkpoint and current_checkpoint != cp:
 		current_checkpoint.set_lit(false)
@@ -152,15 +158,12 @@ func activate_checkpoint(cp: Checkpoint, announce := true) -> void:
 
 
 ## Dedicated healing: resting at a checkpoint fully restores health.
+## No text is shown; the optional tablet before each flame explains it.
 func rest_at_checkpoint(cp: Checkpoint) -> void:
 	activate_checkpoint(cp, cp != current_checkpoint)
 	player.health.full_heal()
 	player.velocity.x = 0.0
 	Events.player_rested.emit(cp)
-	dialogue.open_lines("Checkpoint", PackedStringArray([
-		"You rest by the flame. Your health is fully restored.",
-		"While you stand here, you can change your equipped abilities in the inventory (I or Tab).",
-	]))
 
 
 # ---------- Interaction & dialogue ----------
@@ -192,7 +195,14 @@ func _update_pickups(delta: float) -> void:
 	var pr := player.get_rect().grow(4.0)
 	for coin in coins:
 		coin.step(delta, room)
-		if not coin.collected and coin.get_rect().intersects(pr):
+		if coin.collected:
+			continue
+		# Shards that touch a hazard are lost.
+		if room.find_hazard(coin.get_rect()).has_area():
+			coin.collect()
+			effects.burst(coin.global_position + Vector2(0, -11), {"count": 6, "color": Color("#9aa7c7"), "speed": 90.0, "gravity": -60.0, "life": 0.35, "size": 3.0})
+			continue
+		if coin.get_rect().intersects(pr):
 			coin.collect()
 			player_data.add_currency(coin.value)
 			Events.currency_collected.emit(coin.value, coin.global_position)

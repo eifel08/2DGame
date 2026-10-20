@@ -17,6 +17,7 @@ func _init() -> void:
 	display_name = "Comet Dash"
 	kind = "Mobility Strike"
 	color = Color("#ff7a59")
+	icon = "comet"
 	description = "Aimable invulnerable charge that pierces enemies, then detonates."
 
 

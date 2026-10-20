@@ -188,9 +188,10 @@ func _run() -> void:
 	Input.action_release(&"move_right")
 	Events.player_hazard_respawn.disconnect(on_respawn)
 	_check("hazard deals damage", p.health.health < hp_full, p.health.health)
-	_check("hazard respawns player at the checkpoint",
+	_check("spikes send the player back to safe ground (not the checkpoint)",
 		not respawn.is_empty() and respawn.from.x >= pit_left - Player.WIDTH
-		and respawn.to.is_equal_approx(game.current_checkpoint.get_respawn_position())
+		and respawn.to.x < pit_left - 40.0
+		and respawn.to.distance_to(game.current_checkpoint.get_respawn_position()) > 50.0
 		and p.global_position.distance_to(respawn.to) < 1.0, [respawn, p.global_position])
 	await _frames(30)
 	_check("player is not stuck in the hazard", not game.room.find_hazard(p.get_rect()).has_area() and p.global_position.x < pit_left, p.global_position)
@@ -233,6 +234,116 @@ func _run() -> void:
 	_check("stats visible with hitbox toggle", Config.stats_visible())
 	Config.debug.show_hitboxes = false
 
+	# --- Lethal spikes: death respawns at the checkpoint ---
+	await _reset()
+	p.global_position = Vector2(pit_left - 100.0, p.global_position.y)
+	await _frames(10)
+	p.health.health = 5.0
+	p.global_position = Vector2(pit_left + 40.0, 22.0 * 32.0 - 2.0)
+	await _frames(30)
+	_check("lethal spike hit respawns at the checkpoint",
+		p.global_position.distance_to(game.current_checkpoint.get_respawn_position()) < 2.0
+		and is_equal_approx(p.health.health, p.health.get_max_health()), [p.global_position, p.health.health])
+
+	# --- Shards that touch spikes disappear ---
+	await _reset()
+	var shards_now: int = game.player_data.currency
+	game.drop_currency(Vector2(49.5 * 32.0, 22.0 * 32.0 - 40.0), 6) # Over the centre of the right pit.
+	await _frames(90)
+	var dropped_left := 0
+	for c in game.coins:
+		if c.dropped:
+			dropped_left += 1
+	_check("shards falling on spikes despawn", dropped_left == 0 and game.player_data.currency == shards_now, [dropped_left, game.player_data.currency])
+
+	# --- Empty slots (0-4 equipped) ---
+	await _reset()
+	var loadout: Array = game.player_data.equipped.duplicate()
+	await _frames(3)
+	_check("slot can be emptied at a checkpoint", game.ultimates.unequip(1) and game.ultimates.get_slot(1) == null)
+	_check("loadout has 3 equipped", game.player_data.equipped_count() == 3, game.player_data.equipped)
+	p.health.set_energy(100.0)
+	Input.action_press(&"ult_2")
+	await _frames(2)
+	Input.action_release(&"ult_2")
+	_check("empty slot key does nothing", is_equal_approx(p.health.energy, 100.0) and p.state_name() == "normal", p.health.energy)
+	for i in 4:
+		game.ultimates.unequip(i)
+	_check("all slots can be empty", game.player_data.equipped_count() == 0)
+	for i in loadout.size():
+		game.player_data.equip(i, loadout[i])
+	Events.loadout_changed.emit()
+
+	# --- No numbers in ability descriptions / lore / inventory ---
+	var digit := RegEx.create_from_string("[0-9]")
+	var numeric_text := []
+	for ability in game.ultimates.abilities.values():
+		if digit.search(ability.description) or digit.search(ability.display_name):
+			numeric_text.append(ability.id)
+	for page in load("res://dialogue/lore_ultimates.tres").pages:
+		if digit.search(page):
+			numeric_text.append(page)
+	_check("ability texts and lore contain no numbers", numeric_text.is_empty(), numeric_text)
+
+	# --- Keyboard-only inventory and loadout swapping ---
+	await _reset()
+	await _frames(3)
+	Input.action_press(&"inventory")
+	await _frames(2)
+	Input.action_release(&"inventory")
+	var inv: InventoryMenu = game.inventory
+	inv.tabs.current_tab = 0
+	await _ui_action(&"menu_next_tab")
+	_check("keyboard: switch to abilities tab", inv.tabs.current_tab == 1, inv.tabs.current_tab)
+	_check("keyboard: focus starts on slot 1", get_viewport().gui_get_focus_owner() == inv.slot_cards[0])
+	await _ui_action(&"ui_accept")
+	var focus_after_select := get_viewport().gui_get_focus_owner()
+	_check("keyboard: selecting a slot jumps to the abilities", focus_after_select in inv.pool_cards, focus_after_select)
+	await _ui_action(&"ui_right")
+	var target_card := get_viewport().gui_get_focus_owner() as AbilityCard
+	var target_id: String = target_card.ability.id if target_card and target_card.ability else ""
+	await _ui_action(&"ui_accept")
+	_check("keyboard: equip with Enter", game.player_data.equipped[0] == target_id and target_id != "", [game.player_data.equipped, target_id])
+	await _ui_action(&"menu_clear")
+	_check("keyboard: clear slot with Backspace", game.player_data.equipped[0] == "", game.player_data.equipped)
+	var details_numeric := digit.search(inv.detail_name.text + inv.detail_desc.text) != null
+	var card_text := ""
+	for card in inv.pool_cards + inv.slot_cards:
+		card_text += card.text
+	_check("inventory shows icons, no text or numbers on cards", card_text == "" and not details_numeric, card_text)
+	await _ui_action(&"menu_prev_tab")
+	_check("keyboard: back to status tab", inv.tabs.current_tab == 0)
+	Input.action_press(&"inventory")
+	await _frames(2)
+	Input.action_release(&"inventory")
+	_check("keyboard: inventory closes", not inv.is_open())
+	for i in loadout.size():
+		game.player_data.equip(i, loadout[i])
+
+	# --- Left-to-right order and text ---
+	var hud: Hud = game.hud
+	_check("HUD slot strip runs 1-2-3-4 left to right",
+		hud.slot_rect(0).position.x < hud.slot_rect(1).position.x and hud.slot_rect(2).position.x < hud.slot_rect(3).position.x)
+	_check("inventory slots run 1-2-3-4 left to right",
+		inv.slot_cards[0].get_index() == 0 and inv.slot_cards[3].get_index() == 3 and inv.panel.layout_direction == Control.LAYOUT_DIRECTION_LTR)
+	var tl: Label = game.dialogue.text_label
+	_check("dialogue text is LTR and does not re-wrap while typing",
+		tl.text_direction == Control.TEXT_DIRECTION_LTR and tl.visible_characters_behavior == TextServer.VC_CHARS_AFTER_SHAPING)
+
+	# --- Info tablet shortly before each later checkpoint ---
+	var tablets_ok := true
+	for cp in game.checkpoints:
+		if cp.is_start:
+			continue
+		var found := false
+		for node in game.room.get_objects():
+			if node is LoreObject and node.dialogue and node.dialogue.resource_path.ends_with("lore_checkpoint.tres"):
+				var dx: float = cp.global_position.x - node.global_position.x
+				if dx > 20.0 and dx < 140.0:
+					found = true
+		tablets_ok = tablets_ok and found
+	_check("checkpoint info tablet before each checkpoint", tablets_ok)
+
 	# --- 4 dedicated ultimate keys, no switching ---
 	_check("ultimate hotkeys 1-4 exist", InputMap.has_action(&"ult_1") and InputMap.has_action(&"ult_4"))
 	_check("no ultimate switching action", not InputMap.has_action(&"cycle_ultimate"))
@@ -272,6 +383,7 @@ func _run() -> void:
 	await _frames(2)
 	Input.action_release(&"interact")
 	_check("resting at a checkpoint fully heals", is_equal_approx(p.health.health, p.health.get_max_health()), p.health.health)
+	_check("resting shows no explanation text", not game.dialogue.is_open())
 	await _close_dialogue()
 
 	# --- Currency ---
@@ -309,7 +421,7 @@ func _run() -> void:
 	await _frames(2)
 	Input.action_release(&"inventory")
 	_check("inventory opens", game.inventory.is_open())
-	_check("inventory shows swap restriction", game.inventory.pool_grid.get_child_count() == 4 and game.inventory.notice_label.text.contains("only"), game.inventory.notice_label.text)
+	_check("inventory shows swap restriction", game.inventory.pool_grid.get_child_count() == 5 and game.inventory.notice_label.text.contains("only"), game.inventory.notice_label.text)
 	var frozen_x := p.global_position.x
 	Input.action_press(&"move_right")
 	await _frames(10)
@@ -348,6 +460,21 @@ func _run() -> void:
 	Input.action_release(&"toggle_debug")
 	_check("debug overlay opens", game.debug_overlay.panel.visible)
 	_check("stats visible while debug overlay is open", Config.stats_visible())
+	Input.action_press(&"debug_navigate")
+	await _frames(2)
+	Input.action_release(&"debug_navigate")
+	var dbg_focus := get_viewport().gui_get_focus_owner()
+	var nav_x := p.global_position.x
+	Input.action_press(&"move_right")
+	await _frames(10)
+	Input.action_release(&"move_right")
+	_check("debug overlay keyboard mode focuses controls and pauses",
+		game.debug_overlay.navigating and dbg_focus != null and game.debug_overlay.panel.is_ancestor_of(dbg_focus)
+		and is_equal_approx(p.global_position.x, nav_x), dbg_focus)
+	Input.action_press(&"debug_navigate")
+	await _frames(2)
+	Input.action_release(&"debug_navigate")
+	_check("debug keyboard mode exits", not game.debug_overlay.navigating)
 	Config.upgrades.double_jump = false
 	await _reset()
 	Input.action_press(&"jump")
@@ -407,6 +534,17 @@ func _close_dialogue() -> void:
 		await _frames(2)
 		Input.action_release(&"interact")
 		await _frames(1)
+
+
+## Sends a GUI/menu action press + release, like a key on the keyboard.
+func _ui_action(action: StringName) -> void:
+	for pressed in [true, false]:
+		var ev := InputEventAction.new()
+		ev.action = action
+		ev.pressed = pressed
+		Input.parse_input_event(ev)
+		await _frames(1)
+	await _frames(1)
 
 
 func _first_enemy(flying: bool) -> DummyEnemy:

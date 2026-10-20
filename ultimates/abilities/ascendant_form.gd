@@ -15,6 +15,7 @@ func _init() -> void:
 	display_name = "Ascendant Form"
 	kind = "Transformation"
 	color = Color("#d6a8ff")
+	icon = "ascend"
 	description = "Temporary empowered state: more damage, speed and reach."
 
 

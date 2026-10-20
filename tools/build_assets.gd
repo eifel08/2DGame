@@ -18,7 +18,7 @@ const TS := 32
 
 ## '#' solid  '=' one-way  '^' spikes  'E' ground dummy  'F' flying dummy
 ## 'S' start checkpoint (+ player spawn)  'C' checkpoint  '$' shard (currency)
-## 'N' guide NPC  'W' / 'K' / 'U' lore tablets (see LORE)
+## 'N' guide NPC  'W' / 'K' / 'U' lore tablets  'T' checkpoint info tablet (see LORE)
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. The flying dummy above the right pit is for pogo chains.
 const ROOM_LAYOUT := [
@@ -43,7 +43,7 @@ const ROOM_LAYOUT := [
 	"#.....##..=====...........................K...............##...#",
 	"#.....##................................####...................#",
 	"#.......................................####...................#",
-	"#..W......S....N...........U..$$..E....C####............E...C..#",
+	"#..W......S....N...........U..$$.E...T.C####..........E...T.C..#",
 	"##################^^^^########################^^^^^^^###########",
 	"################################################################",
 ]
@@ -54,6 +54,7 @@ const LORE := {
 	"W": "res://dialogue/lore_wall_jump.tres",
 	"K": "res://dialogue/lore_spikes.tres",
 	"U": "res://dialogue/lore_ultimates.tres",
+	"T": "res://dialogue/lore_checkpoint.tres",
 }
 const CHECKPOINT_SCENE := "res://world/objects/checkpoint.tscn"
 const LORE_SCENE := "res://world/objects/lore_stone.tscn"
@@ -170,6 +171,11 @@ func _build_input_map() -> void:
 		"inventory": [_key(KEY_I), _key(KEY_TAB), _key(KEY_ESCAPE), _joy_button(JOY_BUTTON_BACK)],
 		"toggle_debug": [_key(KEY_F1), _key(KEY_QUOTELEFT), _joy_button(JOY_BUTTON_START)],
 		"reset_room": [_key(KEY_R)],
+		"debug_navigate": [_key(KEY_F2)],
+		# Menu-only actions (inventory). Arrows/Enter/Space use Godot's ui_* actions.
+		"menu_prev_tab": [_key(KEY_Q), _key(KEY_PAGEUP), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
+		"menu_next_tab": [_key(KEY_E), _key(KEY_PAGEDOWN), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
+		"menu_clear": [_key(KEY_BACKSPACE), _key(KEY_DELETE), _joy_button(JOY_BUTTON_X)],
 	}
 	for obsolete in ["ultimate", "cycle_ultimate"]:
 		if ProjectSettings.has_setting("input/" + obsolete):
@@ -447,7 +453,7 @@ func _build_room() -> void:
 					_add_object(root, objects, counts, COIN_SCENE, "Coin", feet, {})
 				"N":
 					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
-				"W", "K", "U":
+				"W", "K", "U", "T":
 					_add_object(root, objects, counts, LORE_SCENE, "Lore", feet, {"dialogue": load(LORE[ch])})
 				"E", "F":
 					enemy_count += 1

@@ -90,6 +90,7 @@ func _build() -> void:
 	panel.offset_top = -150.0
 	panel.offset_bottom = -26.0
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.03, 0.04, 0.08, 0.94)
 	style.border_color = Color("#6f7fb8")
@@ -103,11 +104,20 @@ func _build() -> void:
 	box.add_theme_constant_override("separation", 6)
 	panel.add_child(box)
 	speaker_label = Label.new()
+	speaker_label.text_direction = Control.TEXT_DIRECTION_LTR
 	speaker_label.add_theme_color_override("font_color", Color("#ffd36b"))
 	speaker_label.add_theme_font_size_override("font_size", 14)
 	box.add_child(speaker_label)
 	text_label = Label.new()
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# Strict left-to-right text. The layout is computed for the whole page
+	# up front, so the typewriter only reveals characters and lines never
+	# shift or re-wrap while typing.
+	text_label.text_direction = Control.TEXT_DIRECTION_LTR
+	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	text_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	text_label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
+	text_label.custom_minimum_size = Vector2(0, 58)
 	text_label.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	text_label.add_theme_font_size_override("font_size", 14)
 	box.add_child(text_label)

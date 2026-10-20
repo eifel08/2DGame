@@ -2,13 +2,15 @@ class_name Hud
 extends Control
 ## Screen-space HUD, clean by default:
 ##   - smooth health bar (no numbers)
-##   - energy bar with a color-coded threshold mark per equipped ultimate.
+##   - energy bar with a color-coded threshold mark per equipped ultimate,
+##     plus a left-to-right hotkey strip (1 2 3 4) underneath
 ##     Colors follow energy tiers (Config.ENERGY_TIERS), not specific spells,
 ##     so whatever is slotted later shows its minimum energy clearly.
 ##   - shard (currency) counter, top-right
 ## Exact health / energy numbers appear only in stats mode (Config.stats_visible()).
 
 const BAR_W := 260.0
+const SLOT_BOX := 26.0
 
 var player: Player
 var ultimates: UltimateManager
@@ -78,11 +80,14 @@ func _draw() -> void:
 		draw_string(font, Vector2(bx + BAR_W + 8, ey + 12), "%.1f / %.0f" % [h.energy, h.get_max_energy()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c8f4ff"))
 
-	# Dash cooldown pip (no text).
+	_draw_slot_strip(font, h)
+
+	# Dash cooldown pip (no text), under the slot strip.
 	if Config.upgrades.dash:
 		var cd := clampf(player.dash_cooldown_timer / maxf(0.001, Config.movement.dash_cooldown), 0.0, 1.0)
-		draw_rect(Rect2(bx, ey + 34, 40, 3), Color(1, 1, 1, 0.12))
-		draw_rect(Rect2(bx, ey + 34, 40 * (1.0 - cd), 3), Color("#8890a8") if cd > 0.0 else Color("#d9f6ff"))
+		var dy := slot_rect(0).end.y + 6.0
+		draw_rect(Rect2(bx, dy, 40, 3), Color(1, 1, 1, 0.12))
+		draw_rect(Rect2(bx, dy, 40 * (1.0 - cd), 3), Color("#8890a8") if cd > 0.0 else Color("#d9f6ff"))
 
 	# Currency (top-right).
 	var view := size
@@ -102,9 +107,10 @@ func _draw() -> void:
 		draw_string(font, Vector2(0, view.y / 2.0), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, view.x, 22)
 
 
-## One mark per equipped slot at its cost, colored by energy tier, with the
-## hotkey number underneath. Bright when affordable, dim when not.
-func _draw_thresholds(font: Font, bx: float, ey: float, h: HealthEnergy) -> void:
+## One mark per equipped slot at its energy threshold, colored by energy
+## tier (no numbers). Bright when affordable, dim when not. Empty slots have
+## no mark, so the bar always reflects the current loadout.
+func _draw_thresholds(_font: Font, bx: float, ey: float, h: HealthEnergy) -> void:
 	for slot in PlayerData.SLOT_COUNT:
 		var ability := ultimates.get_slot(slot)
 		if ability == null:
@@ -116,7 +122,30 @@ func _draw_thresholds(font: Font, bx: float, ey: float, h: HealthEnergy) -> void
 		if ready:
 			draw_rect(Rect2(mx - 3.0, ey - 5.0, 7.0, 24.0), Color(col, 0.3))
 		draw_rect(Rect2(mx - 1.0, ey - 4.0, 3.0, 22.0), Color(col, 1.0 if ready else 0.45))
-		draw_string(font, Vector2(mx - 10.0, ey + 30.0), str(slot + 1), HORIZONTAL_ALIGNMENT_CENTER, 21, 10, Color(col, 1.0 if ready else 0.5))
+
+
+## Screen rect of a hotkey box in the slot strip. Slots always run
+## left-to-right: 1, 2, 3, 4.
+func slot_rect(slot: int) -> Rect2:
+	return Rect2(48.0 + slot * (SLOT_BOX + 6.0), 66.0, SLOT_BOX, SLOT_BOX)
+
+
+## Hotkey strip under the energy bar: icon + key number, border in the
+## ability's tier color, bright when there is enough energy.
+func _draw_slot_strip(font: Font, h: HealthEnergy) -> void:
+	for slot in PlayerData.SLOT_COUNT:
+		var r := slot_rect(slot)
+		var ability := ultimates.get_slot(slot)
+		draw_rect(r, Color(0, 0, 0, 0.55))
+		if ability == null:
+			draw_rect(r, Color(1, 1, 1, 0.18), false, 1.0)
+			AbilityIcon.draw_symbol(self, "empty", r.get_center(), SLOT_BOX * 0.36, Color(1, 1, 1, 0.5))
+		else:
+			var ready := h.can_afford(ability.get_cost())
+			var tier := Config.energy_tier_color(ability.get_cost())
+			draw_rect(r, Color(tier, 1.0 if ready else 0.4), false, 2.0 if ready else 1.0)
+			AbilityIcon.draw_symbol(self, ability.icon, r.get_center() + Vector2(0, 1), SLOT_BOX * 0.32, Color(ability.color, 1.0 if ready else 0.35))
+		draw_string(font, r.position + Vector2(3, 10), str(slot + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.7))
 
 
 func _label(font: Font, text: String, pos: Vector2) -> void:

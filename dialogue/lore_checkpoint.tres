@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="DialogueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://dialogue/dialogue_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+speaker = "Tablet of the Flames"
+pages = PackedStringArray("\"Ahead burns a flame of rest. Walk into it and it will light.\"", "\"If you fall in battle, you wake at the last flame you lit. Spikes only send you back a few steps.\"", "\"Stand at the flame and press E to rest. Your wounds close completely.\"", "\"Only beside a lit flame can you change, or clear, the arts on your number keys. Open the inventory there (I or Tab).\"")

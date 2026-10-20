@@ -13,6 +13,7 @@ var id := ""
 var display_name := ""
 var kind := "" ## Short label shown in the HUD and debug overlay.
 var color := Color.WHITE
+var icon := "" ## Symbol drawn by ui/ability_icon.gd ("nova", "volley", "ascend", "comet").
 var description := ""
 var is_running := false
 

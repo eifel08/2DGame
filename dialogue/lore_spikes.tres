@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_data")
 speaker = "Cracked Warning Stone"
-pages = PackedStringArray("\"Do not touch the spikes. They wound you and cast you back to the last flame you lit.\"", "\"Yet a blade swung downward can strike the spikes and lift you above them.\" (Down + Attack in the air: the pogo bounce.)", "\"Lure your foes onto the spikes. Nothing that lives survives their touch.\"")
+pages = PackedStringArray("\"Do not touch the spikes. They wound you and throw you back to the last safe ground.\"", "\"Yet a blade swung downward can strike the spikes and lift you above them.\" (Down + Attack in the air: the pogo bounce.)", "\"Lure your foes onto the spikes. Nothing that lives survives their touch, and any shard that falls on them is lost.\"")

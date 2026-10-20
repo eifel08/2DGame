@@ -3,7 +3,9 @@ extends CanvasLayer
 ## Debug panel, toggled with F1 or ` (backquote).
 ## Fully data-driven: add a row to TOGGLES, SLIDERS or the actions list and it
 ## appears. Controls edit Config live, so changes apply on the next frame.
-## All controls use FOCUS_NONE so they never steal gameplay keys.
+## Controls never steal gameplay keys. For keyboard-only use press F2 while
+## the panel is open: the game pauses, arrows move between controls,
+## Enter/Space toggles or presses, Left/Right moves sliders. F2 again resumes.
 
 const TOGGLES := [
 	["upgrades.double_jump", "Double Jump"],
@@ -50,6 +52,8 @@ var panel: PanelContainer
 var readout: Label
 var _bindings: Array[Dictionary] = [] ## {path, control, value_label}
 var _readout_timer := 0.0
+var _focusables: Array[Control] = []
+var navigating := false ## Keyboard navigation mode (pauses the game).
 
 
 func setup(p_game: Node) -> void:
@@ -61,6 +65,8 @@ func setup(p_game: Node) -> void:
 
 func toggle() -> void:
 	panel.visible = not panel.visible
+	if not panel.visible:
+		set_navigating(false)
 	Config.debug.overlay_open = panel.visible
 	if panel.visible:
 		refresh()
@@ -91,6 +97,7 @@ func _actions() -> Array:
 
 func _build() -> void:
 	panel = PanelContainer.new()
+	panel.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
 	panel.anchor_bottom = 1.0
@@ -111,6 +118,7 @@ func _build() -> void:
 	add_child(panel)
 
 	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	panel.add_child(scroll)
 	var box := VBoxContainer.new()
@@ -119,7 +127,7 @@ func _build() -> void:
 	scroll.add_child(box)
 
 	var title := Label.new()
-	title.text = "DEBUG  ·  F1 / `"
+	title.text = "DEBUG  ·  F1 / `   ·  F2 keyboard"
 	title.add_theme_color_override("font_color", Color("#ffd43b"))
 	box.add_child(title)
 
@@ -132,6 +140,7 @@ func _build() -> void:
 		var check := CheckBox.new()
 		check.text = t[1]
 		check.focus_mode = Control.FOCUS_NONE
+		_focusables.append(check)
 		var path: String = t[0]
 		check.toggled.connect(func(on: bool) -> void: Config.set_value(path, on))
 		grid.add_child(check)
@@ -146,6 +155,7 @@ func _build() -> void:
 		var btn := Button.new()
 		btn.text = a[0]
 		btn.focus_mode = Control.FOCUS_NONE
+		_focusables.append(btn)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var action: Callable = a[1]
 		btn.pressed.connect(func() -> void:
@@ -173,6 +183,17 @@ func _build() -> void:
 	readout.add_theme_font_override("font", mono)
 	readout.add_theme_font_size_override("font_size", 10)
 	box.add_child(readout)
+
+
+## Keyboard mode: controls become focusable and the game pauses.
+func set_navigating(on: bool) -> void:
+	navigating = on and panel.visible
+	for c in _focusables:
+		c.focus_mode = Control.FOCUS_ALL if navigating else Control.FOCUS_NONE
+	if navigating and not _focusables.is_empty():
+		_focusables[0].grab_focus()
+	elif get_viewport():
+		get_viewport().gui_release_focus()
 
 
 func _header(text: String) -> Label:
@@ -204,6 +225,7 @@ func _slider(def: Dictionary) -> HBoxContainer:
 	slider.max_value = def.max
 	slider.step = def.step
 	slider.focus_mode = Control.FOCUS_NONE
+	_focusables.append(slider)
 	var value_label := Label.new()
 	var path: String = def.path
 	slider.value_changed.connect(func(v: float) -> void:

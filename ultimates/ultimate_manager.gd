@@ -60,6 +60,17 @@ func equip(slot: int, ability_id: String, force := false) -> bool:
 	return true
 
 
+## Empties a slot (0 to 4 abilities may be equipped). Same checkpoint rule.
+func unequip(slot: int, force := false) -> bool:
+	if not force and not can_change_loadout():
+		return false
+	if slot < 0 or slot >= SLOT_ACTIONS.size():
+		return false
+	data.unequip(slot)
+	Events.loadout_changed.emit()
+	return true
+
+
 # ---------- Activation ----------
 
 func step(delta: float) -> void:

@@ -57,8 +57,9 @@ class Combat:
 	var shake_on_hurt := 0.5
 	var contact_damage := 15.0
 	var hazard_damage := 20.0
-	## false: hazards send the player to the last checkpoint. true: to the last safe ground.
-	var hazard_to_safe_ground := false
+	## true: spikes send the player back to the last safe ground (default).
+	## false: to the last checkpoint. Dying always respawns at the checkpoint.
+	var hazard_to_safe_ground := true
 
 
 class Vitals:

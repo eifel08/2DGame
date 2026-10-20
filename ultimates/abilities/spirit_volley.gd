@@ -12,6 +12,7 @@ func _init() -> void:
 	display_name = "Spirit Volley"
 	kind = "Projectile Burst"
 	color = Color("#7cf3ff")
+	icon = "volley"
 	description = "Releases a fan of homing bolts that seek the nearest enemies."
 
 
