@@ -1,0 +1,29 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://enemies/dummy_enemy.gd" id="1_enemy"]
+[ext_resource type="PackedScene" path="res://enemies/flyer_rig.tscn" id="2_rig"]
+[ext_resource type="AnimationLibrary" path="res://enemies/flyer_animations.tres" id="3_anims"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(36, 30)
+
+[node name="FlyingDummy" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 1
+script = ExtResource("1_enemy")
+flying = true
+patrol_range = 70.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -15)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Flip" type="Node2D" parent="."]
+
+[node name="Rig" parent="Flip" instance=ExtResource("2_rig")]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+callback_mode_process = 2
+libraries = {
+"": ExtResource("3_anims")
+}

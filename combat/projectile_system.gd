@@ -1,0 +1,99 @@
+class_name ProjectileSystem
+extends Node2D
+## Lightweight projectiles for abilities. Optional homing steers toward the
+## nearest living enemy. Damage goes through CombatManager.apply_damage().
+
+var combat: CombatManager
+var list: Array[Dictionary] = []
+
+
+func setup(p_combat: CombatManager) -> void:
+	combat = p_combat
+
+
+func clear() -> void:
+	list.clear()
+
+
+## opts: position, velocity, radius, damage, life, homing, color, source, knockback, delay
+func spawn(opts: Dictionary) -> void:
+	list.append({
+		"pos": opts.position,
+		"vel": opts.velocity,
+		"radius": opts.get("radius", 7.0),
+		"damage": opts.get("damage", 10.0),
+		"life": opts.get("life", 2.5),
+		"homing": opts.get("homing", 0.0),
+		"color": opts.get("color", Color("#99ffff")),
+		"source": opts.get("source", "projectile"),
+		"knockback": opts.get("knockback", 120.0),
+		"delay": opts.get("delay", 0.0),
+		"trail": [],
+		"dead": false,
+	})
+
+
+func _nearest_enemy(from: Vector2, max_dist := 700.0) -> Node:
+	var best: Node = null
+	var best_d := max_dist * max_dist
+	for e in combat.get_enemies():
+		if not e.alive:
+			continue
+		var d := from.distance_squared_to(e.get_center())
+		if d < best_d:
+			best_d = d
+			best = e
+	return best
+
+
+func step(delta: float) -> void:
+	var room := combat.get_room()
+	for pr in list:
+		pr.life -= delta
+		if pr.life <= 0.0:
+			pr.dead = true
+			continue
+
+		# Steer toward the target after a short launch delay.
+		pr.delay -= delta
+		var target: Node = _nearest_enemy(pr.pos) if pr.homing > 0.0 and pr.delay <= 0.0 else null
+		if target:
+			var vel: Vector2 = pr.vel
+			var want := (target.get_center() - pr.pos as Vector2).angle()
+			var diff := wrapf(want - vel.angle(), -PI, PI)
+			var turn := clampf(diff, -pr.homing * delta, pr.homing * delta)
+			pr.vel = Vector2.from_angle(vel.angle() + turn) * minf(vel.length() * 1.03, 900.0)
+
+		pr.trail.append(pr.pos)
+		if pr.trail.size() > 6:
+			pr.trail.pop_front()
+		pr.pos += pr.vel * delta
+
+		if room.is_solid_at(pr.pos):
+			pr.dead = true
+			continue
+		for e in combat.get_enemies():
+			if not e.alive or not Geom.circle_overlaps_rect(pr.pos, pr.radius, e.get_rect()):
+				continue
+			combat.apply_damage(e, {
+				"damage": pr.damage,
+				"direction": Vector2(signf(pr.vel.x) if pr.vel.x != 0.0 else 1.0, 0.0),
+				"knockback": pr.knockback,
+				"source": pr.source,
+				"strength": 0.4,
+				"position": pr.pos,
+			})
+			pr.dead = true
+			break
+	list = list.filter(func(pr: Dictionary) -> bool: return not pr.dead)
+	queue_redraw()
+
+
+func _draw() -> void:
+	for pr in list:
+		var n: int = pr.trail.size()
+		for i in n:
+			var k := float(i) / n
+			draw_circle(pr.trail[i], pr.radius * k, Color(pr.color, k * 0.5))
+		draw_circle(pr.pos, pr.radius, pr.color)
+		draw_circle(pr.pos, pr.radius * 0.45, Color.WHITE)

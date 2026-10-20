@@ -1,0 +1,76 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://core/game.gd" id="1_game"]
+[ext_resource type="PackedScene" path="res://world/test_room.tscn" id="2_room"]
+[ext_resource type="PackedScene" path="res://player/player.tscn" id="3_player"]
+[ext_resource type="Script" path="res://combat/combat_manager.gd" id="4_combat"]
+[ext_resource type="Script" path="res://combat/projectile_system.gd" id="5_projectiles"]
+[ext_resource type="Script" path="res://ultimates/ultimate_manager.gd" id="6_ultimates"]
+[ext_resource type="Script" path="res://effects/effects.gd" id="7_effects"]
+[ext_resource type="Script" path="res://effects/feedback.gd" id="8_feedback"]
+[ext_resource type="Script" path="res://core/camera_rig.gd" id="9_camera"]
+[ext_resource type="Script" path="res://ui/hud.gd" id="10_hud"]
+[ext_resource type="Script" path="res://ui/debug_overlay.gd" id="11_debug"]
+[ext_resource type="Script" path="res://ui/background.gd" id="12_background"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_game")
+
+[node name="BackgroundLayer" type="CanvasLayer" parent="."]
+layer = -1
+
+[node name="Background" type="Control" parent="BackgroundLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("12_background")
+
+[node name="TestRoom" parent="." instance=ExtResource("2_room")]
+
+[node name="Enemies" type="Node2D" parent="."]
+z_index = 1
+
+[node name="Ultimates" type="Node2D" parent="."]
+z_index = 2
+script = ExtResource("6_ultimates")
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+
+[node name="Combat" type="Node2D" parent="."]
+z_index = 4
+script = ExtResource("4_combat")
+
+[node name="Projectiles" type="Node2D" parent="Combat"]
+script = ExtResource("5_projectiles")
+
+[node name="Effects" type="Node2D" parent="."]
+z_index = 5
+script = ExtResource("7_effects")
+
+[node name="Feedback" type="Node" parent="."]
+script = ExtResource("8_feedback")
+
+[node name="Camera" type="Camera2D" parent="."]
+process_callback = 0
+script = ExtResource("9_camera")
+
+[node name="HudLayer" type="CanvasLayer" parent="."]
+layer = 5
+
+[node name="Hud" type="Control" parent="HudLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("10_hud")
+
+[node name="DebugOverlay" type="CanvasLayer" parent="."]
+layer = 10
+script = ExtResource("11_debug")

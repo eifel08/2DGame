@@ -1,0 +1,37 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://player/player.gd" id="1_player"]
+[ext_resource type="PackedScene" path="res://player/player_rig.tscn" id="2_rig"]
+[ext_resource type="AnimationLibrary" path="res://player/player_animations.tres" id="3_anims"]
+[ext_resource type="Script" path="res://stats/health_energy.gd" id="4_health"]
+[ext_resource type="Script" path="res://player/player_animator.gd" id="5_animator"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(22, 40)
+
+[node name="Player" type="CharacterBody2D"]
+z_index = 3
+collision_layer = 2
+collision_mask = 5
+floor_snap_length = 4.0
+script = ExtResource("1_player")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -20)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Flip" type="Node2D" parent="."]
+
+[node name="Rig" parent="Flip" instance=ExtResource("2_rig")]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+callback_mode_process = 2
+libraries = {
+"": ExtResource("3_anims")
+}
+
+[node name="HealthEnergy" type="Node" parent="."]
+script = ExtResource("4_health")
+
+[node name="Animator" type="Node" parent="."]
+script = ExtResource("5_animator")

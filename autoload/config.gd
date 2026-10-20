@@ -1,0 +1,126 @@
+extends Node
+## Every tunable value in one place (autoload "Config").
+## The debug overlay edits these live and all systems read them each frame,
+## so changes apply instantly. Units: pixels, seconds, px/s, px/s^2.
+
+
+class Upgrades:
+	var double_jump := true
+	var dash := true
+	var wall_jump := true
+	var god_mode := false
+
+
+class Movement:
+	var max_run_speed := 270.0
+	var ground_accel := 2600.0 ## How fast top speed is reached on the ground.
+	var ground_decel := 3400.0 ## How fast the player stops when input is released.
+	var air_accel := 1900.0
+	var air_decel := 1100.0
+	var turn_boost := 1.6 ## Extra acceleration when reversing direction.
+
+	var gravity := 2300.0
+	var fall_gravity_mul := 1.55 ## Heavier fall = less floaty arc.
+	var max_fall_speed := 760.0
+	var apex_threshold := 70.0 ## |vy| under this while holding jump = hang time.
+	var apex_gravity_mul := 0.6
+
+	var jump_velocity := 760.0
+	var jump_cut_mul := 0.42 ## Releasing jump early multiplies upward speed by this.
+	var double_jump_velocity := 660.0
+	var coyote_time := 0.1
+	var jump_buffer_time := 0.12
+
+	var wall_slide_speed := 130.0
+	var wall_jump_vel_x := 380.0
+	var wall_jump_vel_y := 700.0
+	var wall_jump_lock_time := 0.16 ## Reduced air control right after a wall jump.
+	var wall_coyote_time := 0.1
+
+	var dash_speed := 780.0
+	var dash_duration := 0.15
+	var dash_cooldown := 0.45
+
+
+class Combat:
+	var attack_damage := 20.0
+	var attack_duration := 0.26
+	var attack_active_start := 0.02
+	var attack_active_end := 0.13
+	var attack_cooldown := 0.3
+	var attack_buffer_time := 0.12
+	var pogo_velocity := 640.0
+	var recoil_velocity := 170.0 ## Push-back when a side attack connects.
+	var enemy_knockback := 260.0
+	var hitstop_on_hit := 0.07
+	var hitstop_on_hurt := 0.14
+	var shake_on_hit := 0.22
+	var shake_on_hurt := 0.5
+	var contact_damage := 15.0
+	var hazard_damage := 20.0
+
+
+class Vitals:
+	var max_health := 100.0
+	var max_energy := 100.0
+	var energy_per_hit := 11.0
+	var energy_gain_mul := 1.0
+	var iframe_duration := 1.0
+	var heal_windup := 0.25 ## Channel delay before energy starts draining.
+	var heal_energy_per_second := 40.0
+	var health_per_energy := 0.75
+
+
+class DebugFlags:
+	var show_hitboxes := false
+	var show_anim_labels := false
+	var screen_shake := true
+	var paused := false
+	var time_scale := 1.0
+
+
+var upgrades: Upgrades
+var movement: Movement
+var combat: Combat
+var vitals: Vitals
+var debug: DebugFlags
+## One block per ultimate, keyed by ability id. `cost` is fully configurable.
+var ultimates: Dictionary
+
+
+func _init() -> void:
+	restore_defaults()
+
+
+func restore_defaults() -> void:
+	upgrades = Upgrades.new()
+	movement = Movement.new()
+	combat = Combat.new()
+	vitals = Vitals.new()
+	debug = DebugFlags.new()
+	ultimates = {
+		"nova_burst": {"cost": 33.0, "cast_time": 0.35, "damage": 45.0, "radius": 230.0, "expand_time": 0.3},
+		"spirit_volley": {"cost": 50.0, "cast_time": 0.2, "count": 10.0, "damage": 12.0, "interval": 0.04, "speed": 460.0, "homing": 7.0},
+		"ascendant_form": {"cost": 100.0, "cast_time": 0.6, "duration": 8.0, "damage_mul": 2.0, "speed_mul": 1.25, "range_mul": 1.45},
+		"comet_dash": {"cost": 25.0, "cast_time": 0.08, "speed": 1150.0, "duration": 0.3, "damage": 30.0, "burst_damage": 18.0, "burst_radius": 100.0},
+	}
+
+
+## Reads a dotted path such as "movement.jump_velocity" or "ultimates.nova_burst.cost".
+func get_value(path: String) -> Variant:
+	var target: Variant = self
+	for key in path.split("."):
+		target = target[key] if target is Dictionary else target.get(key)
+	return target
+
+
+func set_value(path: String, value: Variant) -> void:
+	var keys := path.split(".")
+	var target: Variant = self
+	for i in keys.size() - 1:
+		target = target[keys[i]] if target is Dictionary else target.get(keys[i])
+	var last := keys[keys.size() - 1]
+	if target is Dictionary:
+		target[last] = value
+	else:
+		target.set(last, value)

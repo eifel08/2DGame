@@ -1,0 +1,116 @@
+class_name Feedback
+extends Node
+## "Game feel" layer. Listens to gameplay events and answers with hitstop,
+## screen shake and particles. Gameplay code never calls these directly.
+
+var camera: CameraRig
+var effects: Effects
+var hitstop_timer := 0.0
+var _ghost_timer := 0.0
+var _heal_sparkle := false
+
+
+func setup(p_camera: CameraRig, p_effects: Effects) -> void:
+	camera = p_camera
+	effects = p_effects
+	Events.hit_landed.connect(_on_hit)
+	Events.pogo_bounced.connect(_on_pogo)
+	Events.player_hurt.connect(_on_player_hurt)
+	Events.player_jumped.connect(_on_player_jumped)
+	Events.player_landed.connect(_on_player_landed)
+	Events.player_dashed.connect(_on_player_dashed)
+	Events.enemy_killed.connect(_on_enemy_killed)
+	Events.ultimate_impact.connect(_on_ultimate_impact)
+	Events.health_healed.connect(func(_amount: float) -> void: _heal_sparkle = true)
+
+
+# ---------- Hitstop ----------
+
+func freeze(seconds: float) -> void:
+	hitstop_timer = maxf(hitstop_timer, seconds)
+
+
+## Returns true while the simulation should stay frozen.
+func step_hitstop(delta: float) -> bool:
+	if hitstop_timer <= 0.0:
+		return false
+	hitstop_timer -= delta
+	return true
+
+
+# ---------- Continuous visuals ----------
+
+func step(delta: float, player: Player) -> void:
+	camera.shake_enabled = Config.debug.screen_shake
+	_ghost_timer -= delta
+	var fast := player.state_name() == "dash" or player.state_name() == "ability"
+	if fast and _ghost_timer <= 0.0:
+		effects.ghost(player.get_rect())
+		_ghost_timer = 0.025
+	if _heal_sparkle and randf() < 0.5:
+		effects.burst(player.global_position + Vector2(randf_range(-12, 12), 0), {
+			"count": 1, "color": Color("#8dffb0"), "speed": 60.0, "angle": -PI / 2.0,
+			"spread": 0.6, "gravity": -200.0, "life": 0.5, "size": 3.0,
+		})
+	_heal_sparkle = false
+
+
+# ---------- Event handlers ----------
+
+func _on_hit(info: Dictionary) -> void:
+	var c = Config.combat
+	var s: float = info.strength
+	freeze(c.hitstop_on_hit * s)
+	camera.add_trauma(c.shake_on_hit * s)
+	effects.burst(info.position, {"count": 8 + int(round(6 * s)), "color": Color("#fff3c4"), "speed": 320.0, "life": 0.3})
+	var col := Color.WHITE if info.source == "melee" else Color("#ffd36b")
+	effects.float_text(info.position + Vector2(0, -18), str(roundi(info.damage)), col)
+
+
+func _on_pogo(pos: Vector2, on_hazard: bool) -> void:
+	effects.burst(pos, {
+		"count": 8, "color": Color("#ff9a9a") if on_hazard else Color("#bff6ff"), "speed": 200.0,
+		"angle": PI / 2.0, "spread": PI * 0.9, "gravity": 300.0,
+	})
+	if on_hazard:
+		freeze(Config.combat.hitstop_on_hit * 0.6)
+		camera.add_trauma(Config.combat.shake_on_hit * 0.5)
+
+
+func _on_player_hurt(player: Node, _damage: float) -> void:
+	freeze(Config.combat.hitstop_on_hurt)
+	camera.add_trauma(Config.combat.shake_on_hurt)
+	effects.burst(player.get_center(), {"count": 16, "color": Color("#ff6b6b"), "speed": 300.0, "size": 5.0})
+
+
+func _on_player_jumped(player: Node, kind: String) -> void:
+	if kind == "double":
+		effects.ring(player.global_position, {"radius": 26.0, "color": Color("#bff6ff"), "width": 3.0, "life": 0.25})
+	else:
+		effects.burst(player.global_position, {"count": 5, "color": Color("#9aa7c7"), "speed": 90.0, "gravity": 100.0, "life": 0.25, "size": 3.0})
+
+
+func _on_player_landed(player: Node, fall_speed: float) -> void:
+	if fall_speed < 450.0:
+		return
+	effects.burst(player.global_position, {
+		"count": 8, "color": Color("#9aa7c7"), "speed": 140.0, "angle": -PI / 2.0,
+		"spread": PI, "gravity": 400.0, "life": 0.3, "size": 3.0,
+	})
+
+
+func _on_player_dashed(player: Node, dir: int) -> void:
+	effects.burst(player.get_center() - Vector2(dir * 10, 0), {
+		"count": 10, "color": Color("#d9f6ff"), "speed": 200.0, "angle": PI if dir > 0 else 0.0,
+		"spread": 0.8, "gravity": 0.0, "life": 0.25, "size": 3.0,
+	})
+
+
+func _on_enemy_killed(enemy: Node) -> void:
+	camera.add_trauma(0.25)
+	effects.burst(enemy.get_center(), {"count": 24, "color": Color("#ffb36b"), "speed": 380.0, "size": 5.0, "life": 0.5})
+
+
+func _on_ultimate_impact(hitstop: float, shake: float) -> void:
+	freeze(hitstop)
+	camera.add_trauma(shake)
