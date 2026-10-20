@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="DialogueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://dialogue/dialogue_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+speaker = "Cracked Warning Stone"
+pages = PackedStringArray("\"Do not touch the spikes. They wound you and cast you back to the last flame you lit.\"", "\"Yet a blade swung downward can strike the spikes and lift you above them.\" (Down + Attack in the air: the pogo bounce.)", "\"Lure your foes onto the spikes. Nothing that lives survives their touch.\"")

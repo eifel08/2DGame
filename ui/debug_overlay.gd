@@ -8,12 +8,13 @@ extends CanvasLayer
 const TOGGLES := [
 	["upgrades.double_jump", "Double Jump"],
 	["upgrades.dash", "Dash"],
-	["upgrades.wall_jump", "Wall Slide / Jump"],
+	["upgrades.wall_jump", "Wall Jump"],
 	["upgrades.god_mode", "God Mode"],
 	["debug.show_hitboxes", "Hitboxes & Stats"],
 	["debug.show_anim_labels", "Anim States"],
 	["debug.screen_shake", "Screen Shake"],
 	["debug.paused", "Pause"],
+	["combat.hazard_to_safe_ground", "Spikes → Safe Ground"],
 ]
 
 const SLIDERS := [
@@ -26,7 +27,6 @@ const SLIDERS := [
 	{"path": "movement.gravity", "label": "Gravity", "min": 600, "max": 5000, "step": 50},
 	{"path": "movement.coyote_time", "label": "Coyote Time", "min": 0, "max": 0.4, "step": 0.01},
 	{"path": "movement.jump_buffer_time", "label": "Jump Buffer", "min": 0, "max": 0.4, "step": 0.01},
-	{"path": "movement.wall_slide_speed", "label": "Wall Slide Spd", "min": 20, "max": 500, "step": 5},
 	{"path": "movement.dash_speed", "label": "Dash Speed", "min": 300, "max": 1400, "step": 10},
 	{"path": "movement.dash_cooldown", "label": "Dash Cooldown", "min": 0, "max": 2, "step": 0.05},
 	{"group": "Combat"},
@@ -48,7 +48,6 @@ const SLIDERS := [
 var game: Node
 var panel: PanelContainer
 var readout: Label
-var ult_select: OptionButton
 var _bindings: Array[Dictionary] = [] ## {path, control, value_label}
 var _readout_timer := 0.0
 
@@ -57,7 +56,7 @@ func setup(p_game: Node) -> void:
 	game = p_game
 	_build()
 	panel.visible = false
-	Events.ultimate_changed.connect(func(_a: RefCounted) -> void: refresh())
+	Events.loadout_changed.connect(func() -> void: refresh())
 
 
 func toggle() -> void:
@@ -76,7 +75,12 @@ func _actions() -> Array:
 		["Take Damage", func() -> void: game.player.receive_hit(15.0, game.player.global_position.x - game.player.facing, false, true)],
 		["Max Energy", func() -> void: game.player.health.set_energy(game.player.health.get_max_energy())],
 		["Empty Energy", func() -> void: game.player.health.set_energy(0.0)],
-		["Next Ultimate", func() -> void: game.ultimates.cycle(1)],
+		["+100 Shards", func() -> void: game.player_data.add_currency(100)],
+		["+10 Max Health", func() -> void: game.player.health.max_health_bonus += 10.0],
+		["+20 Max Energy", func() -> void: game.player.health.max_energy_bonus += 20.0],
+		["Reset Growth", func() -> void:
+			game.player.health.max_health_bonus = 0.0
+			game.player.health.max_energy_bonus = 0.0],
 		["Reset Player", func() -> void: game.reset_player()],
 		["Reset Room", func() -> void: game.reset_room()],
 		["Restore Defaults", func() -> void: game.restore_defaults()],
@@ -149,18 +153,10 @@ func _build() -> void:
 			refresh())
 		buttons.add_child(btn)
 
-	# Ultimates: equipped selection + per-ability cost
-	box.add_child(_header("Ultimate Abilities"))
-	ult_select = OptionButton.new()
-	ult_select.focus_mode = Control.FOCUS_NONE
-	ult_select.fit_to_longest_item = false
-	ult_select.clip_text = true
-	for ability in game.ultimates.abilities:
-		ult_select.add_item("%s (%s)" % [ability.display_name, ability.kind])
-	ult_select.item_selected.connect(func(i: int) -> void: game.ultimates.set_active_index(i))
-	box.add_child(_row("Equipped", ult_select, null))
-	for ability in game.ultimates.abilities:
-		box.add_child(_slider({"path": "ultimates.%s.cost" % ability.id, "label": ability.display_name + " cost", "min": 0, "max": 100, "step": 1}))
+	# Ultimates: per-ability energy cost
+	box.add_child(_header("Ultimate Costs"))
+	for ability in game.ultimates.abilities.values():
+		box.add_child(_slider({"path": "ultimates.%s.cost" % ability.id, "label": ability.display_name, "min": 0, "max": 100, "step": 1}))
 
 	# Tunables
 	for def in SLIDERS:
@@ -229,7 +225,6 @@ func refresh() -> void:
 		else:
 			b.control.set_value_no_signal(float(v))
 			b.value_label.text = _format(float(v))
-	ult_select.select(game.ultimates.active_index)
 
 
 func _format(v: float) -> String:
@@ -245,17 +240,21 @@ func _process(delta: float) -> void:
 	_readout_timer = 0.1
 	var p: Player = game.player
 	var h := p.health
-	var running: Array = game.ultimates.abilities.filter(func(a: UltimateAbility) -> bool: return a.is_running) \
-		.map(func(a: UltimateAbility) -> String: return a.display_name)
+	var running: Array = game.ultimates.abilities.values().filter(func(u: UltimateAbility) -> bool: return u.is_running) \
+		.map(func(u: UltimateAbility) -> String: return u.display_name)
 	var alive: int = game.enemies.filter(func(e: Node) -> bool: return e.alive).size()
-	var active: UltimateAbility = game.ultimates.get_active()
+	var slots := PackedStringArray()
+	for slot in PlayerData.SLOT_COUNT:
+		var u: UltimateAbility = game.ultimates.get_slot(slot)
+		slots.append("%d:%s(%d)" % [slot + 1, u.display_name if u else "-", roundi(u.get_cost()) if u else 0])
+	var cp: Node = game.current_checkpoint
 	readout.text = "\n".join([
 		"fps          %d" % Engine.get_frames_per_second(),
 		"state        %s%s" % [p.state_name(), (" + attack:" + p.attack_dir) if p.attack_dir != "" else ""],
 		"animation    %s" % p.animator.current,
 		"pos          %.1f, %.1f" % [p.global_position.x, p.global_position.y],
 		"vel          %.1f, %.1f" % [p.velocity.x, p.velocity.y],
-		"grounded     %s  wall %d  sliding %s" % [p.grounded, p.wall_dir, p.wall_sliding],
+		"grounded     %s  wall %d" % [p.grounded, p.wall_dir],
 		"coyote       %.2f  buffer %.2f" % [maxf(0.0, p.coyote_timer), maxf(0.0, p.jump_buffer_timer)],
 		"air jumps    %d  air dash used %s" % [p.air_jumps_used, p.air_dash_used],
 		"dash cd      %.2f" % maxf(0.0, p.dash_cooldown_timer),
@@ -263,7 +262,10 @@ func _process(delta: float) -> void:
 		"energy       %.1f / %.0f" % [h.energy, h.get_max_energy()],
 		"i-frames     %.2f  invuln %s %s" % [maxf(0.0, h.iframe_timer), h.is_invulnerable(), h.invuln_flags.keys()],
 		"modifiers    %s" % (", ".join(PackedStringArray(p.modifiers.keys())) if not p.modifiers.is_empty() else "-"),
-		"ultimate     %s (cost %d)" % [active.display_name, roundi(active.get_cost())],
+		"slots        %s" % " ".join(slots),
 		"running      %s" % (", ".join(PackedStringArray(running)) if not running.is_empty() else "-"),
+		"shards       %d" % game.player_data.currency,
+		"checkpoint   %s  at checkpoint %s" % [cp.name if cp else "-", p.at_checkpoint],
 		"enemies      %d alive / %d" % [alive, game.enemies.size()],
 	])
+

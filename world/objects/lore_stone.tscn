@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://world/objects/lore_object.gd" id="1_lore"]
+
+[node name="LoreStone" type="Node2D"]
+z_index = 1
+script = ExtResource("1_lore")
+prompt = "Read"
+interact_size = Vector2(56, 48)
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="Stone" type="Polygon2D" parent="Visual"]
+color = Color(0.36, 0.38, 0.46, 1)
+polygon = PackedVector2Array(-13, 0, 13, 0, 13, -26, 8, -32, -8, -32, -13, -26)
+
+[node name="Glyph" type="Polygon2D" parent="Visual"]
+color = Color(0.5, 0.95, 1, 0.85)
+polygon = PackedVector2Array(-6, -10, -2, -10, 0, -22, 2, -10, 6, -10, 0, -4)

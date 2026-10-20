@@ -30,7 +30,7 @@ var fsm := StateMachine.new()
 var facing := 1
 var grounded := false
 var wall_dir := 0
-var wall_sliding := false
+var at_checkpoint := false ## True while standing at the active checkpoint (loadout swaps allowed).
 var is_channeling_heal := false
 var attack_dir := "" ## Written by CombatManager: "", "left", "right", "up", "down".
 var facing_locked := false ## Written by CombatManager during attacks.
@@ -75,7 +75,7 @@ func reset() -> void:
 	facing = 1
 	grounded = false
 	wall_dir = 0
-	wall_sliding = false
+	at_checkpoint = false
 	is_channeling_heal = false
 	attack_dir = ""
 	facing_locked = false
@@ -206,8 +206,9 @@ func wall_jump(from_wall_dir: int) -> void:
 	var m = Config.movement
 	velocity = Vector2(-from_wall_dir * m.wall_jump_vel_x, -m.wall_jump_vel_y)
 	facing = -from_wall_dir
-	wall_sliding = false
 	is_jumping = true
+	air_jumps_used = 0 # A wall jump refreshes air resources.
+	air_dash_used = false
 	jump_buffer_timer = 0.0
 	wall_coyote_timer = 0.0
 	wall_jump_lock_timer = m.wall_jump_lock_time
@@ -261,8 +262,9 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 
 
 ## Touching a hazard: take damage (unless invulnerable) and teleport back to
-## the last safe ground. Teleporting even when invulnerable (dash, god mode,
-## i-frames) guarantees the player can never get stuck inside a hazard.
+## the last checkpoint (or the last safe ground, see Config.combat).
+## Teleporting even when invulnerable (dash, god mode, i-frames) guarantees
+## the player can never get stuck inside a hazard.
 func hazard_respawn(damage: float) -> void:
 	var from := global_position
 	var took_damage := not health.is_invulnerable()
@@ -270,14 +272,15 @@ func hazard_respawn(damage: float) -> void:
 		health.take_damage(damage)
 	else:
 		health.iframe_timer = maxf(health.iframe_timer, 0.4)
-	global_position = safe_point
+	var target := safe_point if Config.combat.hazard_to_safe_ground else spawn_position
+	global_position = target
 	velocity = Vector2.ZERO
 	grounded = false
 	is_jumping = false
 	set_collision_mask_value(ONE_WAY_LAYER, true)
 	drop_through_timer = 0.0
 	fsm.change("normal")
-	Events.player_hazard_respawn.emit(self, from, safe_point)
+	Events.player_hazard_respawn.emit(self, from, target)
 	if took_damage:
 		Events.player_hurt.emit(self, damage)
 		if health.health <= 0.0:

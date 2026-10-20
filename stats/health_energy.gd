@@ -9,16 +9,19 @@ var energy := 0.0
 var iframe_timer := 0.0
 ## Named invulnerability sources, e.g. "dash", "cast", "ability".
 var invuln_flags := {}
+## Growth hooks for later upgrades (e.g. max-health items). Added to Config base values.
+var max_health_bonus := 0.0
+var max_energy_bonus := 0.0
 ## Extra multiplier for energy gain (wired to the owner's stat modifiers).
 var energy_gain_source: Callable = func() -> float: return 1.0
 
 
 func get_max_health() -> float:
-	return Config.vitals.max_health
+	return Config.vitals.max_health + max_health_bonus
 
 
 func get_max_energy() -> float:
-	return Config.vitals.max_energy
+	return Config.vitals.max_energy + max_energy_bonus
 
 
 func reset() -> void:

@@ -31,7 +31,6 @@ class Movement:
 	var coyote_time := 0.1
 	var jump_buffer_time := 0.12
 
-	var wall_slide_speed := 130.0
 	var wall_jump_vel_x := 380.0
 	var wall_jump_vel_y := 700.0
 	var wall_jump_lock_time := 0.16 ## Reduced air control right after a wall jump.
@@ -58,6 +57,8 @@ class Combat:
 	var shake_on_hurt := 0.5
 	var contact_damage := 15.0
 	var hazard_damage := 20.0
+	## false: hazards send the player to the last checkpoint. true: to the last safe ground.
+	var hazard_to_safe_ground := false
 
 
 class Vitals:
@@ -105,6 +106,23 @@ func restore_defaults() -> void:
 		"ascendant_form": {"cost": 100.0, "cast_time": 0.6, "duration": 8.0, "damage_mul": 2.0, "speed_mul": 1.25, "range_mul": 1.45},
 		"comet_dash": {"cost": 25.0, "cast_time": 0.08, "speed": 1150.0, "duration": 0.3, "damage": 30.0, "burst_damage": 18.0, "burst_radius": 100.0},
 	}
+
+
+## Energy tiers for the color-coded meter. Colors follow cost brackets, not
+## specific abilities, so whatever is slotted later reads correctly.
+const ENERGY_TIERS := [
+	{"max": 25.0, "color": Color("#6ee7a8")},
+	{"max": 50.0, "color": Color("#ffd166")},
+	{"max": 75.0, "color": Color("#ff9f43")},
+	{"max": INF, "color": Color("#ff5e8a")},
+]
+
+
+func energy_tier_color(cost: float) -> Color:
+	for tier in ENERGY_TIERS:
+		if cost <= tier.max:
+			return tier.color
+	return Color.WHITE
 
 
 ## Exact numbers (health, energy, damage) are shown only in debug mode:

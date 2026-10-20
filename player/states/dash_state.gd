@@ -8,16 +8,12 @@ var timer := 0.0
 
 func enter(_params: Dictionary) -> void:
 	var ix := p.input.axis_x()
-	if p.wall_sliding:
-		dir = -p.wall_dir
-	else:
-		dir = ix if ix != 0 else p.facing
+	dir = ix if ix != 0 else p.facing
 	timer = Config.movement.dash_duration
 	p.air_dash_used = not p.grounded
 	p.is_jumping = false
 	p.facing = dir
 	p.velocity.y = 0.0
-	p.wall_sliding = false
 	p.health.set_invulnerable("dash", true)
 	Events.player_dashed.emit(p, dir)
 

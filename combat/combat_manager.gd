@@ -56,6 +56,7 @@ func step(delta: float) -> void:
 	projectiles.step(delta)
 	_resolve_contact_damage()
 	_resolve_hazards()
+	_resolve_enemy_hazards()
 	queue_redraw()
 
 
@@ -216,6 +217,14 @@ func _resolve_hazards() -> void:
 	var r := p.get_rect().grow_individual(-2.0, -4.0, -2.0, 0.0)
 	if get_room().find_hazard(r).has_area():
 		p.hazard_respawn(Config.combat.hazard_damage)
+
+
+## Enemies die instantly when they touch a hazard (knocked into spikes, etc.).
+func _resolve_enemy_hazards() -> void:
+	for enemy in get_enemies():
+		if enemy.alive and get_room().find_hazard(enemy.get_rect()).has_area():
+			if enemy.kill():
+				Events.enemy_killed.emit(enemy)
 
 
 # ---------- Drawing ----------

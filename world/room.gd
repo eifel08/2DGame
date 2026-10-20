@@ -93,3 +93,9 @@ func find_hazard(rect: Rect2) -> Rect2:
 			if h.intersects(rect):
 				return h
 	return Rect2()
+
+
+## Interactables, checkpoints and pickups placed in the room.
+func get_objects() -> Array[Node]:
+	var node := get_node_or_null("Objects")
+	return node.get_children() if node else []

@@ -42,13 +42,25 @@ signal energy_changed(value: float)
 
 # Ultimates
 @warning_ignore("unused_signal")
-signal ultimate_changed(ability: RefCounted)
+signal loadout_changed()
 @warning_ignore("unused_signal")
 signal ultimate_cast(ability: RefCounted)
 @warning_ignore("unused_signal")
 signal ultimate_denied(ability: RefCounted, reason: String)
 @warning_ignore("unused_signal")
 signal ultimate_impact(hitstop: float, shake: float)
+
+# World, progression and UI
+@warning_ignore("unused_signal")
+signal checkpoint_activated(checkpoint: Node)
+@warning_ignore("unused_signal")
+signal player_rested(checkpoint: Node)
+@warning_ignore("unused_signal")
+signal currency_collected(amount: int, position: Vector2)
+@warning_ignore("unused_signal")
+signal dialogue_opened()
+@warning_ignore("unused_signal")
+signal dialogue_closed()
 
 # Animation (frame events from method tracks, e.g. "footstep", "swing")
 @warning_ignore("unused_signal")

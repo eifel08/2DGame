@@ -13,6 +13,7 @@ const RESPAWN_DELAY := 2.5
 @export var max_health := 80.0
 @export var patrol_range := 96.0
 @export var patrol_speed := 55.0
+@export var currency_drop := 6 ## Shards dropped when destroyed.
 
 @onready var flip: Node2D = $Flip
 @onready var anim: AnimationPlayer = $AnimationPlayer
@@ -83,6 +84,16 @@ func take_hit(damage: float, direction: Vector2, knockback: float) -> float:
 		alive = false
 		respawn_timer = RESPAWN_DELAY
 	return damage
+
+
+## Instant death (e.g. touching spikes). Returns true if it was alive.
+func kill() -> bool:
+	if not alive:
+		return false
+	health = 0.0
+	alive = false
+	respawn_timer = RESPAWN_DELAY
+	return true
 
 
 func step(delta: float) -> void:

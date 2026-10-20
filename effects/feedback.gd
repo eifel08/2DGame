@@ -22,6 +22,9 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.player_dashed.connect(_on_player_dashed)
 	Events.enemy_killed.connect(_on_enemy_killed)
 	Events.ultimate_impact.connect(_on_ultimate_impact)
+	Events.currency_collected.connect(_on_currency_collected)
+	Events.checkpoint_activated.connect(_on_checkpoint_activated)
+	Events.player_rested.connect(_on_player_rested)
 	Events.health_healed.connect(func(_amount: float) -> void: _heal_sparkle = true)
 
 
@@ -119,6 +122,22 @@ func _on_player_dashed(player: Node, dir: int) -> void:
 func _on_enemy_killed(enemy: Node) -> void:
 	camera.add_trauma(0.25)
 	effects.burst(enemy.get_center(), {"count": 24, "color": Color("#ffb36b"), "speed": 380.0, "size": 5.0, "life": 0.5})
+
+
+func _on_currency_collected(amount: int, pos: Vector2) -> void:
+	effects.burst(pos + Vector2(0, -11), {"count": 6, "color": Coin.COLOR, "speed": 140.0, "gravity": 200.0, "life": 0.3, "size": 3.0})
+	effects.float_text(pos + Vector2(0, -26), "+%d" % amount, Coin.COLOR)
+
+
+func _on_checkpoint_activated(checkpoint: Node) -> void:
+	effects.ring(checkpoint.global_position + Vector2(0, -50), {"radius": 50.0, "color": Color("#ffb347"), "width": 4.0, "life": 0.45})
+
+
+func _on_player_rested(checkpoint: Node) -> void:
+	effects.burst(checkpoint.global_position + Vector2(0, -20), {
+		"count": 20, "color": Color("#8dffb0"), "speed": 120.0, "angle": -PI / 2.0,
+		"spread": 1.4, "gravity": -150.0, "life": 0.7, "size": 3.0,
+	})
 
 
 func _on_ultimate_impact(hitstop: float, shake: float) -> void:

@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="DialogueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://dialogue/dialogue_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+speaker = "Weathered Tablet"
+pages = PackedStringArray("\"The walls here do not hold you. No hand can cling to this stone.\"", "\"But a wall can be pushed. Leap while touching one, and you spring away from it.\"", "\"In the narrow shafts, spring from wall to wall to climb.\" (Press jump while touching a wall in mid-air.)")

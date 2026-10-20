@@ -71,13 +71,13 @@ func _run() -> void:
 	Input.action_release(&"dash")
 	await _frames(40)
 
-	# --- Wall slide + wall jump (left shaft) ---
+	# --- Walls are jump-only: no wall slide (left shaft) ---
 	p.global_position = Vector2(32 + Player.WIDTH / 2.0 + 1.0, 320) # Next to the room's left wall.
 	p.velocity = Vector2.ZERO
 	Input.action_press(&"move_left")
 	await _frames(20)
-	_check("wall slide", p.wall_sliding and p.animator.current == "wall_slide", [p.wall_sliding, p.animator.current])
-	_check("wall slide speed capped", p.velocity.y <= Config.movement.wall_slide_speed + 0.1, p.velocity.y)
+	_check("no wall slide: falls at full speed against a wall", p.velocity.y > 400.0 and p.wall_dir == -1, [p.velocity.y, p.wall_dir])
+	_check("no wall slide animation", p.animator.current == "fall" and not p.animator.animation_player.has_animation("wall_slide"), p.animator.current)
 	Input.action_press(&"jump")
 	await _frames(2)
 	_check("wall jump pushes away", p.velocity.x > 200.0, p.velocity.x)
@@ -128,7 +128,7 @@ func _run() -> void:
 	# --- All four ultimates ---
 	for ult_id in ["nova_burst", "spirit_volley", "ascendant_form", "comet_dash"]:
 		await _reset()
-		game.ultimates.set_active_by_id(ult_id)
+		var key: StringName = UltimateManager.SLOT_ACTIONS[game.ultimates.slot_of(ult_id)]
 		var target: DummyEnemy = _first_enemy(false)
 		target.patrol = false
 		await _frames(3)
@@ -136,10 +136,10 @@ func _run() -> void:
 		p.facing = 1
 		p.health.set_energy(100.0)
 		var cost: float = Config.ultimates[ult_id].cost
-		Input.action_press(&"ultimate")
+		Input.action_press(key)
 		await _frames(2)
-		Input.action_release(&"ultimate")
-		_check("%s spends its cost" % ult_id, is_equal_approx(p.health.energy, 100.0 - cost), p.health.energy)
+		Input.action_release(key)
+		_check("%s (key %s) spends its cost" % [ult_id, key], is_equal_approx(p.health.energy, 100.0 - cost), p.health.energy)
 		await _frames(60)
 		if ult_id == "ascendant_form":
 			_check("ascendant form buffs the player", p.stat("damage_mul") > 1.0, p.modifiers.keys())
@@ -148,11 +148,11 @@ func _run() -> void:
 
 	# --- Insufficient energy is refused ---
 	await _reset()
-	game.ultimates.set_active_by_id("ascendant_form")
+	var ascendant_key: StringName = UltimateManager.SLOT_ACTIONS[game.ultimates.slot_of("ascendant_form")]
 	p.health.set_energy(50.0)
-	Input.action_press(&"ultimate")
+	Input.action_press(ascendant_key)
 	await _frames(2)
-	Input.action_release(&"ultimate")
+	Input.action_release(ascendant_key)
 	_check("ultimate refused without energy", is_equal_approx(p.health.energy, 50.0) and p.state_name() == "normal", p.health.energy)
 
 	# --- Contact damage + i-frames ---
@@ -188,8 +188,9 @@ func _run() -> void:
 	Input.action_release(&"move_right")
 	Events.player_hazard_respawn.disconnect(on_respawn)
 	_check("hazard deals damage", p.health.health < hp_full, p.health.health)
-	_check("hazard respawns player at safe point",
-		not respawn.is_empty() and respawn.from.x >= pit_left - Player.WIDTH and respawn.to.x < pit_left - 40.0
+	_check("hazard respawns player at the checkpoint",
+		not respawn.is_empty() and respawn.from.x >= pit_left - Player.WIDTH
+		and respawn.to.is_equal_approx(game.current_checkpoint.get_respawn_position())
 		and p.global_position.distance_to(respawn.to) < 1.0, [respawn, p.global_position])
 	await _frames(30)
 	_check("player is not stuck in the hazard", not game.room.find_hazard(p.get_rect()).has_area() and p.global_position.x < pit_left, p.global_position)
@@ -232,6 +233,115 @@ func _run() -> void:
 	_check("stats visible with hitbox toggle", Config.stats_visible())
 	Config.debug.show_hitboxes = false
 
+	# --- 4 dedicated ultimate keys, no switching ---
+	_check("ultimate hotkeys 1-4 exist", InputMap.has_action(&"ult_1") and InputMap.has_action(&"ult_4"))
+	_check("no ultimate switching action", not InputMap.has_action(&"cycle_ultimate"))
+	_check("energy tiers have distinct colors",
+		Config.energy_tier_color(25.0) != Config.energy_tier_color(50.0)
+		and Config.energy_tier_color(50.0) != Config.energy_tier_color(100.0))
+
+	# --- Dialogue with the guide NPC (pauses the game) ---
+	await _reset()
+	var npc: LoreObject = _find_object("Npc1")
+	p.global_position = npc.global_position + Vector2(-20, 0)
+	await _frames(3)
+	_check("NPC shows interaction prompt", game.focused_interactable == npc and npc.highlighted)
+	Input.action_press(&"interact")
+	await _frames(2)
+	Input.action_release(&"interact")
+	_check("dialogue opens", game.dialogue.is_open())
+	var paused_x := p.global_position.x
+	Input.action_press(&"move_right")
+	await _frames(20)
+	Input.action_release(&"move_right")
+	_check("game paused during dialogue", is_equal_approx(p.global_position.x, paused_x), p.global_position.x)
+	await _close_dialogue()
+	_check("dialogue closes after the last page", not game.dialogue.is_open())
+	var lore_count := 0
+	for node in game.room.get_objects():
+		if node is LoreObject and node.dialogue != null:
+			lore_count += 1
+	_check("room has NPC + lore tablets", lore_count >= 4, lore_count)
+
+	# --- Dedicated healing: rest at a checkpoint ---
+	await _reset()
+	p.health.health = 30.0
+	p.global_position = game.current_checkpoint.global_position
+	await _frames(3)
+	Input.action_press(&"interact")
+	await _frames(2)
+	Input.action_release(&"interact")
+	_check("resting at a checkpoint fully heals", is_equal_approx(p.health.health, p.health.get_max_health()), p.health.health)
+	await _close_dialogue()
+
+	# --- Currency ---
+	await _reset()
+	var shards_before: int = game.player_data.currency
+	var coin: Coin = null
+	for c in game.coins:
+		if not c.dropped and not c.collected:
+			coin = c
+			break
+	p.global_position = coin.global_position
+	await _frames(3)
+	_check("collecting a shard adds currency", game.player_data.currency == shards_before + coin.value, game.player_data.currency)
+	var victim: DummyEnemy = _first_enemy(false)
+	var coins_before: int = game.coins.size()
+	victim.kill()
+	Events.enemy_killed.emit(victim)
+	var dropped_value := 0
+	for c in game.coins:
+		if c.dropped:
+			dropped_value += c.value
+	_check("enemies drop shards", game.coins.size() > coins_before and dropped_value == victim.currency_drop, dropped_value)
+
+	# --- Loadout: swaps only at a checkpoint ---
+	await _reset()
+	var data: PlayerData = game.player_data
+	var original := data.equipped.duplicate()
+	await _frames(3)
+	_check("starts at a checkpoint", p.at_checkpoint)
+	_check("swap allowed at checkpoint", game.ultimates.equip(0, "comet_dash") and data.equipped[0] == "comet_dash" and data.equipped[3] == original[0], data.equipped)
+	p.global_position += Vector2(200, 0)
+	await _frames(3)
+	_check("swap refused away from checkpoint", not p.at_checkpoint and not game.ultimates.equip(0, original[0]), data.equipped)
+	Input.action_press(&"inventory")
+	await _frames(2)
+	Input.action_release(&"inventory")
+	_check("inventory opens", game.inventory.is_open())
+	_check("inventory shows swap restriction", game.inventory.pool_grid.get_child_count() == 4 and game.inventory.notice_label.text.contains("only"), game.inventory.notice_label.text)
+	var frozen_x := p.global_position.x
+	Input.action_press(&"move_right")
+	await _frames(10)
+	Input.action_release(&"move_right")
+	_check("game paused in inventory", is_equal_approx(p.global_position.x, frozen_x))
+	Input.action_press(&"inventory")
+	await _frames(2)
+	Input.action_release(&"inventory")
+	_check("inventory closes", not game.inventory.is_open())
+	for i in original.size():
+		data.equip(i, original[i])
+
+	# --- Enemies die on hazards ---
+	await _reset()
+	var faller: DummyEnemy = _first_enemy(false)
+	faller.patrol = false
+	faller.global_position = Vector2(46.0 * 32.0 + 60.0, 23.0 * 32.0) # Inside the right pit.
+	await _frames(3)
+	_check("enemy touching spikes dies", not faller.alive)
+
+	# --- Checkpoints: activation and respawn after death ---
+	await _reset()
+	var mid: Checkpoint = _find_object("Checkpoint2")
+	p.global_position = mid.global_position
+	await _frames(3)
+	_check("touching a checkpoint activates it", game.current_checkpoint == mid and mid.lit)
+	p.global_position = mid.global_position + Vector2(-150, 0)
+	await _frames(2)
+	p.receive_hit(1000.0, p.global_position.x, false, true)
+	await _frames(30)
+	_check("death respawns at the last checkpoint", p.global_position.distance_to(mid.get_respawn_position()) < 2.0, p.global_position)
+
 	# --- Debug overlay and toggles ---
 	Input.action_press(&"toggle_debug")
 	await _frames(2)
@@ -273,8 +383,30 @@ func _jump_height(hold_frames: int) -> float:
 
 
 func _reset() -> void:
+	# Deterministic start: back at the start checkpoint, no dialogue/menus open.
+	for cp in game.checkpoints:
+		if cp.is_start:
+			game.activate_checkpoint(cp, false)
+	if game.dialogue.is_open():
+		game.dialogue.close()
+	if game.inventory.is_open():
+		game.inventory.toggle()
 	game.reset_room()
 	await _frames(20)
+
+
+func _find_object(node_name: String) -> Node:
+	return game.room.get_node("Objects/" + node_name)
+
+
+func _close_dialogue() -> void:
+	for i in 60:
+		if not game.dialogue.is_open():
+			return
+		Input.action_press(&"interact")
+		await _frames(2)
+		Input.action_release(&"interact")
+		await _frames(1)
 
 
 func _first_enemy(flying: bool) -> DummyEnemy:

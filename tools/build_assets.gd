@@ -16,7 +16,9 @@ extends SceneTree
 
 const TS := 32
 
-## '#' solid  '=' one-way  '^' spikes  'P' player  'E' ground dummy  'F' flying dummy
+## '#' solid  '=' one-way  '^' spikes  'E' ground dummy  'F' flying dummy
+## 'S' start checkpoint (+ player spawn)  'C' checkpoint  '$' shard (currency)
+## 'N' guide NPC  'W' / 'K' / 'U' lore tablets (see LORE)
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. The flying dummy above the right pit is for pogo chains.
 const ROOM_LAYOUT := [
@@ -24,27 +26,39 @@ const ROOM_LAYOUT := [
 	"#..............................................................#",
 	"#..............................................................#",
 	"#..............................................................#",
-	"#.............................##...............................#",
-	"#=====..................#####.##...............................#",
+	"#..$..........................##...............................#",
+	"#=====..................#####.##.......................$.......#",
 	"#.....##......................##....................########...#",
 	"#.....##......................##..........................##...#",
-	"#.....##......................##..........................##...#",
+	"#.....##.....$................##..............$...........##...#",
 	"#.....##...======.............##............======........##...#",
 	"#.....##..................F...##..........................##...#",
-	"#.....##......................##..........................##...#",
-	"#.....##..............=====...##..........................##...#",
+	"#.....##................$.....##..........................##...#",
+	"#.....##..............=====...##.....$....................##...#",
 	"#.....##......................##...####...................##...#",
-	"#.....##......................##..........................##...#",
+	"#.....##..........$...........##..........................##...#",
 	"#.....##........=====.........##..........................##...#",
 	"#.....##......................##..........................##...#",
-	"#.....##......................##.................F........##...#",
-	"#.....##..=====...........................................##...#",
+	"#.....##....$.................##.................F........##...#",
+	"#.....##..=====...........................K...............##...#",
 	"#.....##................................####...................#",
 	"#.......................................####...................#",
-	"#.........P.........................E...####............E......#",
+	"#..W......S....N...........U..$$..E....C####............E...C..#",
 	"##################^^^^########################^^^^^^^###########",
 	"################################################################",
 ]
+
+## Dialogue per object letter.
+const LORE := {
+	"N": "res://dialogue/guide.tres",
+	"W": "res://dialogue/lore_wall_jump.tres",
+	"K": "res://dialogue/lore_spikes.tres",
+	"U": "res://dialogue/lore_ultimates.tres",
+}
+const CHECKPOINT_SCENE := "res://world/objects/checkpoint.tscn"
+const LORE_SCENE := "res://world/objects/lore_stone.tscn"
+const NPC_SCENE := "res://world/objects/npc.tscn"
+const COIN_SCENE := "res://world/objects/coin.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -64,7 +78,6 @@ const PLAYER_ANIMS := {
 	"jump": {"frames": 2, "fps": 10, "loop": false, "color": "#9fe0ff", "sx": 0.82, "sy": 1.14},
 	"fall": {"frames": 2, "fps": 8, "loop": true, "color": "#9fe0ff", "sx": 0.92, "sy": 1.06, "bob": 1.0},
 	"dash": {"frames": 3, "fps": 20, "loop": false, "color": "#ffffff", "sx": 1.45, "sy": 0.72, "lean": 0.25},
-	"wall_slide": {"frames": 2, "fps": 6, "loop": true, "color": "#6fb8e0", "sx": 0.9, "sy": 1.04, "lean": -0.1},
 	"attack_side": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 1.12, "sy": 0.94, "lean": 0.18, "arm": [-1.6, 0.9], "events": {1: "swing"}},
 	"attack_up": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 0.88, "sy": 1.12, "arm": [-0.3, -2.8], "events": {1: "swing"}},
 	"attack_down": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 1.08, "sy": 0.9, "arm": [0.3, 2.8], "events": {1: "swing"}},
@@ -99,6 +112,7 @@ func _initialize() -> void:
 	_save_library("res://player/player_animations.tres", PLAYER_ANIMS, 40.0, true)
 	_save_library("res://enemies/dummy_animations.tres", DUMMY_ANIMS, 44.0, false)
 	_save_library("res://enemies/flyer_animations.tres", FLYER_ANIMS, 30.0, false)
+	_save_checkpoint_library("res://world/objects/checkpoint_animations.tres")
 
 	if not FileAccess.file_exists(TILES_PNG) or force:
 		_build_tile_png()
@@ -148,11 +162,18 @@ func _build_input_map() -> void:
 		"attack": [_key(KEY_J), _key(KEY_X), _joy_button(JOY_BUTTON_X)],
 		"dash": [_key(KEY_K), _key(KEY_C), _key(KEY_SHIFT), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
 		"heal": [_key(KEY_L), _key(KEY_V), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
-		"ultimate": [_key(KEY_U), _key(KEY_Q), _joy_button(JOY_BUTTON_Y)],
-		"cycle_ultimate": [_key(KEY_TAB), _joy_button(JOY_BUTTON_BACK)],
+		"ult_1": [_key(KEY_1), _joy_button(JOY_BUTTON_Y)],
+		"ult_2": [_key(KEY_2), _joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)],
+		"ult_3": [_key(KEY_3), _joy_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)],
+		"ult_4": [_key(KEY_4), _joy_button(JOY_BUTTON_RIGHT_STICK)],
+		"interact": [_key(KEY_E), _key(KEY_F), _joy_button(JOY_BUTTON_B)],
+		"inventory": [_key(KEY_I), _key(KEY_TAB), _key(KEY_ESCAPE), _joy_button(JOY_BUTTON_BACK)],
 		"toggle_debug": [_key(KEY_F1), _key(KEY_QUOTELEFT), _joy_button(JOY_BUTTON_START)],
 		"reset_room": [_key(KEY_R)],
 	}
+	for obsolete in ["ultimate", "cycle_ultimate"]:
+		if ProjectSettings.has_setting("input/" + obsolete):
+			ProjectSettings.set_setting("input/" + obsolete, null)
 	for action in actions:
 		ProjectSettings.set_setting("input/" + action, {"deadzone": 0.5, "events": actions[action]})
 	ProjectSettings.save()
@@ -282,6 +303,30 @@ func _make_animation(def: Dictionary, height: float, with_arm: bool) -> Animatio
 	return anim
 
 
+## Checkpoint flame: "inactive" (dim ember), "activate" (flare), "active" (flicker loop).
+func _save_checkpoint_library(path: String) -> void:
+	if not _should_write(path):
+		return
+	var lib := AnimationLibrary.new()
+	var specs := {
+		"inactive": {"length": 0.1, "loop": false, "keys": [[0.0, Vector2(0.6, 0.5), Color("#737f99")]]},
+		"activate": {"length": 0.45, "loop": false, "keys": [[0.0, Vector2(0.6, 0.5), Color.WHITE], [0.15, Vector2(1.8, 1.9), Color("#fff3c4")], [0.45, Vector2(1, 1), Color("#ffb347")]]},
+		"active": {"length": 0.6, "loop": true, "keys": [[0.0, Vector2(1, 1), Color("#ffb347")], [0.3, Vector2(0.88, 1.18), Color("#ffd36b")], [0.6, Vector2(1, 1), Color("#ffb347")]]},
+	}
+	for anim_name in specs:
+		var spec: Dictionary = specs[anim_name]
+		var anim := Animation.new()
+		anim.length = spec.length
+		anim.loop_mode = Animation.LOOP_LINEAR if spec.loop else Animation.LOOP_NONE
+		var scale_track := _value_track(anim, "Visual/Flame:scale")
+		var color_track := _value_track(anim, "Visual/Flame:color")
+		for key in spec.keys:
+			anim.track_insert_key(scale_track, key[0], key[1])
+			anim.track_insert_key(color_track, key[0], key[2])
+		lib.add_animation(anim_name, anim)
+	_check(ResourceSaver.save(lib, path), path)
+
+
 # ---------- Tiles ----------
 
 func _build_tile_png() -> void:
@@ -369,6 +414,11 @@ func _build_room() -> void:
 	spawns.name = "EnemySpawns"
 	_add(root, spawns)
 
+	var objects := Node2D.new()
+	objects.name = "Objects"
+	_add(root, objects)
+	var counts := {}
+
 	var enemy_count := 0
 	for y in ROOM_LAYOUT.size():
 		var row: String = ROOM_LAYOUT[y]
@@ -384,11 +434,21 @@ func _build_room() -> void:
 					tiles.set_cell(cell, 0, ONE_WAY)
 				"^":
 					tiles.set_cell(cell, 0, SPIKES)
-				"P":
+				"P", "S":
 					var marker := Marker2D.new()
 					marker.name = "PlayerSpawn"
 					marker.position = feet
 					_add(root, marker)
+					if ch == "S":
+						_add_object(root, objects, counts, CHECKPOINT_SCENE, "Checkpoint", feet, {"is_start": true})
+				"C":
+					_add_object(root, objects, counts, CHECKPOINT_SCENE, "Checkpoint", feet, {})
+				"$":
+					_add_object(root, objects, counts, COIN_SCENE, "Coin", feet, {})
+				"N":
+					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
+				"W", "K", "U":
+					_add_object(root, objects, counts, LORE_SCENE, "Lore", feet, {"dialogue": load(LORE[ch])})
 				"E", "F":
 					enemy_count += 1
 					var m := Marker2D.new()
@@ -400,6 +460,16 @@ func _build_room() -> void:
 
 
 # ---------- Helpers ----------
+
+func _add_object(root: Node, parent: Node, counts: Dictionary, scene_path: String, base_name: String, pos: Vector2, props: Dictionary) -> void:
+	counts[base_name] = counts.get(base_name, 0) + 1
+	var node: Node2D = load(scene_path).instantiate()
+	node.name = "%s%d" % [base_name, counts[base_name]]
+	node.position = pos
+	for key in props:
+		node.set(key, props[key])
+	_add(root, node, parent)
+
 
 func _save_scene(root: Node, path: String) -> void:
 	var packed := PackedScene.new()

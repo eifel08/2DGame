@@ -1,53 +1,82 @@
 class_name UltimateManager
 extends Node2D
-## Holds the registered ultimates, tracks which one is equipped, checks the
-## energy cost, starts the cast wind-up and updates running abilities.
+## Owns every known ultimate and the 4 hotkey slots (ult_1 .. ult_4).
+## Checks the energy cost, starts the cast wind-up and updates running
+## abilities. Loadout changes are only allowed at a checkpoint.
 ## Also draws ability visuals in world space.
 
+const SLOT_ACTIONS: Array[StringName] = [&"ult_1", &"ult_2", &"ult_3", &"ult_4"]
+
 var ctx: UltimateContext
-var abilities: Array[UltimateAbility] = []
-var active_index := 0
+var data: PlayerData
+var abilities := {} ## id -> UltimateAbility
 
 
-func setup(p_ctx: UltimateContext) -> void:
+func setup(p_ctx: UltimateContext, p_data: PlayerData) -> void:
 	ctx = p_ctx
+	data = p_data
 
 
 func register(ability: UltimateAbility) -> void:
-	abilities.append(ability)
+	abilities[ability.id] = ability
 
 
-func get_active() -> UltimateAbility:
-	return abilities[active_index]
+func get_ability(ability_id: String) -> UltimateAbility:
+	return abilities.get(ability_id)
 
 
-func cycle(step_by := 1) -> void:
-	set_active_index(posmod(active_index + step_by, abilities.size()))
+## Ability in a hotkey slot, or null when the slot is empty.
+func get_slot(slot: int) -> UltimateAbility:
+	return abilities.get(data.equipped[slot])
 
 
-func set_active_by_id(ability_id: String) -> void:
-	for i in abilities.size():
-		if abilities[i].id == ability_id:
-			set_active_index(i)
-			return
+func slot_of(ability_id: String) -> int:
+	return data.equipped.find(ability_id)
 
 
-func set_active_index(i: int) -> void:
-	active_index = i
-	Events.ultimate_changed.emit(get_active())
+func unlocked_abilities() -> Array[UltimateAbility]:
+	var list: Array[UltimateAbility] = []
+	for ability_id in data.unlocked:
+		if abilities.has(ability_id):
+			list.append(abilities[ability_id])
+	return list
 
+
+# ---------- Loadout ----------
+
+func can_change_loadout() -> bool:
+	return ctx.player.at_checkpoint
+
+
+## Equips an unlocked ability into a slot. Refused away from checkpoints
+## unless `force` is set (debug tools only).
+func equip(slot: int, ability_id: String, force := false) -> bool:
+	if not force and not can_change_loadout():
+		return false
+	if not data.is_unlocked(ability_id) or slot < 0 or slot >= SLOT_ACTIONS.size():
+		return false
+	data.equip(slot, ability_id)
+	Events.loadout_changed.emit()
+	return true
+
+
+# ---------- Activation ----------
 
 func step(delta: float) -> void:
-	if ctx.input.was_pressed(&"ultimate"):
-		try_activate()
-	for ability in abilities:
+	for slot in SLOT_ACTIONS.size():
+		if ctx.input.was_pressed(SLOT_ACTIONS[slot]):
+			try_activate(slot)
+	for ability in abilities.values():
 		ability.step(delta, ctx)
 	queue_redraw()
 
 
-func try_activate() -> bool:
-	var ability := get_active()
+func try_activate(slot: int) -> bool:
+	var ability := get_slot(slot)
 	var player := ctx.player
+	if ability == null:
+		Events.ultimate_denied.emit(null, "empty")
+		return false
 	if not player.can_cast() or not ability.can_activate(ctx):
 		Events.ultimate_denied.emit(ability, "busy")
 		return false
@@ -60,11 +89,11 @@ func try_activate() -> bool:
 
 
 func cancel_all() -> void:
-	for ability in abilities:
+	for ability in abilities.values():
 		if ability.is_running:
 			ability.cancel(ctx)
 
 
 func _draw() -> void:
-	for ability in abilities:
+	for ability in abilities.values():
 		ability.draw_world(self, ctx)

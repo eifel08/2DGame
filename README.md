@@ -14,14 +14,11 @@ Tested with **Godot 4.3**. Newer 4.x versions open it too; Godot may offer to up
    git clone https://github.com/eifel08/2DGame.git
    ```
    Or on GitHub: **Code → Download ZIP**, then unzip.
-3. Start Godot. In the Project Manager click **Import**, select the `project.godot` file inside the `2DGame` folder, then **Import & Edit**.
+3. Start Godot. In the Project Manager click **Import**, select `2DGame/project.godot`, then **Import & Edit**.
 4. The first opening imports the assets. This takes a few seconds.
-5. Press **F5** (or the ▶ button) to play.
+5. Press **F5** (or ▶) to play.
 
-From a terminal you can also run it without the editor:
-```bash
-godot --path 2DGame
-```
+To pull later changes: `git pull` inside the `2DGame` folder, then reopen the project.
 
 ## Controls
 
@@ -32,116 +29,113 @@ godot --path 2DGame
 | Drop through a platform | Down + Jump | Down + A |
 | Attack (directional) | J / X (hold Up or Down to aim; Down only in the air) | X |
 | Dash | K / C / Shift | RB |
-| Heal (hold) | L / V (on the ground) | LB |
-| Ultimate | U / Q | Y |
-| Switch ultimate | Tab | Back / Select |
-| Debug overlay | F1 or ` / ~ (backquote key) | Start |
+| Heal (hold, uses energy) | L / V (on the ground) | LB |
+| Ultimate slot 1 / 2 / 3 / 4 | 1 / 2 / 3 / 4 | Y / RT / LT / R3 |
+| Interact (talk, read, rest) | E / F | B |
+| Inventory | I / Tab / Esc | Back / Select |
+| Debug overlay | F1 or ` / ~ | Start |
 | Reset room | R | — |
 
 Bindings live in **Project → Project Settings → Input Map**.
 
-## What to test
+## Systems
 
-| Mechanic | How |
+### Movement
+Crisp acceleration and stopping, dynamic jump height, double jump, dash with i-frames, coyote time and jump buffering. Gravity defaults to 2100, a little low, to give more reaction time for pogo chains.
+
+**Walls are jump-only.** There is no wall slide: you fall at full speed next to a wall. Press jump while touching a wall in mid-air to spring away from it. A wall jump refreshes your double jump and air dash, so you can climb narrow shafts wall to wall.
+
+### Combat
+Directional attacks (left, right, up, down) and the downward pogo bounce off enemies and spikes. Hits trigger hitstop and screen shake. Enemy contact deals damage, knocks you back and starts the i-frames.
+
+### Energy, healing and ultimates
+- **One shared energy meter.** Basic attacks fill it.
+- **Two ways to heal:**
+  1. **Channel:** hold L on the ground. Energy drains into health for as long as you hold it.
+  2. **Rest:** stand at a checkpoint flame and press E. Your health is fully restored. This needs no energy.
+- **Four hotkeys (1–4).** Each slot holds one ultimate. There is no switching.
+  - Defaults: 1 Nova Burst (33), 2 Spirit Volley (50), 3 Ascendant Form (100), 4 Comet Dash (25).
+- **Color-coded energy bar.** Each equipped slot has a mark on the bar at its cost, with the slot number under it. A mark is bright when you can afford it.
+  - The color follows the cost tier, not the spell. Green is up to 25, yellow up to 50, orange up to 75, and pink above that.
+  - So when you swap abilities later, the colors still show the minimum energy each slot needs.
+
+### Checkpoints
+Touching a checkpoint lights it. After a death **or a spike hit** you return to the last lit checkpoint. Resting (E) heals you fully. The game starts at the first checkpoint. The debug toggle *Spikes → Safe Ground* switches spike hits back to the "last safe ground" behavior.
+
+Checkpoint art is modular. Replace the polygons under `Visual` in `world/objects/checkpoint.tscn`, and edit or replace its animations named `inactive`, `activate` and `active`. No code changes are needed.
+
+### Hazards
+Spikes damage the player and send them to the last checkpoint. They teleport you even when you are invulnerable (but then deal no damage), so a damage loop is impossible. **Enemies that touch spikes die instantly.** Knock a dummy into a pit to see it.
+
+### Currency (Shards)
+Shards (◆) lie on ledges around the room, and destroyed enemies drop them. The total shows in the top-right corner and in the inventory. Placed shards return when you reset the room (R). Collected currency is kept.
+
+### Dialogue, lore and explanations
+Walk up to an NPC or a lore tablet. An "E Talk" or "E Read" prompt appears. Press E to open the dialogue. Press E, Space or J to reveal the page and then to turn it. The game pauses while dialogue is open.
+- **Archivist Mira** (next to the start) explains healing, checkpoints, currency, the ultimate keys and the loadout rule.
+- **Tablets** explain wall jumps (left shaft), spikes and the pogo (on the raised block), and the four ultimates (center).
+
+Dialogue texts are `DialogueData` resources in `dialogue/`. Edit them in the Inspector, or create new ones (FileSystem → New Resource → DialogueData). Assign one to any `lore_stone.tscn` or `npc.tscn` instance.
+
+### Inventory and loadout (I / Tab)
+The game pauses while the inventory is open. It has two tabs:
+- **Status:** shards, current/max health and current/max energy. Max values support growth through `max_health_bonus` and `max_energy_bonus`. The debug overlay has buttons to test this.
+- **Abilities:** the top row shows the 4 equipped slots. The bottom grid shows every unlocked ability, starting with the 4 basic ones.
+  - To swap, select a slot, then click an ability. If that ability already sits in another slot, the two slots swap.
+  - **Swapping only works while you stand at a checkpoint.** Elsewhere the buttons are disabled, and the rule is enforced in code too (`UltimateManager.equip`).
+
+### HUD
+The HUD is clean by default: health and energy bars, threshold marks and the shard count. There are no cost or switching texts. Turn on **Hitboxes & Stats** in the debug overlay (or simply open it) to see exact health, energy, enemy health, damage numbers and hitboxes.
+
+## Test checklist
+
+| Feature | How |
 | --- | --- |
-| Variable jump | Tap jump, then hold it. Holding goes about 3× higher. |
-| Coyote time | Run off a ledge and jump just after leaving it. |
-| Jump buffer | Press jump just before landing. The jump fires on touchdown. |
-| Double jump | Jump again in mid-air. |
-| Wall slide / jump | Far-left shaft or the narrow right shaft. Hold toward the wall while falling, then jump. |
-| Dash + i-frames | Dash through a dummy. With *Show Hitboxes* on, the player box turns blue while invulnerable. |
-| Directional attacks | Attack sideways, with Up held, and with Down held in the air. |
-| Pogo | Down-attack the flying dummy above the right spike pit, or the spikes themselves. Gravity is 2100 (slightly low) to give more reaction time. |
-| Hazards | Walk into a spike pit. You take damage and reappear on the last safe ground. With God Mode or i-frames you still reappear, without damage. |
-| Hitstop / shake | Hit anything. Tune both in the debug overlay. |
-| Contact damage + i-frames | Walk into a dummy. You take damage, get knocked back and flicker for the i-frame time. |
-| Stats display | The HUD shows bars only. Turn on *Hitboxes & Stats* (or open the debug overlay) to see exact health, energy, enemy health, damage numbers and the safe point. |
-| Energy + heal | Hit dummies to fill EN. Hold L on the ground to turn energy into HP. |
-| Ultimates | Fill the meter (or *Max Energy*), press U. Tab switches. Ticks on the EN bar show each cost. |
-
-Dummies respawn 2.5 s after being destroyed. Dying respawns the player at the start.
-
-## Hazards and safe points
-
-While you stand on solid ground away from hazards, the game records that spot as your **safe point**. Touching spikes deals damage and moves you straight back to it, so you can never get stuck in a damage loop. Regular enemies work differently: they deal damage, knock you back and start the i-frames. The rule for safe ground is in `world/room.gd` (`is_safe_ground`).
-
-## The four ultimates
-
-| Ultimate | Type | Default cost |
-| --- | --- | --- |
-| Nova Burst | Area-of-effect shockwave | 33 |
-| Spirit Volley | Fan of homing projectiles | 50 |
-| Ascendant Form | 8 s buff: damage, speed, reach | 100 |
-| Comet Dash | Aimable invulnerable charge + blast | 25 |
-
-Costs and all other numbers are in `autoload/config.gd` and can be changed live in the debug overlay.
+| No wall slide | Fall next to a wall while holding toward it: you do not slow down. Jump to wall-jump. |
+| Dialogue | Walk to the robed NPC right of the start, press E. Read the tablets too. |
+| Rest-heal | Take damage on a dummy, walk to a flame, press E. |
+| Checkpoints | Walk to the flame in the middle (it lights up). Then touch spikes: you reappear there. |
+| Currency | Collect the ◆ shards on the platforms. Destroy a dummy and collect its drops. |
+| Ultimate keys | Fill energy (debug: *Max Energy*), press 1, 2, 3, 4. Watch the colored marks. |
+| Loadout | Press I away from a checkpoint (swapping is locked), then at a checkpoint (select a slot, then an ability). |
+| Enemy on spikes | Knock the right-side dummy into the right pit, or use *Spawn Dummy* above a pit. |
+| Stats | Debug overlay (F1) → *Hitboxes & Stats*. |
 
 ## Project layout
 
 ```
-project.godot          settings, input map, autoloads
-autoload/
-  config.gd            Config: every tunable value (edited live by the debug overlay)
-  events.gd            Events: global signal bus
-core/
-  game.gd              composition root + fixed 60 Hz step order + hitstop gate
-  input_state.gd       buffered input edges (no lost presses during hitstop)
-  state_machine.gd     generic FSM
-  camera_rig.gd        follow camera + trauma screen shake
-  geom.gd
+autoload/config.gd       Config: every tunable value + energy tier colors
+autoload/events.gd       Events: global signal bus
+core/game.gd             composition root: fixed-step loop, checkpoints, interaction, pickups
 player/
-  player.tscn / .gd    CharacterBody2D: body, components, movement helpers
-  states/              normal, dash, heal, cast, ability, hurt
-  player_animator.gd   animation state machine (ordered rules → animation name)
-  player_rig.tscn      placeholder skeleton (Flip/Rig/Body, Visor, Arm/Blade)
-  player_animations.tres
-stats/health_energy.gd health, shared energy, healing, i-frames
-combat/
-  combat_manager.gd    melee, pogo, recoil, damage API, contact + hazard damage
-  projectile_system.gd homing projectiles
-ultimates/
-  ultimate_ability.gd  base class (lifecycle hooks)
-  ultimate_manager.gd  equip / cycle / cost check / cast / update
-  ultimate_registry.gd list of available ultimates
-  abilities/           nova_burst, spirit_volley, ascendant_form, comet_dash
-enemies/               training dummy (ground + flying) scenes, rigs, animations
-effects/
-  feedback.gd          hitstop + shake + particles, driven by events
-  effects.gd           particles, rings, damage numbers, afterimages
-ui/                    HUD, debug overlay, parallax background
+  player.gd, states/     movement state machine (normal, dash, heal, cast, ability, hurt)
+  player_data.gd         currency, unlocked abilities, 4 equipped slots
+  player_animator.gd     animation state machine (rules → animation name)
+  player_rig.tscn        placeholder skeleton; swap art here
+stats/health_energy.gd   health, shared energy, healing, i-frames, growth bonuses
+combat/                  melee, pogo, damage API, contact/hazard damage, projectiles
+ultimates/               ability base class, slot manager (keys 1-4), the 4 abilities
+enemies/                 training dummies (ground + flying)
 world/
-  room.gd              world queries (solid, one-way, hazard, ground, safe ground)
-  test_room.tscn       the test room (TileMapLayer, two spike pits, spawn markers)
-  tiles/               tile atlas and TileSet
-scenes/main.tscn       main scene
-tools/build_assets.gd  regenerates rigs, animations, TileSet, room and input map
-tests/smoke_test.tscn  automated headless test of the core mechanics
+  room.gd                world queries (solid, hazard, ground, safe ground, objects)
+  test_room.tscn         test room: platforms, walls, 2 spike pits, objects
+  objects/               interactable base, checkpoint, lore stone, NPC, coin
+dialogue/                DialogueData resources (NPC + lore texts)
+ui/                      HUD, dialogue box, inventory, debug overlay, background
+tools/build_assets.gd    regenerates rigs, animations, TileSet, room and input map
+tests/smoke_test.tscn    automated headless test (64 checks)
 ```
-
-### Design rules
-
-- **One loop drives the game.** `core/game.gd` steps every system in a fixed order. During hitstop it simply stops stepping, and animations freeze too, because the AnimationPlayers run in manual mode.
-- **Systems talk through signals.** Combat emits `Events.hit_landed`. Energy gain, hitstop, shake and particles each react on their own.
-- **One config.** Every number lives in `Config`. The debug overlay writes to it, and systems read it every frame.
-- **Gameplay never touches animation.** The player exposes state. `player_animator.gd` maps that state to an animation name.
-- **Buffs are stat modifiers.** `player.add_modifier(id, {"speed_mul": 1.25, ...})`. Movement and combat read `player.stat("speed_mul")`.
 
 ## Extending
 
-**Swap in real art.** Open `player/player_rig.tscn` and replace the Polygon2D parts with your Sprite2D, AnimatedSprite2D or Skeleton2D setup. Then edit the animations in the player's AnimationPlayer. Keep the animation names (`idle`, `run`, `jump`, `fall`, `dash`, `wall_slide`, `attack_side`, `attack_up`, `attack_down`, `heal`, `cast`, `hurt`). No code changes are needed.
-
-**Add an animation state.** Add an animation to the AnimationPlayer and one rule to `player/player_animator.gd`. Rule order is priority.
-
-**Add an ultimate.**
-1. Create `ultimates/abilities/my_ult.gd` extending `UltimateAbility`. Override `_on_activate`, `_on_step`, `_on_end`, `draw_world` as needed. Call `end(ctx)` when done.
-2. Add `"my_ult": {"cost": 40.0, "cast_time": 0.3, ...}` to `Config.ultimates`.
-3. Add `MyUlt.new()` to `ultimates/ultimate_registry.gd`.
-
-It then appears in the HUD, the Tab cycle and the debug overlay.
-
-**Add a debug control.** Add one entry to `TOGGLES`, `SLIDERS` or `_actions()` in `ui/debug_overlay.gd`.
-
-**Edit the room.** Open `world/test_room.tscn` and paint with the TileMap editor. Tiles: solid, solid (lit top), one-way plank, spikes. Move the markers under `EnemySpawns` to place dummies. To set a marker as flying, give it the metadata `flying = true`.
+- **New ultimate:** extend `UltimateAbility` in `ultimates/abilities/`, add a config block to `Config.ultimates`, and register it in `ultimate_registry.gd`. Unlock it with `game.player_data.unlock("id")`. It then appears in the inventory pool and can be slotted at a checkpoint.
+- **New lore or NPC:** create a `DialogueData` resource and assign it to an instance of `world/objects/lore_stone.tscn` or `npc.tscn` under `TestRoom/Objects`.
+- **New interactable:** extend `Interactable` and override `interact(game)`. Put the node under `Objects`.
+- **Real sprites:** replace `player/player_rig.tscn` (keep the animation names), the enemy rigs, or the `Visual` nodes of the world objects.
+- **Edit the room:** paint in `world/test_room.tscn`, or edit `ROOM_LAYOUT` in `tools/build_assets.gd`. Delete `world/test_room.tscn`, then run:
+  ```bash
+  godot --headless --path . --script res://tools/build_assets.gd
+  ```
 
 ## Automated test
 
@@ -149,4 +143,4 @@ It then appears in the HUD, the Tab cycle and the debug overlay.
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It drives the game through real input actions and checks 43 behaviors: movement, jumps, dash, wall slide/jump, attacks, pogo (on enemies and spikes), healing, all four ultimates, contact damage, i-frames, hazard respawn, the stats display and the debug toggles. Exit code 0 means all passed.
+It plays the game through real input actions and checks 64 behaviors. These include movement, the no-wall-slide rule, combat, healing (channel and rest), the 4 hotkeys, energy tiers, dialogue, currency, checkpoints, the loadout restriction, the inventory, hazards for the player and for enemies, and the debug toggles. Exit code 0 means everything passed.

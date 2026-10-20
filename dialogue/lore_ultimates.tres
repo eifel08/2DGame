@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="DialogueData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://dialogue/dialogue_data.gd" id="1_data"]
+
+[resource]
+script = ExtResource("1_data")
+speaker = "Tablet of the Four Arts"
+pages = PackedStringArray("\"Nova Burst: a ring of force around you. It needs a third of your energy.\"", "\"Spirit Volley: bolts that seek your enemies. It needs half.\"", "\"Ascendant Form: for a time you strike harder, move faster and reach further. It needs all of it.\"", "\"Comet Dash: a charge in any direction you aim, ending in a blast. It needs a quarter.\"", "\"Strike foes with your blade to gather energy. Each mark on the bar shows when an art is ready.\"")
