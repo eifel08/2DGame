@@ -1,0 +1,26 @@
+[gd_scene format=3]
+
+[node name="Rig" type="Node2D"]
+
+[node name="ArmBack" type="Polygon2D" parent="."]
+color = Color(0.172549, 0.184314, 0.301961, 1)
+polygon = PackedVector2Array(-40, -56, -28, -60, -24, -14, -38, -10)
+
+[node name="Body" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-30, 0, 30, 0, 34, -48, 22, -68, -22, -68, -34, -48)
+
+[node name="Crest" type="Polygon2D" parent="."]
+color = Color(0.172549, 0.184314, 0.301961, 1)
+polygon = PackedVector2Array(-14, -66, 0, -88, 14, -66)
+
+[node name="ArmFront" type="Polygon2D" parent="."]
+color = Color(0.211765, 0.227451, 0.368627, 1)
+polygon = PackedVector2Array(26, -58, 40, -54, 44, -12, 30, -10)
+
+[node name="Mask" type="Polygon2D" parent="."]
+color = Color(0.05, 0.05, 0.1, 0.95)
+polygon = PackedVector2Array(-4, -60, 26, -60, 26, -44, -4, -44)
+
+[node name="Eyes" type="Polygon2D" parent="."]
+color = Color(1, 0.419608, 0.419608, 1)
+polygon = PackedVector2Array(4, -56, 10, -56, 10, -50, 4, -50, 4, -53, 16, -53, 16, -56, 22, -56, 22, -50, 16, -50, 16, -53, 4, -53)

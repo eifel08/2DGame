@@ -3,11 +3,11 @@ extends SceneTree
 ## every scene and resource is guaranteed valid:
 ##   - Input Map actions (keyboard + gamepad) in project.godot
 ##   - Tile atlas texture, TileSet (collision, one-way, hazard data)
-##   - Test room scene (from the ASCII layout below)
+##   - Room scenes (test room + boss room, from the ASCII layouts below)
 ##   - Player and enemy placeholder rigs ("skeletons") and their AnimationLibraries
 ##
 ## The generated files are already committed. You only need this tool to
-## rebuild them, e.g. after editing ROOM_LAYOUT:
+## rebuild them, e.g. after editing a room layout (delete the room .tscn first):
 ##   godot --headless --path . --script res://tools/build_assets.gd -- --force
 ## The first run on a fresh checkout creates tiles.png; run
 ##   godot --headless --path . --import
@@ -16,7 +16,8 @@ extends SceneTree
 
 const TS := 32
 
-## '#' solid  '=' one-way  '^' spikes  'E' ground dummy  'F' flying dummy
+## '#' solid  '=' one-way  '^' spikes  'E' weak ground dummy  'F' weak flying dummy
+## 'G' strong dummy  'D' door (doorway to another room, see ROOMS)
 ## 'S' start checkpoint (+ player spawn)  'C' checkpoint  '$' shard (currency)
 ## 'N' guide NPC  'W' / 'K' / 'U' lore tablets  'T' checkpoint info tablet (see LORE)
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
@@ -27,7 +28,7 @@ const ROOM_LAYOUT := [
 	"#..............................................................#",
 	"#..............................................................#",
 	"#..$..........................##...............................#",
-	"#=====..................#####.##.......................$.......#",
+	"#=====..................#####.##.......................$.G.....#",
 	"#.....##......................##....................########...#",
 	"#.....##......................##..........................##...#",
 	"#.....##.....$................##..............$...........##...#",
@@ -41,12 +42,49 @@ const ROOM_LAYOUT := [
 	"#.....##......................##..........................##...#",
 	"#.....##....$.................##.................F........##...#",
 	"#.....##..=====...........................K...............##...#",
-	"#.....##................................####...................#",
-	"#.......................................####...................#",
-	"#..W......S....N...........U..$$.E...T.C####..........E...T.C..#",
+	"#.....##................................####....................",
+	"#.......................................####....................",
+	"#..W......S....N...........U..$$.E...T.C####..........E...T.C..D",
 	"##################^^^^########################^^^^^^^###########",
 	"################################################################",
 ]
+
+## Boss room: a sealed arena. Letters are arena wave markers:
+##   'w' weak dummy (wave 1)  'v' flying dummy (wave 1)  's' strong dummy (wave 2)  'B' boss (final wave)
+const BOSS_LAYOUT := [
+	"########################################",
+	"#......................................#",
+	"#......................................#",
+	"#......................................#",
+	"#......................................#",
+	"#......................................#",
+	"#......................................#",
+	"#......................................#",
+	"#...............========...............#",
+	"#......................................#",
+	"#...................v..................#",
+	"#......................................#",
+	"#.....======................======.....#",
+	".......................................#",
+	".......................................#",
+	"D.............w.......s...w...B........#",
+	"########################################",
+	"########################################",
+]
+
+## Rooms: layout, output scene, door settings per room and optional arena.
+const ROOMS := {
+	"test_room": {
+		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn",
+		"door": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1},
+	},
+	"boss_room": {
+		"name": "BossRoom", "layout": BOSS_LAYOUT, "path": "res://world/boss_room.tscn",
+		"door": {"door_id": "west", "target_room": "test_room", "target_door": "east", "inward": 1},
+		"arena": {"arena_id": "sentinel_arena", "trigger_cols": [5, 38], "waves": [["w", "v"], ["s"], ["B"]]},
+	},
+}
+const ARENA_KINDS := {"w": "weak", "v": "flyer", "s": "strong", "B": "boss"}
 
 ## Dialogue per object letter.
 const LORE := {
@@ -60,16 +98,21 @@ const CHECKPOINT_SCENE := "res://world/objects/checkpoint.tscn"
 const LORE_SCENE := "res://world/objects/lore_stone.tscn"
 const NPC_SCENE := "res://world/objects/npc.tscn"
 const COIN_SCENE := "res://world/objects/coin.tscn"
+const DOOR_SCENE := "res://world/objects/door.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
-const ROOM_SCENE := "res://world/test_room.tscn"
 
-# Atlas coordinates.
-const SOLID_TOP := Vector2i(0, 0)
-const SOLID := Vector2i(1, 0)
-const ONE_WAY := Vector2i(2, 0)
-const SPIKES := Vector2i(3, 0)
+# Atlas: columns 0-15 are solid tiles, one per exposed-edge mask
+# (top = 1, right = 2, bottom = 4, left = 8), so every face that borders open
+# space is lit and the collision outline is always visible.
+const EDGE_TOP := 1
+const EDGE_RIGHT := 2
+const EDGE_BOTTOM := 4
+const EDGE_LEFT := 8
+const ONE_WAY := Vector2i(16, 0)
+const SPIKES := Vector2i(17, 0)
+const ATLAS_COLUMNS := 18
 
 ## Player clips: frames/fps give the length; sx/sy squash, bob, lean (skew),
 ## body color, and an optional arm sweep [from, to] for attacks.
@@ -102,6 +145,27 @@ const FLYER_ANIMS := {
 	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#3d2336", "sx": 0.6, "sy": 0.6},
 }
 
+const STRONG_ANIMS := {
+	"idle": {"frames": 2, "fps": 3, "loop": true, "color": "#7d8aa6", "sx": 1.0, "sy": 1.0, "bob": 1.0},
+	"move": {"frames": 4, "fps": 6, "loop": true, "color": "#7d8aa6", "sx": 1.03, "sy": 0.97, "bob": 2.0},
+	"hurt": {"frames": 2, "fps": 16, "loop": false, "color": "#ffffff", "sx": 1.08, "sy": 0.92},
+	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#2e3446", "sx": 1.3, "sy": 0.25},
+}
+
+## Boss clips also animate the glowing eyes (telegraphs read clearly).
+const BOSS_ANIMS := {
+	"idle": {"frames": 4, "fps": 4, "loop": true, "color": "#4b4f78", "eyes": "#ff6b6b", "sx": 1.0, "sy": 1.0, "bob": 2.0},
+	"walk": {"frames": 4, "fps": 8, "loop": true, "color": "#4b4f78", "eyes": "#ff6b6b", "sx": 1.02, "sy": 0.98, "bob": 3.0, "lean": 0.08},
+	"telegraph": {"frames": 2, "fps": 8, "loop": true, "color": "#7a6fd1", "eyes": "#ffffff", "sx": 1.12, "sy": 0.88, "bob": 2.0},
+	"charge": {"frames": 2, "fps": 12, "loop": true, "color": "#5b5f96", "eyes": "#ffd36b", "sx": 1.2, "sy": 0.86, "lean": 0.3},
+	"leap": {"frames": 2, "fps": 8, "loop": false, "color": "#5b5f96", "eyes": "#ffd36b", "sx": 0.86, "sy": 1.16},
+	"volley": {"frames": 3, "fps": 10, "loop": true, "color": "#5b5f96", "eyes": "#7cf3ff", "sx": 0.94, "sy": 1.08},
+	"recover": {"frames": 2, "fps": 4, "loop": true, "color": "#3c3f60", "eyes": "#7a3f4a", "sx": 1.06, "sy": 0.92},
+	"roar": {"frames": 2, "fps": 10, "loop": true, "color": "#8a4fd1", "eyes": "#ffd36b", "sx": 1.15, "sy": 1.08, "bob": 3.0},
+	"hurt": {"frames": 2, "fps": 16, "loop": false, "color": "#ffffff", "eyes": "#ffffff", "sx": 1.05, "sy": 0.95},
+	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#22243a", "eyes": "#22243a", "sx": 1.3, "sy": 0.3},
+}
+
 var force := false
 
 
@@ -111,9 +175,13 @@ func _initialize() -> void:
 	_build_rig("res://player/player_rig.tscn", Vector2(22, 40), true)
 	_build_rig("res://enemies/dummy_rig.tscn", Vector2(34, 44), false)
 	_build_rig("res://enemies/flyer_rig.tscn", Vector2(36, 30), false)
+	_build_rig("res://enemies/strong_rig.tscn", Vector2(40, 54), false)
+	_build_boss_rig("res://enemies/boss_rig.tscn")
 	_save_library("res://player/player_animations.tres", PLAYER_ANIMS, 40.0, true)
 	_save_library("res://enemies/dummy_animations.tres", DUMMY_ANIMS, 44.0, false)
 	_save_library("res://enemies/flyer_animations.tres", FLYER_ANIMS, 30.0, false)
+	_save_library("res://enemies/strong_animations.tres", STRONG_ANIMS, 54.0, false)
+	_save_library("res://enemies/boss_animations.tres", BOSS_ANIMS, 72.0, false)
 	_save_checkpoint_library("res://world/objects/checkpoint_animations.tres")
 
 	if not FileAccess.file_exists(TILES_PNG) or force:
@@ -124,7 +192,8 @@ func _initialize() -> void:
 		quit(1)
 		return
 	_build_tileset(texture)
-	_build_room()
+	for room_id in ROOMS:
+		_build_room(room_id, ROOMS[room_id])
 	print("build_assets: done")
 	quit()
 
@@ -230,6 +299,29 @@ func _build_rig(path: String, size: Vector2, with_arm: bool) -> void:
 	_save_scene(rig, path)
 
 
+## Boss rig: broad body, crest, two arms and glowing eyes (all Polygon2D).
+func _build_boss_rig(path: String) -> void:
+	if not _should_write(path):
+		return
+	var rig := Node2D.new()
+	rig.name = "Rig"
+	var parts := [
+		["ArmBack", PackedVector2Array([Vector2(-40, -56), Vector2(-28, -60), Vector2(-24, -14), Vector2(-38, -10)]), Color("#2c2f4d")],
+		["Body", PackedVector2Array([Vector2(-30, 0), Vector2(30, 0), Vector2(34, -48), Vector2(22, -68), Vector2(-22, -68), Vector2(-34, -48)]), Color.WHITE],
+		["Crest", PackedVector2Array([Vector2(-14, -66), Vector2(0, -88), Vector2(14, -66)]), Color("#2c2f4d")],
+		["ArmFront", PackedVector2Array([Vector2(26, -58), Vector2(40, -54), Vector2(44, -12), Vector2(30, -10)]), Color("#363a5e")],
+		["Mask", PackedVector2Array([Vector2(-4, -60), Vector2(26, -60), Vector2(26, -44), Vector2(-4, -44)]), Color(0.05, 0.05, 0.1, 0.95)],
+		["Eyes", PackedVector2Array([Vector2(4, -56), Vector2(10, -56), Vector2(10, -50), Vector2(4, -50), Vector2(4, -53), Vector2(16, -53), Vector2(16, -56), Vector2(22, -56), Vector2(22, -50), Vector2(16, -50), Vector2(16, -53), Vector2(4, -53)]), Color("#ff6b6b")],
+	]
+	for part in parts:
+		var poly := Polygon2D.new()
+		poly.name = part[0]
+		poly.polygon = part[1]
+		poly.color = part[2]
+		_add(rig, poly)
+	_save_scene(rig, path)
+
+
 func _add(owner_node: Node, child: Node, parent: Node = null) -> void:
 	(parent if parent else owner_node).add_child(child)
 	child.owner = owner_node
@@ -294,6 +386,9 @@ func _make_animation(def: Dictionary, height: float, with_arm: bool) -> Animatio
 
 	t = _value_track(anim, "Flip/Rig/Body:color", true)
 	anim.track_insert_key(t, 0.0, Color(def.color))
+	if def.has("eyes"):
+		t = _value_track(anim, "Flip/Rig/Eyes:color", true)
+		anim.track_insert_key(t, 0.0, Color(def.eyes))
 
 	if with_arm:
 		var arm: Array = def.get("arm", [])
@@ -343,22 +438,28 @@ func _save_checkpoint_library(path: String) -> void:
 # ---------- Tiles ----------
 
 func _build_tile_png() -> void:
-	var img := Image.create(TS * 4, TS, false, Image.FORMAT_RGBA8)
+	var img := Image.create(TS * ATLAS_COLUMNS, TS, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
-	for i in 2: # Solid (with and without a lit top edge).
-		var ox := i * TS
+	for mask in 16: # Solid variants: lit faces wherever the tile borders open space.
+		var ox := mask * TS
 		img.fill_rect(Rect2i(ox, 0, TS, TS), Color("#2a3150"))
 		img.fill_rect(Rect2i(ox + 2, 2, TS - 4, TS - 4), Color("#323a5e"))
-		if i == 0:
-			img.fill_rect(Rect2i(ox, 0, TS, 3), Color("#6f7fb8"))
+		if mask & EDGE_TOP:
+			img.fill_rect(Rect2i(ox, 0, TS, 3), Color("#7f8fcc"))
+		if mask & EDGE_BOTTOM:
+			img.fill_rect(Rect2i(ox, TS - 2, TS, 2), Color("#56649a"))
+		if mask & EDGE_LEFT:
+			img.fill_rect(Rect2i(ox, 0, 2, TS), Color("#5d6ca6"))
+		if mask & EDGE_RIGHT:
+			img.fill_rect(Rect2i(ox + TS - 2, 0, 2, TS), Color("#5d6ca6"))
 	# One-way plank.
-	var px := TS * 2
+	var px := ONE_WAY.x * TS
 	img.fill_rect(Rect2i(px, 0, TS, 6), Color("#8a6a4a"))
 	img.fill_rect(Rect2i(px, 0, TS, 2), Color("#c49a6c"))
 	img.fill_rect(Rect2i(px + 4, 6, 3, 8), Color(0.54, 0.42, 0.29, 0.5))
 	img.fill_rect(Rect2i(px + TS - 7, 6, 3, 8), Color(0.54, 0.42, 0.29, 0.5))
 	# Spikes: four triangles in the lower 60% of the tile.
-	var sx := TS * 3
+	var sx := SPIKES.x * TS
 	var top := int(TS * 0.4)
 	for s in 4:
 		var x0 := sx + s * (TS / 4)
@@ -393,13 +494,13 @@ func _build_tileset(texture: Texture2D) -> void:
 	src.texture = texture
 	src.texture_region_size = Vector2i(TS, TS)
 	ts.add_source(src, 0)
-	for coords in [SOLID_TOP, SOLID, ONE_WAY, SPIKES]:
-		src.create_tile(coords)
+	for column in ATLAS_COLUMNS:
+		src.create_tile(Vector2i(column, 0))
 
 	var h := TS / 2.0
 	var full := PackedVector2Array([Vector2(-h, -h), Vector2(h, -h), Vector2(h, h), Vector2(-h, h)])
-	for coords in [SOLID_TOP, SOLID]:
-		var d := src.get_tile_data(coords, 0)
+	for mask in 16:
+		var d := src.get_tile_data(Vector2i(mask, 0), 0)
 		d.add_collision_polygon(0)
 		d.set_collision_polygon_points(0, 0, full)
 	var plank := src.get_tile_data(ONE_WAY, 0)
@@ -411,12 +512,15 @@ func _build_tileset(texture: Texture2D) -> void:
 	_check(ResourceSaver.save(ts, TILESET), TILESET)
 
 
-func _build_room() -> void:
-	if not _should_write(ROOM_SCENE):
+func _build_room(room_id: String, def: Dictionary) -> void:
+	var path: String = def.path
+	if not _should_write(path):
 		return
+	var layout: Array = def.layout
 	var root := Node2D.new()
-	root.name = "TestRoom"
+	root.name = def.name
 	root.set_script(load("res://world/room.gd"))
+	root.set("room_id", room_id)
 
 	var tiles := TileMapLayer.new()
 	tiles.name = "Tiles"
@@ -432,17 +536,22 @@ func _build_room() -> void:
 	_add(root, objects)
 	var counts := {}
 
+	var arena_def: Dictionary = def.get("arena", {})
+	var arena: Node2D = null
+	var wave_nodes := []
+	if not arena_def.is_empty():
+		arena = _build_arena(root, objects, layout, arena_def, wave_nodes)
+
 	var enemy_count := 0
-	for y in ROOM_LAYOUT.size():
-		var row: String = ROOM_LAYOUT[y]
+	for y in layout.size():
+		var row: String = layout[y]
 		for x in row.length():
 			var ch := row[x]
 			var cell := Vector2i(x, y)
 			var feet := Vector2(x * TS + TS / 2.0, (y + 1) * TS)
 			match ch:
 				"#":
-					var above: String = ROOM_LAYOUT[y - 1][x] if y > 0 else "#"
-					tiles.set_cell(cell, 0, SOLID if above == "#" else SOLID_TOP)
+					tiles.set_cell(cell, 0, Vector2i(_edge_mask(layout, x, y), 0))
 				"=":
 					tiles.set_cell(cell, 0, ONE_WAY)
 				"^":
@@ -462,14 +571,77 @@ func _build_room() -> void:
 					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
 				"W", "K", "U", "T":
 					_add_object(root, objects, counts, LORE_SCENE, "Lore", feet, {"dialogue": load(LORE[ch])})
-				"E", "F":
+				"D":
+					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.door)
+				"E", "F", "G":
 					enemy_count += 1
+					var kind: String = {"E": "weak", "F": "flyer", "G": "strong"}[ch]
 					var m := Marker2D.new()
-					m.name = "%s%d" % ["Flyer" if ch == "F" else "Dummy", enemy_count]
+					m.name = "%s%d" % [kind.capitalize(), enemy_count]
 					m.position = feet
+					m.set_meta("kind", kind)
 					m.set_meta("flying", ch == "F")
 					_add(root, m, spawns)
-	_save_scene(root, ROOM_SCENE)
+				"w", "v", "s", "B":
+					if arena == null:
+						continue
+					for i in arena_def.waves.size():
+						if (arena_def.waves[i] as Array).has(ch):
+							var am := Marker2D.new()
+							am.name = "%s%d" % [ARENA_KINDS[ch].capitalize(), wave_nodes[i].get_child_count() + 1]
+							am.position = feet - arena.position
+							am.set_meta("kind", ARENA_KINDS[ch])
+							_add(root, am, wave_nodes[i])
+	_save_scene(root, path)
+
+
+## Exposed-edge mask for a solid cell: an edge is exposed when the neighbour
+## is open space. Cells outside the layout count as solid.
+func _edge_mask(layout: Array, x: int, y: int) -> int:
+	var mask := 0
+	if not _is_solid_char(layout, x, y - 1):
+		mask |= EDGE_TOP
+	if not _is_solid_char(layout, x + 1, y):
+		mask |= EDGE_RIGHT
+	if not _is_solid_char(layout, x, y + 1):
+		mask |= EDGE_BOTTOM
+	if not _is_solid_char(layout, x - 1, y):
+		mask |= EDGE_LEFT
+	return mask
+
+
+func _is_solid_char(layout: Array, x: int, y: int) -> bool:
+	if y < 0 or y >= layout.size() or x < 0 or x >= (layout[y] as String).length():
+		return true
+	return layout[y][x] == "#"
+
+
+## Arena node: trigger area across the given columns, a gate over the room's
+## doorway, and one Node2D per wave holding the spawn markers.
+func _build_arena(root: Node, objects: Node, layout: Array, def: Dictionary, wave_nodes: Array) -> Node2D:
+	var arena := Node2D.new()
+	arena.name = "Arena"
+	arena.set_script(load("res://world/objects/arena_encounter.gd"))
+	arena.set("arena_id", def.arena_id)
+	var cols: Array = def.trigger_cols
+	arena.set("trigger_rect", Rect2(cols[0] * TS, TS, (cols[1] - cols[0] + 1) * TS, (layout.size() - 3) * TS))
+	var gates: Array[Rect2] = []
+	for y in layout.size(): # Seal every doorway cell on the room border.
+		var row: String = layout[y]
+		for x in [0, row.length() - 1]:
+			if row[x] != "#":
+				gates.append(Rect2(x * TS, y * TS, TS, TS))
+	arena.set("gate_rects", gates)
+	_add(root, arena, objects)
+	var waves := Node2D.new()
+	waves.name = "Waves"
+	_add(root, waves, arena)
+	for i in (def.waves as Array).size():
+		var w := Node2D.new()
+		w.name = "Wave%d" % (i + 1)
+		_add(root, w, waves)
+		wave_nodes.append(w)
+	return arena
 
 
 # ---------- Helpers ----------

@@ -208,7 +208,7 @@ func _resolve_contact_damage() -> void:
 	var pr := p.get_rect()
 	for enemy in get_enemies():
 		if enemy.deals_contact_damage() and pr.intersects(enemy.get_rect()):
-			if p.receive_hit(Config.combat.contact_damage, enemy.get_center().x):
+			if p.receive_hit(Config.combat.contact_damage * enemy.contact_damage_mul, enemy.get_center().x):
 				return
 
 
@@ -263,6 +263,7 @@ func _draw_hitboxes() -> void:
 	draw_rect(p.get_rect(), Color("#4dabf7") if p.health.is_invulnerable() else Color("#69db7c"), false, 1.0)
 	for enemy in get_enemies():
 		draw_rect(enemy.get_rect(), Color("#ffa94d"), false, 1.0)
+	_draw_world_collision()
 	# Hazard respawn target.
 	var sp := p.safe_point
 	draw_line(sp + Vector2(-8, 0), sp + Vector2(8, 0), Color("#69db7c"), 2.0)
@@ -271,6 +272,26 @@ func _draw_hitboxes() -> void:
 	if not attack.is_empty():
 		var active: bool = attack.t >= c.attack_active_start and attack.t <= c.attack_active_end
 		draw_rect(get_attack_hitbox(attack.dir), Color("#ff3b3b") if active else Color(1, 1, 1, 0.4), false, 1.0)
+
+
+## Debug: solid tile outlines near the camera, door triggers and arena areas,
+## so the visual layout can be checked against the real collision.
+func _draw_world_collision() -> void:
+	var room := get_room()
+	var view: Rect2 = game.camera.view_rect().grow(32.0)
+	var ts := Vector2(room.tiles.tile_set.tile_size)
+	var first := room.tiles.local_to_map(room.tiles.to_local(view.position))
+	var last := room.tiles.local_to_map(room.tiles.to_local(view.end))
+	for y in range(first.y, last.y + 1):
+		for x in range(first.x, last.x + 1):
+			var center := room.cell_center(Vector2i(x, y))
+			if room.is_solid_at(center):
+				draw_rect(Rect2(center - ts / 2.0, ts), Color(0.4, 0.9, 1.0, 0.18), false, 1.0)
+	for door in game.doors:
+		draw_rect(door.get_trigger_rect(), Color("#ffd36b"), false, 1.0)
+	var arena := room.get_arena()
+	if arena:
+		draw_rect(arena.get_trigger_rect(), Color(1.0, 0.4, 0.8, 0.5), false, 1.0)
 
 
 func _draw_labels() -> void:

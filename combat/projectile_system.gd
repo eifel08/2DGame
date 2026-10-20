@@ -1,7 +1,8 @@
 class_name ProjectileSystem
 extends Node2D
-## Lightweight projectiles for abilities. Optional homing steers toward the
-## nearest living enemy. Damage goes through CombatManager.apply_damage().
+## Lightweight projectiles. Player projectiles (abilities) hit enemies through
+## CombatManager.apply_damage(); optional homing steers toward the nearest
+## living enemy. Hostile projectiles (boss shards, shockwaves) hit the player.
 
 var combat: CombatManager
 var list: Array[Dictionary] = []
@@ -15,7 +16,8 @@ func clear() -> void:
 	list.clear()
 
 
-## opts: position, velocity, radius, damage, life, homing, color, source, knockback, delay
+## opts: position, velocity, radius, damage, life, homing, color, source, knockback,
+## delay, hostile (hits the player), shape ("orb" or "wave")
 func spawn(opts: Dictionary) -> void:
 	list.append({
 		"pos": opts.position,
@@ -28,6 +30,8 @@ func spawn(opts: Dictionary) -> void:
 		"source": opts.get("source", "projectile"),
 		"knockback": opts.get("knockback", 120.0),
 		"delay": opts.get("delay", 0.0),
+		"hostile": opts.get("hostile", false),
+		"shape": opts.get("shape", "orb"),
 		"trail": [],
 		"dead": false,
 	})
@@ -72,6 +76,12 @@ func step(delta: float) -> void:
 		if room.is_solid_at(pr.pos):
 			pr.dead = true
 			continue
+		if pr.hostile:
+			var player: Player = combat.get_player()
+			if Geom.circle_overlaps_rect(pr.pos, pr.radius, player.get_rect()):
+				player.receive_hit(pr.damage, pr.pos.x - signf(pr.vel.x))
+				pr.dead = true
+			continue
 		for e in combat.get_enemies():
 			if not e.alive or not Geom.circle_overlaps_rect(pr.pos, pr.radius, e.get_rect()):
 				continue
@@ -91,6 +101,11 @@ func step(delta: float) -> void:
 
 func _draw() -> void:
 	for pr in list:
+		if pr.shape == "wave":
+			var h: float = pr.radius * 2.4
+			draw_rect(Rect2(pr.pos.x - 5.0, pr.pos.y + pr.radius - h, 10.0, h), pr.color)
+			draw_rect(Rect2(pr.pos.x - 9.0, pr.pos.y + pr.radius - h * 0.6, 18.0, h * 0.6), Color(pr.color, 0.4))
+			continue
 		var n: int = pr.trail.size()
 		for i in n:
 			var k := float(i) / n

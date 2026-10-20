@@ -25,6 +25,11 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.currency_collected.connect(_on_currency_collected)
 	Events.checkpoint_activated.connect(_on_checkpoint_activated)
 	Events.player_rested.connect(_on_player_rested)
+	Events.boss_telegraph.connect(_on_boss_telegraph)
+	Events.boss_phase_changed.connect(_on_boss_phase_changed)
+	Events.boss_defeated.connect(_on_boss_defeated)
+	Events.arena_started.connect(func(_id: String) -> void: camera.add_trauma(0.35))
+	Events.arena_cleared.connect(func(_id: String) -> void: camera.add_trauma(0.3))
 	Events.health_healed.connect(func(_amount: float) -> void: _heal_sparkle = true)
 
 
@@ -138,6 +143,22 @@ func _on_player_rested(checkpoint: Node) -> void:
 		"count": 20, "color": Color("#8dffb0"), "speed": 120.0, "angle": -PI / 2.0,
 		"spread": 1.4, "gravity": -150.0, "life": 0.7, "size": 3.0,
 	})
+
+
+func _on_boss_telegraph(boss: Node, _attack: String) -> void:
+	effects.ring(boss.get_center() + Vector2(0, -20), {"radius": 46.0, "color": Color.WHITE, "width": 3.0, "life": 0.3})
+
+
+func _on_boss_phase_changed(boss: Node, _phase: int) -> void:
+	camera.add_trauma(0.6)
+	effects.ring(boss.get_center(), {"radius": 140.0, "color": Color("#b06cff"), "width": 8.0, "life": 0.6})
+
+
+func _on_boss_defeated(boss: Node) -> void:
+	freeze(0.25)
+	camera.add_trauma(0.9)
+	effects.burst(boss.get_center(), {"count": 60, "color": Color("#b06cff"), "speed": 480.0, "size": 6.0, "life": 0.8})
+	effects.ring(boss.get_center(), {"radius": 200.0, "color": Color.WHITE, "width": 8.0, "life": 0.7})
 
 
 func _on_ultimate_impact(hitstop: float, shake: float) -> void:

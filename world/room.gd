@@ -7,6 +7,8 @@ extends Node2D
 ## TileSet custom data layers: "one_way" (bool), "hazard" (bool).
 ## Any painted tile that is neither one-way nor hazard counts as solid.
 
+@export var room_id := "" ## Key used by WorldState and doors.
+
 @onready var tiles: TileMapLayer = $Tiles
 
 
@@ -16,15 +18,23 @@ func get_bounds() -> Rect2:
 	return Rect2(Vector2(used.position) * size, Vector2(used.size) * size)
 
 
+## Player spawn marker, or the first door's arrival point, or the room center.
 func get_player_spawn() -> Vector2:
-	return ($PlayerSpawn as Marker2D).global_position
+	var marker := get_node_or_null("PlayerSpawn") as Marker2D
+	if marker:
+		return marker.global_position
+	var doors := get_doors()
+	return doors[0].get_arrival_position() if not doors.is_empty() else get_bounds().get_center()
 
 
-## Returns [{position: Vector2, flying: bool}, ...] from the EnemySpawns markers.
+## Returns [{id, position, kind}, ...] from the EnemySpawns markers.
+## kind: "weak", "flyer" or "strong". The marker name is the persistence id.
 func get_enemy_spawns() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for marker in $EnemySpawns.get_children():
-		result.append({"position": marker.global_position, "flying": marker.get_meta("flying", false)})
+		var flying: bool = marker.get_meta("flying", false)
+		var kind: String = marker.get_meta("kind", "flyer" if flying else "weak")
+		result.append({"id": String(marker.name), "position": marker.global_position, "kind": kind})
 	return result
 
 
@@ -99,3 +109,35 @@ func find_hazard(rect: Rect2) -> Rect2:
 func get_objects() -> Array[Node]:
 	var node := get_node_or_null("Objects")
 	return node.get_children() if node else []
+
+
+func get_doors() -> Array[Door]:
+	var list: Array[Door] = []
+	for node in get_objects():
+		if node is Door:
+			list.append(node)
+	return list
+
+
+func get_arena() -> ArenaEncounter:
+	for node in get_objects():
+		if node is ArenaEncounter:
+			return node
+	return null
+
+
+## Non-solid cells on the room border. Every one must be covered by a door
+## (see the layout test), so the player can never walk into empty space.
+func border_openings() -> Array[Vector2i]:
+	var used := tiles.get_used_rect()
+	var gaps: Array[Vector2i] = []
+	for y in range(used.position.y, used.end.y):
+		for x in range(used.position.x, used.end.x):
+			var on_border := x == used.position.x or x == used.end.x - 1 or y == used.position.y or y == used.end.y - 1
+			if on_border and not is_solid_at(cell_center(Vector2i(x, y))):
+				gaps.append(Vector2i(x, y))
+	return gaps
+
+
+func cell_center(cell: Vector2i) -> Vector2:
+	return tiles.to_global(tiles.map_to_local(cell))

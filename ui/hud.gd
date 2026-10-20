@@ -20,6 +20,7 @@ var ghost_health := -1.0 ## Trailing bar that shows recent damage.
 var denied_flash := 0.0
 var damage_flash := 0.0
 var shard_pulse := 0.0
+var boss_provider: Callable = func() -> Node: return null ## Returns the active boss or null.
 
 
 func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -> void:
@@ -50,6 +51,8 @@ func _draw() -> void:
 	if player == null:
 		return
 	var font := ThemeDB.fallback_font
+	# Backing panel: marks the HUD corner as UI, not as open room space.
+	draw_rect(Rect2(8, 8, 330, slot_rect(0).end.y + 6.0), Color(0.02, 0.03, 0.07, 0.55))
 	var h := player.health
 	var stats := Config.stats_visible()
 	var x := 20.0
@@ -85,6 +88,8 @@ func _draw() -> void:
 		energy_col = Color("#8dffb0")
 	_label(font, "EN", Vector2(x, ey + 12))
 	_bar(Rect2(bx, ey, BAR_W, 14), [[h.energy / h.get_max_energy(), energy_col]])
+	if heal_ready():
+		_draw_heal_glow(Rect2(bx, ey, BAR_W, 14), h)
 	_draw_thresholds(font, bx, ey, h)
 	if stats:
 		draw_string(font, Vector2(bx + BAR_W + 8, ey + 12), "%.1f / %.0f" % [h.energy, h.get_max_energy()],
@@ -109,6 +114,8 @@ func _draw() -> void:
 	if Config.upgrades.god_mode:
 		draw_string(font, Vector2(0, 52), "GOD MODE", HORIZONTAL_ALIGNMENT_RIGHT, view.x - 14, 11, Color("#ffd43b"))
 
+	_draw_boss_bar(font)
+
 	# Control hints (bottom).
 	draw_string(font, Vector2(0, view.y - 12),
 		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Ultimates 1-4 · Interact E · Inventory I/Tab · Debug F1/`",
@@ -132,6 +139,45 @@ func _draw_thresholds(_font: Font, bx: float, ey: float, h: HealthEnergy) -> voi
 		if ready:
 			draw_rect(Rect2(mx - 3.0, ey - 5.0, 7.0, 24.0), Color(col, 0.3))
 		draw_rect(Rect2(mx - 1.0, ey - 4.0, 3.0, 22.0), Color(col, 1.0 if ready else 0.45))
+
+
+## True when the energy meter holds enough for one full heal chunk.
+func heal_ready() -> bool:
+	return player != null and player.health.energy >= Config.vitals.heal_chunk_energy - 0.0001
+
+
+## Heal readiness: a pulsing green glow around the energy bar plus a light
+## sweep across the filled part, shown whenever a full heal chunk is affordable.
+func _draw_heal_glow(bar: Rect2, h: HealthEnergy) -> void:
+	var t := Time.get_ticks_msec() / 1000.0
+	var pulse := 0.5 + 0.5 * sin(t * 5.0)
+	var glow := Color("#8dffb0")
+	for i in 3:
+		draw_rect(bar.grow(3.0 + i * 2.0), Color(glow, (0.45 - i * 0.13) * (0.6 + 0.4 * pulse)), false, 2.0)
+	var filled := bar.size.x * clampf(h.energy / h.get_max_energy(), 0.0, 1.0)
+	var sweep_x := bar.position.x + fmod(t * 160.0, maxf(1.0, filled + 40.0)) - 20.0
+	var x0 := clampf(sweep_x, bar.position.x, bar.position.x + filled)
+	var x1 := clampf(sweep_x + 18.0, bar.position.x, bar.position.x + filled)
+	if x1 > x0:
+		draw_rect(Rect2(x0, bar.position.y, x1 - x0, bar.size.y), Color(1, 1, 1, 0.35))
+	# Mark where a heal chunk's cost sits on the bar.
+	var cx := bar.position.x + bar.size.x * clampf(Config.vitals.heal_chunk_energy / h.get_max_energy(), 0.0, 1.0)
+	draw_rect(Rect2(cx - 1.0, bar.end.y + 2.0, 3.0, 3.0), Color(glow, 0.9))
+
+
+## Boss health bar at the top center while a boss fight runs (no numbers).
+func _draw_boss_bar(font: Font) -> void:
+	var boss: Node = boss_provider.call()
+	if boss == null:
+		return
+	var view := size
+	var w := view.x * 0.4
+	var bar := Rect2((view.x - w) / 2.0 + 40.0, 36.0, w, 10.0)
+	draw_string(font, Vector2(bar.position.x, bar.position.y - 6.0), boss.display_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color("#e6dcff"))
+	draw_rect(bar.grow(2.0), Color(0, 0, 0, 0.65))
+	draw_rect(Rect2(bar.position, Vector2(w * clampf(boss.health / boss.max_health, 0.0, 1.0), bar.size.y)),
+		Color("#b06cff") if boss.phase == 2 else Color("#8a6cff"))
+	draw_rect(Rect2(bar.position.x + w * 0.5 - 1.0, bar.position.y, 2.0, bar.size.y), Color(1, 1, 1, 0.35)) # Phase 2 mark.
 
 
 ## Screen rect of a hotkey box in the slot strip. Slots always run

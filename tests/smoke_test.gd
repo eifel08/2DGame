@@ -561,6 +561,208 @@ func _run() -> void:
 	_check("pressing Down on the ground also saves", game.current_checkpoint == mid
 		and absf(p.global_position.x - mid.global_position.x) < 0.5, game.current_checkpoint)
 
+	# --- Layout: no open space beyond walls, camera never shows outside the room ---
+	for rid in ["test_room", "boss_room"]:
+		game.load_room(rid)
+		await _frames(2)
+		var uncovered := []
+		for cell in game.room.border_openings():
+			var c: Vector2 = game.room.cell_center(cell)
+			var covered := false
+			for door in game.doors:
+				if door.get_trigger_rect().grow_individual(0, 0, 0, 2).has_point(c):
+					covered = true
+			if not covered:
+				uncovered.append(cell)
+		_check("%s: every border opening is a door" % rid, uncovered.is_empty(), uncovered)
+		var bounds: Rect2 = game.room.get_bounds()
+		var view_ok := true
+		for corner in [bounds.position + Vector2(40, 40), Vector2(bounds.end.x - 40, bounds.position.y + 40),
+				Vector2(bounds.position.x + 40, bounds.end.y - 40), bounds.end - Vector2(40, 40)]:
+			p.global_position = corner
+			game.camera.snap_to(p)
+			game.camera.add_trauma(1.0)
+			for i in 5:
+				game.camera.step_shake(1.0 / 60.0)
+				view_ok = view_ok and bounds.encloses(game.camera.view_rect())
+		_check("%s: camera view stays inside the room even while shaking" % rid, view_ok)
+	game.load_room("test_room")
+	var tiles: TileMapLayer = game.room.tiles
+	_check("wall faces bordering open space are lit (edge tiles)",
+		(tiles.get_cell_atlas_coords(Vector2i(0, 10)).x & 2) != 0 and tiles.get_cell_atlas_coords(Vector2i(10, 23)).x == 0,
+		[tiles.get_cell_atlas_coords(Vector2i(0, 10)), tiles.get_cell_atlas_coords(Vector2i(10, 23))])
+
+	# --- Heal readiness glow on the energy meter ---
+	await _reset()
+	p.health.set_energy(Config.vitals.heal_chunk_energy - 1.0)
+	_check("no heal glow below one chunk of energy", not game.hud.heal_ready())
+	p.health.set_energy(Config.vitals.heal_chunk_energy)
+	_check("heal glow once a full chunk is affordable", game.hud.heal_ready())
+
+	# --- Room transition through the doorway ---
+	await _reset()
+	var east: Door = game.doors[0]
+	p.global_position = east.global_position + Vector2(-90, 0)
+	await _frames(3)
+	Input.action_press(&"move_right")
+	for i in 120:
+		await _frames(1)
+		if game.room_id == "boss_room":
+			break
+	Input.action_release(&"move_right")
+	await _frames(30)
+	_check("walking through the east door enters the boss room", game.room_id == "boss_room", game.room_id)
+	var west: Door = game.doors[0]
+	_check("player arrives beside the boss room door",
+		p.global_position.distance_to(west.get_arrival_position()) < 40.0 and game.fade.color.a < 0.01, p.global_position)
+	Input.action_press(&"move_left")
+	for i in 120:
+		await _frames(1)
+		if game.room_id == "test_room":
+			break
+	Input.action_release(&"move_left")
+	await _frames(30)
+	_check("walking back through the door returns to the test room", game.room_id == "test_room"
+		and p.global_position.distance_to(game.doors[0].get_arrival_position()) < 40.0, [game.room_id, p.global_position])
+
+	# --- Enemy persistence and respawn hierarchy ---
+	game.new_game()
+	await _reset()
+	var weak: DummyEnemy = _first_enemy(false)
+	var weak_id := weak.spawn_id
+	weak.kill()
+	Events.enemy_killed.emit(weak)
+	await _frames(240)
+	_check("weak enemy does not respawn by itself", not weak.alive and _enemy_by_id(weak_id) == weak, weak_id)
+	game.load_room("boss_room", "west")
+	game.load_room("test_room", "east")
+	await _frames(2)
+	var revived := _enemy_by_id(weak_id)
+	_check("weak enemy respawns after a room transition", revived != null and revived.alive)
+	var survivor: DummyEnemy = _first_enemy(false)
+	var survivor_id := survivor.spawn_id
+	survivor.take_hit(30.0, Vector2.ZERO, 0.0)
+	game.load_room("boss_room", "west")
+	game.load_room("test_room", "east")
+	await _frames(2)
+	var back := _enemy_by_id(survivor_id)
+	_check("damaged survivor is back at full health after leaving and returning",
+		back != null and is_equal_approx(back.health, back.max_health), back.health if back else -1.0)
+	var strong: DummyEnemy = null
+	for e in game.enemies:
+		if e.tier == "strong":
+			strong = e
+	var strong_id := strong.spawn_id
+	strong.kill()
+	Events.enemy_killed.emit(strong)
+	game.load_room("boss_room", "west")
+	game.load_room("test_room", "east")
+	await _frames(2)
+	_check("strong enemy stays dead across room transitions", _enemy_by_id(strong_id) == null)
+	p.global_position = game.checkpoints[0].global_position
+	await _frames(3)
+	game.save_at_checkpoint(game.checkpoints[0])
+	await _frames(2)
+	var strong_back := _enemy_by_id(strong_id)
+	_check("strong enemy respawns when saving at a checkpoint", strong_back != null and strong_back.alive)
+
+	# --- Boss: tracks and targets the player ---
+	game.new_game()
+	game.world.clear_arena("sentinel_arena") # Fight the boss on its own here.
+	game.load_room("boss_room", "west")
+	Config.upgrades.god_mode = true
+	var boss: BossSentinel = game.spawn_enemy_kind("boss", Vector2(900, 512), "")
+	p.global_position = Vector2(400, 512)
+	await _frames(60)
+	_check("boss faces the player (left)", boss.facing == -1, boss.facing)
+	_check("boss walks toward the player", boss.state != "stalk" or boss.velocity.x < 0.0, [boss.state, boss.velocity.x])
+	p.global_position = Vector2(1150, 512)
+	await _frames(40)
+	_check("boss turns to track the player (right)", boss.facing == 1, boss.facing)
+	boss._launch("charge")
+	await _frames(1)
+	_check("charge is aimed at the player's position",
+		boss.velocity.x > 0.0 and absf(boss.last_target_position.x - p.global_position.x) < 2.0, [boss.velocity.x, boss.last_target_position])
+	await _frames(70)
+	p.global_position = Vector2(520, 512)
+	boss.global_position = Vector2(900, 512)
+	boss._launch("leap")
+	var landed := false
+	for i in 90:
+		await _frames(1)
+		if boss.state == "recover":
+			landed = true
+			break
+	_check("leap lands on the player's position", landed and absf(boss.global_position.x - 520.0) < 70.0, boss.global_position)
+	await _frames(40)
+	game.combat.projectiles.clear()
+	p.global_position = Vector2(boss.global_position.x - 300.0, 512) # Shards need room to fly.
+	boss._launch("volley")
+	await _frames(3)
+	var aimed := false
+	for pr in game.combat.projectiles.list:
+		if pr.hostile:
+			var to_player: Vector2 = (p.get_center() - pr.pos).normalized()
+			aimed = aimed or (pr.vel as Vector2).normalized().dot(to_player) > 0.9
+	_check("volley shards are aimed at the player", aimed)
+	Config.upgrades.god_mode = false
+	await _frames(60)
+	boss.take_hit(boss.max_health * 0.55, Vector2.ZERO, 0.0)
+	_check("boss enters phase 2 below half health", boss.phase == 2)
+	boss.kill()
+	Events.enemy_killed.emit(boss)
+	_check("defeated boss is recorded", game.world.is_boss_defeated(boss.boss_id))
+	_check("defeated boss never respawns", game.spawn_enemy_kind("boss", Vector2(900, 512), "") == null)
+	game.world.on_checkpoint_rest()
+	_check("not even after a checkpoint save", game.spawn_enemy_kind("boss", Vector2(900, 512), "") == null)
+
+	# --- Arena waves: weak/strong waves, boss last, cleared forever ---
+	game.new_game()
+	Config.upgrades.god_mode = true
+	game.load_room("boss_room", "west")
+	await _frames(2)
+	var director: ArenaDirector = game.arena_director
+	p.global_position = game.room.get_arena().get_trigger_rect().get_center() + Vector2(0, 200)
+	p.global_position.y = 512
+	await _frames(30) # Lets the boss-defeat hitstop from the previous test run out.
+	_check("entering the arena starts it and seals the door", director.is_active() and game.doors[0].locked and game.room.get_arena().gates_closed,
+		[director.state, game.doors[0].locked, game.room.get_arena().gates_closed, p.global_position, game.room.get_arena().get_trigger_rect()])
+	var waves_seen := []
+	for i in 600:
+		await _frames(1)
+		if director.state == "cleared":
+			break
+		for e in director.wave_enemies:
+			if e.alive and e.flash_timer <= 0.0:
+				if not waves_seen.has(director.wave):
+					waves_seen.append(director.wave)
+				var kind: String = "boss" if e is BossSentinel else e.tier
+				waves_seen.append(kind)
+				e.kill()
+				Events.enemy_killed.emit(e)
+	_check("arena runs its waves (weak, strong, then the boss)",
+		waves_seen.has("weak") and waves_seen.has("strong") and waves_seen.has("boss") and waves_seen.find("boss") > waves_seen.find("strong"), waves_seen)
+	_check("arena is cleared and the door opens", director.state == "cleared" and not game.doors[0].locked and not game.room.get_arena().gates_closed)
+	game.load_room("test_room", "east")
+	game.load_room("boss_room", "west")
+	await _frames(5)
+	p.global_position = Vector2(600, 512)
+	await _frames(10)
+	_check("cleared arena never repeats", director.state == "cleared" and game.enemies.is_empty(), [director.state, game.enemies.size()])
+	Config.upgrades.god_mode = false
+
+	game.new_game()
+	game.load_room("boss_room", "west")
+	await _frames(2)
+	p.global_position = Vector2(600, 512)
+	await _frames(60)
+	_check("arena active again in a new game", director.is_active())
+	p.receive_hit(1000.0, p.global_position.x, false, true)
+	await _frames(30)
+	_check("dying in the arena returns to the checkpoint and resets the arena",
+		game.room_id == "test_room" and not game.world.is_arena_cleared("sentinel_arena"), game.room_id)
+	game.new_game()
+
 	# --- Debug overlay and toggles ---
 	Input.action_press(&"toggle_debug")
 	await _frames(2)
@@ -617,7 +819,9 @@ func _jump_height(hold_frames: int) -> float:
 
 
 func _reset() -> void:
-	# Deterministic start: back at the start checkpoint, no dialogue/menus open.
+	# Deterministic start: test room, start checkpoint, no dialogue/menus open.
+	if game.room_id != "test_room":
+		game.load_room("test_room", "east")
 	for cp in game.checkpoints:
 		if cp.is_start:
 			game.activate_checkpoint(cp, false)
@@ -669,7 +873,14 @@ func _focus_pool_card(inv: InventoryMenu, ability_id: String) -> void:
 
 func _first_enemy(flying: bool) -> DummyEnemy:
 	for e in game.enemies:
-		if e.flying == flying:
+		if e is DummyEnemy and e.tier == "weak" and e.flying == flying:
+			return e
+	return null
+
+
+func _enemy_by_id(spawn_id: String) -> Enemy:
+	for e in game.enemies:
+		if e.spawn_id == spawn_id:
 			return e
 	return null
 

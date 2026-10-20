@@ -21,10 +21,7 @@ func setup(room_bounds: Rect2) -> void:
 func _target_for(player: Player) -> Vector2:
 	var view := get_viewport_rect().size
 	var target := player.get_center() + Vector2(player.facing * look_ahead, -view.y * 0.05)
-	var half := view / 2.0
-	target.x = clampf(target.x, bounds.position.x + half.x, maxf(bounds.position.x + half.x, bounds.end.x - half.x))
-	target.y = clampf(target.y, bounds.position.y + half.y, maxf(bounds.position.y + half.y, bounds.end.y - half.y))
-	return target
+	return _clamp_center(target)
 
 
 func follow(player: Player, delta: float) -> void:
@@ -41,7 +38,23 @@ func add_trauma(amount: float) -> void:
 	trauma = clampf(trauma + amount, 0.0, 1.0)
 
 
+## Shake is clamped so the view never shows anything outside the room:
+## no glimpses of empty space beyond the walls.
 func step_shake(delta: float) -> void:
 	trauma = maxf(0.0, trauma - trauma_decay * delta)
 	var power := trauma * trauma * max_shake if shake_enabled else 0.0
-	offset = Vector2(randf_range(-1, 1), randf_range(-1, 1)) * power
+	var wanted := global_position + Vector2(randf_range(-1, 1), randf_range(-1, 1)) * power
+	offset = _clamp_center(wanted) - global_position
+
+
+## Visible world rect (camera center + offset), for checks and tests.
+func view_rect() -> Rect2:
+	var view := get_viewport_rect().size
+	return Rect2(global_position + offset - view / 2.0, view)
+
+
+func _clamp_center(center: Vector2) -> Vector2:
+	var half := get_viewport_rect().size / 2.0
+	return Vector2(
+		clampf(center.x, bounds.position.x + half.x, maxf(bounds.position.x + half.x, bounds.end.x - half.x)),
+		clampf(center.y, bounds.position.y + half.y, maxf(bounds.position.y + half.y, bounds.end.y - half.y)))

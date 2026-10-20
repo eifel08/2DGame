@@ -80,6 +80,10 @@ func _actions() -> Array:
 	return [
 		["Spawn Dummy", func() -> void: game.spawn_enemy(false)],
 		["Spawn Flyer", func() -> void: game.spawn_enemy(true)],
+		["Spawn Strong", func() -> void: game.spawn_enemy(false, "strong")],
+		["Go to Boss Room", func() -> void: game.load_room("boss_room", "west")],
+		["Go to Test Room", func() -> void: game.load_room("test_room", "east")],
+		["New Game (reset world)", func() -> void: game.new_game()],
 		["Reset Enemies", func() -> void: game.reset_enemies()],
 		["Full Heal", func() -> void: game.player.health.full_heal()],
 		["Take Damage", func() -> void: game.player.receive_hit(15.0, game.player.global_position.x - game.player.facing, false, true)],
@@ -293,5 +297,7 @@ func _process(delta: float) -> void:
 		"shards       %d" % game.player_data.currency,
 		"checkpoint   %s  at checkpoint %s" % [cp.name if cp else "-", p.at_checkpoint],
 		"enemies      %d alive / %d" % [alive, game.enemies.size()],
+		"room         %s  arena %s" % [game.room_id, game.arena_director.state],
+		"world        dead %s  bosses %s  arenas %s" % [game.world.dead_enemies, game.world.defeated_bosses.keys(), game.world.cleared_arenas.keys()],
 	])
 

@@ -1,0 +1,32 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://enemies/boss_sentinel.gd" id="1_enemy"]
+[ext_resource type="PackedScene" path="res://enemies/boss_rig.tscn" id="2_rig"]
+[ext_resource type="AnimationLibrary" path="res://enemies/boss_animations.tres" id="3_anims"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(60, 72)
+
+[node name="BossSentinel" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 5
+script = ExtResource("1_enemy")
+tier = "boss"
+max_health = 520.0
+currency_drop = 60
+contact_damage_mul = 1.4
+knockback_mul = 0.15
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -36)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Flip" type="Node2D" parent="."]
+
+[node name="Rig" parent="Flip" instance=ExtResource("2_rig")]
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+callback_mode_process = 2
+libraries = {
+"": ExtResource("3_anims")
+}
