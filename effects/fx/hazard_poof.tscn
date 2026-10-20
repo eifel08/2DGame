@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_e18es"]
+
+[sub_resource type="Gradient" id="Gradient_86s8u"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="HazardPoof" type="Node2D"]
+script = ExtResource("1_e18es")
+lifetime = 0.45
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 18
+lifetime = 0.4
+one_shot = true
+explosiveness = 1.0
+spread = 180.0
+gravity = Vector2(0, 600)
+initial_velocity_min = 98.0
+initial_velocity_max = 280.0
+scale_amount_min = 3.0
+scale_amount_max = 6.0
+color = Color(1, 0.419608, 0.419608, 1)
+color_ramp = SubResource("Gradient_86s8u")

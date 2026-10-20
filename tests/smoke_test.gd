@@ -439,19 +439,21 @@ func _run() -> void:
 	_check("dialogue text is LTR and does not re-wrap while typing",
 		tl.text_direction == Control.TEXT_DIRECTION_LTR and tl.visible_characters_behavior == TextServer.VC_CHARS_AFTER_SHAPING)
 
-	# --- Info tablet shortly before each later checkpoint ---
-	var tablets_ok := true
+	# --- One checkpoint info tablet, only at the first checkpoint ---
+	var tablet_spots := []
+	for rid in game.ROOM_SCENES:
+		var scene_root: Node = (game.ROOM_SCENES[rid] as PackedScene).instantiate()
+		for node in scene_root.get_node("Objects").get_children():
+			if node is LoreObject and node.dialogue and node.dialogue.resource_path.ends_with("lore_checkpoint.tres"):
+				tablet_spots.append([rid, node.position.x])
+		scene_root.free()
+	var start_cp: Checkpoint = null
 	for cp in game.checkpoints:
 		if cp.is_start:
-			continue
-		var found := false
-		for node in game.room.get_objects():
-			if node is LoreObject and node.dialogue and node.dialogue.resource_path.ends_with("lore_checkpoint.tres"):
-				var dx: float = cp.global_position.x - node.global_position.x
-				if dx > 20.0 and dx < 140.0:
-					found = true
-		tablets_ok = tablets_ok and found
-	_check("checkpoint info tablet before each checkpoint", tablets_ok)
+			start_cp = cp
+	_check("the checkpoint tablet appears once, just before the first checkpoint",
+		tablet_spots.size() == 1 and tablet_spots[0][0] == "test_room"
+		and start_cp.global_position.x - tablet_spots[0][1] > 20.0 and start_cp.global_position.x - tablet_spots[0][1] < 140.0, tablet_spots)
 
 	# --- 4 dedicated ultimate keys, no switching ---
 	_check("ultimate hotkeys 1-4 exist", InputMap.has_action(&"ult_1") and InputMap.has_action(&"ult_4"))
@@ -563,6 +565,8 @@ func _run() -> void:
 	await _frames(2)
 	Input.action_release(&"interact")
 	_check("pressing E saves the checkpoint", game.current_checkpoint == mid and mid.lit and p.at_checkpoint)
+	_check("saving at a checkpoint starts the trance", p.state_name() == "trance", p.state_name())
+	p.fsm.change("normal")
 	p.global_position = mid.global_position + Vector2(-150, 0)
 	await _frames(2)
 	p.receive_hit(1000.0, p.global_position.x, false, true)
@@ -576,6 +580,13 @@ func _run() -> void:
 	Input.action_release(&"move_down")
 	_check("pressing Down on the ground also saves", game.current_checkpoint == mid
 		and absf(p.global_position.x - mid.global_position.x) < 0.5, game.current_checkpoint)
+	await _frames(20)
+	_check("holding Down does not break the save trance", p.state_name() == "trance", p.state_name())
+	Input.action_press(&"jump")
+	await _frames(3)
+	Input.action_release(&"jump")
+	_check("a fresh press wakes the player after saving", p.state_name() != "trance", p.state_name())
+	await _frames(40)
 
 	# --- Layout: no open space beyond walls, camera never shows outside the room ---
 	for rid in ["test_room", "boss_room", "arena_room", "secret_room"]:
@@ -834,9 +845,18 @@ func _run() -> void:
 		absf(portal.global_position.x - p.global_position.x) >= game.SPAWN_CLEARANCE, portal.global_position)
 	_check("a spawning enemy is harmless and untouchable",
 		portal.is_spawning() and not portal.deals_contact_damage() and is_zero_approx(portal.take_hit(5.0, Vector2.ZERO, 0.0)))
-	await _frames(70)
-	_check("after the telegraph the enemy becomes active", not portal.is_spawning() and portal.hitbox_active())
+	await _frames(3)
+	_check("the spawn uses the portal effect and the spawn clip (no timer)",
+		game.effects.count("spawn_portal") > 0 and portal.anim.assigned_animation == "spawn", portal.anim.assigned_animation)
+	await _frames(22)
+	_check("the spawn telegraph is short (under half a second)", not portal.is_spawning() and portal.hitbox_active())
 	game.remove_enemy(portal)
+	var plain_spawns := Sfx.count("spawn")
+	game.spawn_enemy(false)
+	await _frames(2)
+	var plain: Enemy = game.enemies[-1]
+	_check("outside arenas, enemies spawn without a telegraph", not plain.is_spawning() and Sfx.count("spawn") == plain_spawns)
+	game.remove_enemy(plain)
 
 	# --- Boss death: roar and dissolve ---
 	game.new_game()
@@ -851,13 +871,14 @@ func _run() -> void:
 	await _frames(2)
 	_check("the boss roars when it dies", Sfx.count("boss_roar") > roars)
 	_check("the dead boss stops hurting at once", not dying_boss.hitbox_active() and not dying_boss.deals_contact_damage())
-	_check("a boss defeat shows a banner", game.hud.banner_text.contains("FELLED"), game.hud.banner_text)
+	_check("a boss defeat shows no text pop-up", not "banner_text" in game.hud)
 	_check("the boss is still visible while it screams", dying_boss.visible and not dying_boss.is_dissolved())
 	for i in 300:
 		await _frames(1)
 		if dying_boss.is_dissolved():
 			break
-	_check("the boss dissolves after the scream", dying_boss.is_dissolved())
+	_check("the boss dissolves after the scream (dissolve clip + particle effect)",
+		dying_boss.is_dissolved() and game.effects.count("boss_dissolve") > 0)
 
 	# --- Proving Grounds: a dedicated arena room that stays cleared ---
 	game.new_game()
@@ -876,8 +897,8 @@ func _run() -> void:
 				e.kill()
 				Events.enemy_killed.emit(e)
 	_check("the Proving Grounds arena runs and clears", grounds.state == "cleared" and game.world.is_arena_cleared("proving_grounds"), grounds.state)
-	_check("clearing an arena plays a victory sound and banner",
-		Sfx.count("victory") > victories and game.hud.banner_text == "ARENA CLEARED", game.hud.banner_text)
+	_check("clearing an arena plays a victory sound and effect (no text)",
+		Sfx.count("victory") > victories and game.effects.count("arena_clear") > 0)
 	game.load_room("boss_room", "east")
 	game.load_room("arena_room", "west")
 	await _frames(3)
@@ -898,11 +919,16 @@ func _run() -> void:
 		Input.action_release(&"attack")
 		await _frames(30)
 	_check("three hits break the hidden wall", not wall.intact and game.world.is_secret_open("proving_grounds_wall"), wall.hits)
+	_check("a broken wall opens at once, with no message", game.effects.count("wall_break") > 0 and not wall.visible)
 	Input.action_press(&"move_right")
+	var walk_frames := 0
 	for i in 120:
 		await _frames(1)
+		walk_frames += 1
 		if game.room_id == "secret_room":
 			break
+	_check("walking through the gap enters the shrine with no fade or wait",
+		game.room_id == "secret_room" and walk_frames < 40 and game.transition.is_empty() and game.fade.color.a < 0.01, walk_frames)
 	Input.action_release(&"move_right")
 	await _frames(30)
 	_check("the hidden passage leads to the Hidden Shrine", game.room_id == "secret_room", game.room_id)
@@ -994,6 +1020,41 @@ func _run() -> void:
 	_check("reset controls restores the default key", Settings.key_name("jump") != "K", Settings.key_name("jump"))
 	Settings.set_value("sfx_volume", 0.9)
 
+	# --- Placeholder architecture: sounds and effects are swappable nodes ---
+	var sounds_ok := true
+	for sound in ["hit", "pogo", "hurt", "death", "save", "spawn", "door", "break", "secret", "relic", "boss_roar", "victory", "ui_move", "ui_confirm"]:
+		var node := Sfx.get_node_or_null(sound) as AudioStreamPlayer
+		sounds_ok = sounds_ok and node != null and node.stream != null and node.bus == &"SFX"
+	_check("every sound is its own AudioStreamPlayer node with a stream", sounds_ok)
+	var fx: FxPlayer = game.effects.play("hit_spark", Vector2(300, 300))
+	_check("effects are scenes played by name", fx != null and fx.get_child_count() > 0 and fx.is_inside_tree())
+	await _frames(int(fx.lifetime * 60.0) + 10)
+	_check("a finished effect frees itself", not is_instance_valid(fx))
+	var anims_ok := true
+	for kind in ["weak", "flyer", "strong", "boss"]:
+		var e: Enemy = game.ENEMY_SCENES[kind].instantiate()
+		var ap := e.get_node("AnimationPlayer") as AnimationPlayer
+		anims_ok = anims_ok and ap.has_animation("spawn") and ap.has_animation("dead") and e.has_node("Flip/Rig")
+		if kind == "boss":
+			anims_ok = anims_ok and ap.has_animation("roar") and ap.has_animation("dissolve")
+		e.free()
+	_check("enemy visuals are rig + AnimationPlayer clips (spawn, dead, roar, dissolve)", anims_ok)
+	var pap := p.get_node("AnimationPlayer") as AnimationPlayer
+	_check("the player has trance and dying clips", pap.has_animation("trance") and pap.has_animation("dying"))
+
+	# --- HUD shows the bound hotkeys on the ability slots ---
+	_check("HUD slots show keys 1-4 by default", game.hud.hotkey_label(0) == "1" and game.hud.hotkey_label(3) == "4",
+		[game.hud.hotkey_label(0), game.hud.hotkey_label(3)])
+	Settings.rebind("ult_1", KEY_Q)
+	_check("HUD slot follows a rebound key", game.hud.hotkey_label(0) == "Q", game.hud.hotkey_label(0))
+	Settings.reset_controls()
+
+	# --- The pause menu has no path to the inventory ---
+	var has_inventory_button := false
+	for b in game.pause_menu.find_children("*", "Button", true, false):
+		has_inventory_button = has_inventory_button or (b as Button).text.contains("Inventory")
+	_check("the pause menu has no Inventory option", not has_inventory_button)
+
 	# --- Debug overlay and toggles ---
 	Input.action_press(&"toggle_debug")
 	await _frames(2)
@@ -1041,10 +1102,30 @@ func _run() -> void:
 	_check("Enter on Settings opens the settings", title.settings.visible and not title.main_panel.visible)
 	await _ui_action(&"ui_cancel")
 	_check("Esc leaves the settings", title.main_panel.visible and not title.settings.visible)
+	await _ui_action(&"ui_down")
+	await _ui_action(&"ui_accept")
 	await _ui_action(&"ui_up")
+	_check("Up from the first setting wraps to Back", get_viewport().gui_get_focus_owner() == title.settings.back_button,
+		get_viewport().gui_get_focus_owner())
+	await _ui_action(&"ui_down")
+	_check("Down from Back wraps to the first setting", get_viewport().gui_get_focus_owner() == title.settings._first)
+	for i in 40:
+		await _ui_action(&"ui_down")
+		if get_viewport().gui_get_focus_owner() == title.settings.back_button:
+			break
+	_check("Down alone reaches the last button (Back) in the settings", get_viewport().gui_get_focus_owner() == title.settings.back_button)
+	await _ui_action(&"ui_cancel")
+	_check("leaving the settings focuses Play again", get_viewport().gui_get_focus_owner() == title.play_button)
 	await _ui_action(&"ui_accept")
 	_check("Play opens the slot select with 5 slots", title.slots_panel.visible and title.slot_buttons.size() == 5)
 	_check("used slots show their summary", title.slot_buttons[0].text.contains("Testing Halls"), title.slot_buttons[0].text)
+	var labels_ok := true
+	for b in title.slot_buttons:
+		labels_ok = labels_ok and not b.text.contains("Slot")
+	Saves.delete_slot(4)
+	title.refresh_slots()
+	_check("slots carry no 'Slot N' label; an empty slot reads New Game", labels_ok and title.slot_buttons[4].text == "New Game",
+		title.slot_buttons[4].text)
 	await _ui_action(&"ui_cancel")
 	_check("Esc returns from the slot select", title.main_panel.visible and not title.slots_panel.visible)
 	await _click(title.settings_button)

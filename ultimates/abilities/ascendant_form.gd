@@ -29,7 +29,7 @@ func _on_activate(ctx: UltimateContext) -> void:
 		"energy_gain_mul": 0.5, # Balance: slower meter gain while empowered.
 	})
 	Events.ultimate_impact.emit(0.1, 0.6)
-	ctx.effects.ring(ctx.player.get_center(), {"radius": 120.0, "color": color, "width": 8.0, "life": 0.5})
+	ctx.effects.play("ascendant_ring", ctx.player.get_center(), {"tint": color})
 
 
 func _on_step(delta: float, ctx: UltimateContext) -> void:
@@ -38,10 +38,7 @@ func _on_step(delta: float, ctx: UltimateContext) -> void:
 	spark_timer -= delta
 	if spark_timer <= 0.0:
 		spark_timer = 0.04
-		ctx.effects.burst(p.global_position + Vector2(randf_range(-11, 11), 0), {
-			"count": 1, "color": color, "speed": 90.0, "angle": -PI / 2.0,
-			"spread": 0.5, "gravity": -250.0, "life": 0.45, "size": 3.0,
-		})
+		ctx.effects.play("ascendant_spark", p.global_position + Vector2(randf_range(-11, 11), 0), {"tint": color})
 	if remaining <= 0.0:
 		end(ctx)
 

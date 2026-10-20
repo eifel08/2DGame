@@ -59,9 +59,9 @@ func delete_slot(slot: int) -> void:
 func summary(slot: int) -> String:
 	var data := read_slot(slot)
 	if data.is_empty():
-		return "Slot %d  ·  New game" % (slot + 1)
+		return "New Game"
 	var minutes := int(data.get("playtime", 0.0)) / 60
-	return "Slot %d  ·  %s  ·  ◆ %d  ·  %d:%02d" % [slot + 1, ROOM_NAMES.get(data.get("room", ""), "?"),
+	return "%s  ·  ◆ %d  ·  %d:%02d" % [ROOM_NAMES.get(data.get("room", ""), "?"),
 		int(data.get("currency", 0)), minutes / 60, minutes % 60]
 
 

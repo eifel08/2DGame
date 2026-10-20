@@ -41,7 +41,7 @@ func _on_step(delta: float, ctx: UltimateContext) -> void:
 			"color": color,
 			"source": id,
 		})
-		ctx.effects.burst(origin, {"count": 3, "color": color, "speed": 120.0, "gravity": 0.0, "life": 0.2, "size": 3.0})
+		ctx.effects.play("volley_muzzle", origin, {"tint": color})
 		fired += 1
 		timer += cfg("interval")
 	if fired >= count:

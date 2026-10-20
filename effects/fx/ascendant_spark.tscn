@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_j7jye"]
+
+[sub_resource type="Gradient" id="Gradient_p818y"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="AscendantSpark" type="Node2D"]
+script = ExtResource("1_j7jye")
+lifetime = 0.5
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.45
+one_shot = true
+explosiveness = 1.0
+direction = Vector2(-4.37114e-08, -1)
+spread = 15.0
+gravity = Vector2(0, -250)
+initial_velocity_min = 31.5
+initial_velocity_max = 90.0
+scale_amount_min = 1.8
+scale_amount_max = 3.6
+color_ramp = SubResource("Gradient_p818y")

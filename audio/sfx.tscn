@@ -1,0 +1,90 @@
+[gd_scene load_steps=16 format=3]
+
+[ext_resource type="Script" path="res://autoload/sfx.gd" id="script"]
+[ext_resource type="AudioStream" path="res://audio/sfx/hit.wav" id="s1"]
+[ext_resource type="AudioStream" path="res://audio/sfx/pogo.wav" id="s2"]
+[ext_resource type="AudioStream" path="res://audio/sfx/hurt.wav" id="s3"]
+[ext_resource type="AudioStream" path="res://audio/sfx/death.wav" id="s4"]
+[ext_resource type="AudioStream" path="res://audio/sfx/save.wav" id="s5"]
+[ext_resource type="AudioStream" path="res://audio/sfx/spawn.wav" id="s6"]
+[ext_resource type="AudioStream" path="res://audio/sfx/door.wav" id="s7"]
+[ext_resource type="AudioStream" path="res://audio/sfx/break.wav" id="s8"]
+[ext_resource type="AudioStream" path="res://audio/sfx/secret.wav" id="s9"]
+[ext_resource type="AudioStream" path="res://audio/sfx/relic.wav" id="s10"]
+[ext_resource type="AudioStream" path="res://audio/sfx/boss_roar.wav" id="s11"]
+[ext_resource type="AudioStream" path="res://audio/sfx/victory.wav" id="s12"]
+[ext_resource type="AudioStream" path="res://audio/sfx/ui_move.wav" id="s13"]
+[ext_resource type="AudioStream" path="res://audio/sfx/ui_confirm.wav" id="s14"]
+
+[node name="Sfx" type="Node"]
+script = ExtResource("script")
+
+[node name="hit" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s1")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="pogo" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s2")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="hurt" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s3")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="death" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s4")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="save" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s5")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="spawn" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s6")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="door" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s7")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="break" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s8")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="secret" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s9")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="relic" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s10")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="boss_roar" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s11")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="victory" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s12")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="ui_move" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s13")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="ui_confirm" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s14")
+max_polyphony = 4
+bus = &"SFX"

@@ -42,7 +42,10 @@ To pull later changes: `git pull` inside the `2DGame` folder, then reopen the pr
 | Reset room | R | — |
 
 Keys can be rebound in **Settings → Controls** (title screen or pause menu). The defaults live in **Project → Project Settings → Input Map**.
-Every menu (title, slot select, settings, pause, inventory) works with the mouse and with the keyboard or gamepad. Hovering a button with the mouse moves the keyboard focus there too.
+Every menu (title, slot select, settings, pause, inventory) works with the mouse and with the keyboard or gamepad.
+- Arrows or WASD move the focus. Enter, Space or Z confirms. A click works too.
+- Only one button is highlighted at a time (gold frame). Hovering with the mouse moves that highlight.
+- Up and Down wrap around, so the first and last buttons are always reachable. In Settings, Down goes all the way to **Back**.
 
 ## Systems
 
@@ -68,7 +71,7 @@ The pogo is forgiving: the downward swing has a wide hitbox (78 × 80 px, `Confi
 - **Heal-ready glow:** the energy bar glows green, with a light sweep, whenever it holds enough energy for one full heal chunk. A small green dot under the bar marks a chunk's cost.
 - **Four hotkeys (1–4).** Each slot holds one ultimate, or nothing. You can equip 0 to 4 abilities. There is no switching.
   - Defaults: 1 Nova Burst, 2 Spirit Volley, 3 Ascendant Form, 4 Comet Dash.
-- **Color-coded energy bar, no numbers.** Each equipped slot puts a mark on the bar at the energy it needs. Under the bar, the hotkey strip shows slots 1, 2, 3 and 4 from left to right, each with its icon. A mark or slot is bright when there is enough energy.
+- **Color-coded energy bar, no numbers.** Each equipped slot puts a mark on the bar at the energy it needs. Under the bar, the hotkey strip shows the four slots from left to right, each with its icon and its **actual key** (1–4 by default; a key rebound in Settings shows its new name). A mark or slot is bright when there is enough energy.
   - The color follows the energy tier, not the spell: green (low), yellow, orange, pink (full).
   - Empty slots have no mark.
 - **No exact stats for the player.** Abilities, tooltips and lore never show energy numbers. Each ability shows a small gauge filled to its requirement instead. Exact values appear only in the debug stats view.
@@ -79,9 +82,9 @@ The pogo is forgiving: the downward swing has a wide hitbox (78 × 80 px, `Confi
   - A short collapse animation plays first (red flash, death sound). Then the screen fades.
   - Respawning works like a save: weak and strong enemies return. Energy starts at **0**.
   - Dead enemies stop hurting at once: their contact damage, hurtbox and body collision switch off the moment they die.
-- **Trance:** after a death, or when a save loads, you float in a trance at the checkpoint. You are safe there. Any **new** button press wakes you. A key you were already holding does not.
+- **Trance:** after saving at a checkpoint, after a death, or when a save loads, you float in a trance at the checkpoint. You are safe there. Any **new** button press wakes you. A key you were already holding does not.
 - **Checkpoints save only on purpose.** Standing near a flame does nothing. Press **E** (or **Down** on the ground) to save: the flame lights, you snap to its exact center, and your health is fully restored. No text appears. Only at the flame where you saved can you change the loadout.
-- **Info tablets:** a tablet stands shortly before each later checkpoint. Reading it is optional; it explains saving, death respawn and the loadout rule.
+- **Info tablet:** one tablet stands just before the very first checkpoint. Reading it is optional; it explains saving, death respawn and the loadout rule. Later checkpoints have no tablet.
 - The debug toggle *Spikes → Safe Ground* (on by default) can send spike hits to the checkpoint instead.
 
 Checkpoint art is modular. Replace the polygons under `Visual` in `world/objects/checkpoint.tscn`, and edit or replace its animations named `inactive`, `activate` and `active`.
@@ -93,9 +96,9 @@ The world map has four rooms:
 Testing Halls  ⇄  Sentinel's Arena  ⇄  Proving Grounds  ⇄ (hidden wall) ⇄  Hidden Shrine
 ```
 
-- Walk into a lit doorway to move through it, with a short fade.
+- Walk into a lit doorway to move through it. The switch is instant: no fade and no wait, and you keep running.
 - **Proving Grounds** is a dedicated arena room with its own checkpoint and three waves. Once cleared, it stays cleared.
-- **Secret passage:** at the far east end of the Proving Grounds, one wall section is cracked. Strike it three times. It crumbles and opens the way to the **Hidden Shrine**. The shrine holds a lore tablet, shards and a **relic** that raises max health for this save. The broken wall and the relic are saved.
+- **Secret passage:** at the far east end of the Proving Grounds, one wall section is cracked. Strike it three times. It crumbles at once, with no message, and opens the way to the **Hidden Shrine**. The shrine holds a lore tablet, shards and a **relic** that raises max health for this save. The broken wall and the relic are saved.
 - Each room is its own scene in `world/`. They are loaded on demand by `core/game.gd` (`ROOM_SCENES`).
 
 ### Enemy tiers and respawning
@@ -119,7 +122,7 @@ The Sentinel waits in the Boss Room. It always tracks you: it turns to face you,
 - **Volley:** shards aimed at you, in a spread.
 - **Phase 2** (below half health): shorter warnings, faster moves, more shards.
 - Its health bar appears at the top of the screen during the fight. A defeated Sentinel never returns.
-- **Death:** it rears up and screams (a low roar, a heavy shake, a flash), then dissolves into purple particles. A "HOLLOW SENTINEL FELLED" banner appears.
+- **Death:** it rears up and screams (a low roar, a heavy shake, a flash), then dissolves into purple particles. There is no text pop-up.
 
 ### Arena encounters
 The Boss Room is an **arena**. Stepping in seals the doorway with gates, then the waves follow:
@@ -127,9 +130,9 @@ The Boss Room is an **arena**. Stepping in seals the doorway with gates, then th
 2. A strong dummy.
 3. The boss.
 
-Each wave starts once the previous one is defeated. After the last wave the gates open, and the arena is **cleared for good**. A clear plays a victory fanfare, golden rings and sparks, and an "ARENA CLEARED" banner. If you die inside, the attempt resets and the arena starts fresh next time.
+Each wave starts once the previous one is defeated. After the last wave the gates open, and the arena is **cleared for good**. A clear plays a victory fanfare with golden rings and sparks. There is no text pop-up. If you die inside, the attempt resets and the arena starts fresh next time.
 
-**Telegraphed spawns:** wave enemies (and enemies that return while you stand in the room) appear through a portal. For 0.9 s they are see-through, harmless and cannot be hit. They never appear on top of you: a spawn point too close to the player moves aside.
+**Telegraphed spawns (arenas only):** arena wave enemies appear through a short portal. For 0.35 s they fade in, harmless and impossible to hit. No timer or text is shown. They never appear on top of you: a spawn point too close to the player moves aside. Everywhere else enemies simply appear, with no telegraph.
 - Arenas are data: in a room scene, `Objects/Arena` has a trigger rect, gate rects, and `Waves/Wave1`, `Wave2`, ... with marker children (meta `kind`: `weak`, `flyer`, `strong` or `boss`).
 - The logic is in `core/arena_director.gd`. Add a wave by adding a `WaveN` node with markers.
 
@@ -166,16 +169,27 @@ The game pauses while the inventory is open. It has two tabs (switch with Q / E)
 
 ### Title screen, save slots and settings
 - **Title screen:** Play, Settings, Quit.
-- **Play** opens the slot select. There are **5 independent slots**. Each line shows the location, the shards and the play time. An empty slot starts a new game. *Delete* asks for confirmation (press it twice).
+- **Play** opens the slot select. There are **5 independent slots**. A used slot shows the location, the shards and the play time. An empty slot reads **New Game**. *Delete* asks for confirmation (press it twice).
 - **A slot stores:** the saved checkpoint and room, shards, unlocked and equipped abilities, health/energy growth, defeated bosses, cleared arenas, collected shards, opened secrets and relics. Respawnable enemies are not stored.
 - **Saving happens** when you save at a checkpoint, clear an arena, defeat a boss, break a secret wall or take a relic.
 - **Loading** puts you at the saved checkpoint, in a trance, with 0 energy and the respawnable enemies reset.
 - Save files are JSON in `user://saves/slot_N.json`.
 - **Settings:** master, music and effects volume, screen shake, fullscreen, and key rebinding (choose a key, then press the new one; Esc cancels). *Reset controls* restores the defaults. Settings are kept in `user://settings.cfg`.
-- **Pause menu (Esc):** Resume, Inventory, Settings, Quit to title. The game is paused while it is open.
+- **Pause menu (Esc):** Resume, Settings, Quit to title. The game is paused while it is open. The inventory is not in this menu; it opens only with its own key (I / Tab).
 
-### Audio
-All sounds are short placeholder tones, made in code by `autoload/sfx.gd` (hit, pogo, hurt, death, save, spawn, door, wall break, secret, relic, boss roar, victory, menu clicks). They play on an **SFX** bus. A **Music** bus is ready for music. To use real audio, put a sound file in `Sfx.streams` under the same name.
+### Placeholder art, animation and sound (swap without code changes)
+Gameplay code never draws art or builds sounds. It only asks for things **by name**. Everything visible or audible is a placeholder in its own node or file:
+
+| What | Where | How to replace |
+| --- | --- | --- |
+| Player poses (idle, run, attack, heal, hurt, **dying**, **trance**, ...) | `player/player_rig.tscn` + `player/player_animations.tres` (AnimationPlayer) | Swap the rig for sprites or an AnimatedSprite2D; keep the clip names. |
+| Enemy and boss poses (idle, move, hurt, dead, **spawn**; boss: telegraph, charge, leap, volley, **roar**, **dissolve**) | `enemies/*_rig.tscn` + `enemies/*_animations.tres` | Same: new rig, same clip names. |
+| Checkpoint flame, relic, secret wall | `Visual` node + AnimationPlayer in each object scene (`world/objects/`) | Replace `Visual`; keep the clip names (wall: `idle`, `hit_1`, `hit_2`). |
+| Particle effects (hits, dust, portal, boss dissolve, arena clear, wall break, ...) | One scene per effect in `effects/fx/<name>.tscn` (root: `FxPlayer`) | Open the scene, delete the placeholder children, add your own CPUParticles2D / GPUParticles2D / AnimatedSprite2D / AnimationPlayer ("play" clip). |
+| Sounds | `audio/sfx.tscn` (the `Sfx` autoload): one **AudioStreamPlayer** per sound, named after it. Files in `audio/sfx/<name>.wav` | Overwrite the `.wav` with the same name, or drop a file on the node's Stream. |
+
+- Sounds play on the **SFX** bus; a **Music** bus is ready for music (`default_bus_layout.tres`).
+- The placeholders are made by `tools/build_assets.gd`. It never overwrites a file that exists, so your replacements are safe. Delete a file to get its placeholder back.
 
 ### Text direction
 The UI is always laid out left to right, even on a system set to a right-to-left language. This is set in `project.godot` (`root_node_layout_direction`) and on every panel. Dialogue text is laid out for the whole page before typing starts, so lines never shift or re-wrap while the letters appear.
@@ -207,7 +221,8 @@ The HUD is clean by default: health and energy bars, threshold marks, the hotkey
 | Loadout | At your saved flame: I, Right (Abilities), Down. Confirm on an equipped ability to remove it. Confirm on a free one, then pick a slot (an occupied slot is replaced). |
 | Icons and details | Move focus over ability cards: the name and description appear only for the focused one. |
 | Left to right | Slots read 1-2-3-4 left to right in the HUD and the inventory. Dialogue types from the left. |
-| Checkpoint tablets | Read the tablet before the middle or right flame. Saving at the flame shows no text. |
+| Hotkeys on slots | Settings → rebind Ultimate 1: the first HUD slot shows the new key. |
+| Checkpoint tablet | The only tablet stands just before the first flame. Saving at any flame shows no text and starts the trance. |
 | Dialogue | Walk to the robed NPC right of the start, press E. |
 | Debug, keyboard only | F1, then F2: arrows, Enter, Left/Right on sliders. F2 again resumes. |
 
@@ -246,7 +261,9 @@ ui/                      HUD, dialogue box, inventory, debug overlay, title, pau
 tools/build_assets.gd    regenerates rigs, animations, TileSet, room and input map
 core/world_state.gd      dead enemies, bosses, arenas, collected shards
 core/arena_director.gd   arena waves: start, next wave, clear, abort
-tests/smoke_test.tscn    automated headless test (187 checks)
+effects/fx/               one scene per visual effect (placeholders), FxPlayer
+audio/sfx.tscn, sfx/     the Sfx autoload: one AudioStreamPlayer per sound + .wav placeholders
+tests/smoke_test.tscn    automated headless test (207 checks)
 ```
 
 ## Extending
@@ -254,7 +271,7 @@ tests/smoke_test.tscn    automated headless test (187 checks)
 - **New ultimate:** extend `UltimateAbility` in `ultimates/abilities/`, add a config block to `Config.ultimates`, and register it in `ultimate_registry.gd`. Unlock it with `game.player_data.unlock("id")`. It then appears in the inventory pool and can be slotted at a checkpoint.
 - **New lore or NPC:** create a `DialogueData` resource and assign it to an instance of `world/objects/lore_stone.tscn` or `npc.tscn` under `TestRoom/Objects`.
 - **New interactable:** extend `Interactable` and override `interact(game)`. Put the node under `Objects`.
-- **Real sprites:** replace `player/player_rig.tscn` (keep the animation names), the enemy rigs, or the `Visual` nodes of the world objects.
+- **Real sprites, effects and sounds:** see *Placeholder art, animation and sound* above.
 - **Edit the room:** paint in `world/test_room.tscn`, or edit `ROOM_LAYOUT` in `tools/build_assets.gd`. Delete `world/test_room.tscn`, then run:
   ```bash
   godot --headless --path . --script res://tools/build_assets.gd
@@ -266,4 +283,4 @@ tests/smoke_test.tscn    automated headless test (187 checks)
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It plays the game through real input actions and checks 187 behaviors. New in this version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.
+It plays the game through real input actions and checks 207 behaviors. New in this version: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.

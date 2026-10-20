@@ -3,7 +3,7 @@ extends Control
 ## Screen-space HUD, clean by default:
 ##   - smooth health bar (no numbers)
 ##   - energy bar with a color-coded threshold mark per equipped ultimate,
-##     plus a left-to-right hotkey strip (1 2 3 4) underneath
+##     plus a left-to-right hotkey strip (bound keys, 1 2 3 4 by default) underneath
 ##     Colors follow energy tiers (Config.ENERGY_TIERS), not specific spells,
 ##     so whatever is slotted later shows its minimum energy clearly.
 ##   - shard (currency) counter, top-right
@@ -21,9 +21,6 @@ var denied_flash := 0.0
 var damage_flash := 0.0
 var shard_pulse := 0.0
 var boss_provider: Callable = func() -> Node: return null ## Returns the active boss or null.
-var banner_text := "" ## Big centered message (arena cleared, boss felled, ...).
-var banner_time := 0.0
-const BANNER_DURATION := 2.6
 
 
 func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -> void:
@@ -33,15 +30,6 @@ func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -
 	Events.ultimate_denied.connect(func(_a: RefCounted, _r: String) -> void: denied_flash = 0.35)
 	Events.health_damaged.connect(func(_amount: float) -> void: damage_flash = 0.3)
 	Events.currency_collected.connect(func(_amount: int, _pos: Vector2) -> void: shard_pulse = 0.25)
-	Events.arena_cleared.connect(func(_id: String) -> void: show_banner("ARENA CLEARED"))
-	Events.boss_defeated.connect(func(b: Node) -> void: show_banner("%s FELLED" % String(b.display_name).to_upper()))
-	Events.secret_found.connect(func(_id: String, _p: Vector2) -> void: show_banner("A HIDDEN PASSAGE"))
-	Events.relic_collected.connect(func(_id: String, _p: Vector2) -> void: show_banner("VITALITY INCREASED"))
-
-
-func show_banner(text: String) -> void:
-	banner_text = text
-	banner_time = BANNER_DURATION
 
 
 func _process(delta: float) -> void:
@@ -49,7 +37,6 @@ func _process(delta: float) -> void:
 		return
 	denied_flash -= delta
 	damage_flash -= delta
-	banner_time -= delta
 	shard_pulse -= delta
 	var hp := player.health.health
 	if smooth_health < 0.0:
@@ -128,7 +115,6 @@ func _draw() -> void:
 		draw_string(font, Vector2(0, 52), "GOD MODE", HORIZONTAL_ALIGNMENT_RIGHT, view.x - 14, 11, Color("#ffd43b"))
 
 	_draw_boss_bar(font)
-	_draw_banner(font)
 	if player.state_name() == "trance":
 		var a := 0.45 + 0.35 * sin(Time.get_ticks_msec() / 260.0)
 		draw_string(font, Vector2(0, size.y * 0.72), "Press any button", HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, Color(0.85, 0.95, 1.0, a))
@@ -182,16 +168,6 @@ func _draw_heal_glow(bar: Rect2, h: HealthEnergy) -> void:
 	draw_rect(Rect2(cx - 1.0, bar.end.y + 2.0, 3.0, 3.0), Color(glow, 0.9))
 
 
-func _draw_banner(font: Font) -> void:
-	if banner_time <= 0.0:
-		return
-	var t := BANNER_DURATION - banner_time
-	var a := clampf(minf(t / 0.25, banner_time / 0.5), 0.0, 1.0)
-	var y := size.y * 0.32
-	draw_rect(Rect2(0, y - 34.0, size.x, 52.0), Color(0, 0, 0, 0.45 * a))
-	draw_string(font, Vector2(0, y), banner_text, HORIZONTAL_ALIGNMENT_CENTER, size.x, 30, Color(1.0, 0.86, 0.45, a))
-
-
 ## Boss health bar at the top center while a boss fight runs (no numbers).
 func _draw_boss_bar(font: Font) -> void:
 	var boss: Node = boss_provider.call()
@@ -213,8 +189,9 @@ func slot_rect(slot: int) -> Rect2:
 	return Rect2(48.0 + slot * (SLOT_BOX + 6.0), 66.0, SLOT_BOX, SLOT_BOX)
 
 
-## Hotkey strip under the energy bar: icon + key number, border in the
-## ability's tier color, bright when there is enough energy.
+## Hotkey strip under the energy bar: icon + the slot's actual key (follows
+## rebinding in Settings), border in the ability's tier color, bright when
+## there is enough energy.
 func _draw_slot_strip(font: Font, h: HealthEnergy) -> void:
 	for slot in PlayerData.SLOT_COUNT:
 		var r := slot_rect(slot)
@@ -228,7 +205,13 @@ func _draw_slot_strip(font: Font, h: HealthEnergy) -> void:
 			var tier := Config.energy_tier_color(ability.get_cost())
 			draw_rect(r, Color(tier, 1.0 if ready else 0.4), false, 2.0 if ready else 1.0)
 			AbilityIcon.draw_symbol(self, ability.icon, r.get_center() + Vector2(0, 1), SLOT_BOX * 0.32, Color(ability.color, 1.0 if ready else 0.35))
-		draw_string(font, r.position + Vector2(3, 10), str(slot + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.7))
+		draw_string(font, r.position + Vector2(3, 10), hotkey_label(slot), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.8))
+
+
+## The keyboard key bound to a slot ("1".."4" by default), shortened to fit.
+func hotkey_label(slot: int) -> String:
+	var key := Settings.key_name("ult_%d" % (slot + 1))
+	return key if key.length() <= 3 else key.substr(0, 3)
 
 
 func _label(font: Font, text: String, pos: Vector2) -> void:

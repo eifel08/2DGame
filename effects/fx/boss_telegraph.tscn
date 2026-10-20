@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_2gobx"]
+[ext_resource type="Script" path="res://effects/fx/placeholders/ring_placeholder.gd" id="2_fp6jp"]
+
+[node name="BossTelegraph" type="Node2D"]
+script = ExtResource("1_2gobx")
+lifetime = 0.35
+emit_time = 0.0
+
+[node name="Ring1" type="Node2D" parent="."]
+script = ExtResource("2_fp6jp")
+radius = 46.0
+color = Color(1, 1, 1, 1)
+width = 3.0
+life = 0.3
+delay = 0.0

@@ -41,7 +41,7 @@ func _init() -> void:
 	add_child(key_label)
 
 
-## `key` > 0 shows the hotkey number in the corner (slot cards only).
+## `key` > 0 (slot number 1-4) shows that slot's bound key in the corner.
 func show_ability(p_ability: UltimateAbility, max_energy: float, key := 0, dim := false) -> void:
 	ability = p_ability
 	if ability:
@@ -51,4 +51,4 @@ func show_ability(p_ability: UltimateAbility, max_energy: float, key := 0, dim :
 	else:
 		icon_view.set_icon("empty", Color.WHITE, dim)
 		gauge.visible = false
-	key_label.text = str(key) if key > 0 else ""
+	key_label.text = Settings.key_name("ult_%d" % key) if key > 0 else "" # The bound key.

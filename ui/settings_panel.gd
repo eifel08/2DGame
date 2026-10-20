@@ -11,6 +11,7 @@ var _key_buttons := {} ## action -> Button
 var _rebinding := ""
 var _sliders := {}
 var _checks := {}
+var back_button: Button
 var handle_cancel := true ## Close on ui_cancel (Esc) when not rebinding.
 
 
@@ -31,6 +32,10 @@ func _init() -> void:
 func open() -> void:
 	visible = true
 	refresh()
+	focus_first()
+
+
+func focus_first() -> void:
 	_first.grab_focus()
 
 
@@ -64,6 +69,7 @@ func _build() -> void:
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)
 
+	var rows := [] # Focus order, top to bottom (see MenuKit.link_rows).
 	box.add_child(MenuKit.label("AUDIO", 12, Color("#7fa2ff")))
 	for row in [["master_volume", "Master volume"], ["music_volume", "Music volume"], ["sfx_volume", "Effects volume"]]:
 		var slider := HSlider.new()
@@ -78,6 +84,7 @@ func _build() -> void:
 			Sfx.play("ui_move"))
 		_sliders[key] = slider
 		box.add_child(_row(row[1], slider))
+		rows.append([slider])
 		if _first == null:
 			_first = slider
 
@@ -92,6 +99,7 @@ func _build() -> void:
 			Sfx.play("ui_confirm"))
 		_checks[key] = check
 		box.add_child(check)
+		rows.append([check])
 
 	box.add_child(MenuKit.label("CONTROLS  (confirm a key, then press the new key)", 12, Color("#7fa2ff")))
 	var grid := GridContainer.new()
@@ -109,14 +117,27 @@ func _build() -> void:
 		b.pressed.connect(func() -> void: _start_rebind(a))
 		_key_buttons[action] = b
 		grid.add_child(b)
+		if rows[-1].size() == 1 and rows[-1][0] in _key_buttons.values() and rows[-1][0] != b:
+			rows[-1].append(b) # Two key buttons per grid row.
+		else:
+			rows.append([b])
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 12)
 	root.add_child(buttons)
-	buttons.add_child(MenuKit.button("Reset controls", func() -> void:
+	var reset := MenuKit.button("Reset controls", func() -> void:
 		Settings.reset_controls()
-		refresh(), 200))
-	buttons.add_child(MenuKit.button("Back", close, 200))
+		refresh(), 200)
+	back_button = MenuKit.button("Back", close, 200)
+	buttons.add_child(reset)
+	buttons.add_child(back_button)
+	rows.append([reset, back_button])
+	MenuKit.link_rows(rows)
+	# Down also steps Reset -> Back, so the last button is reachable with Down
+	# alone; from Back it wraps to the top.
+	reset.focus_neighbor_bottom = reset.get_path_to(back_button)
+	back_button.focus_neighbor_bottom = back_button.get_path_to(_first)
+	_first.focus_neighbor_top = _first.get_path_to(back_button)
 
 
 func _row(text: String, control: Control) -> HBoxContainer:

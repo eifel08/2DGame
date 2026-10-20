@@ -1,0 +1,35 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_a8pyo"]
+[ext_resource type="Script" path="res://effects/fx/placeholders/ring_placeholder.gd" id="2_83aku"]
+
+[sub_resource type="Gradient" id="Gradient_m62xe"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="WallBreak" type="Node2D"]
+script = ExtResource("1_a8pyo")
+lifetime = 0.75
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 40
+lifetime = 0.7
+one_shot = true
+explosiveness = 1.0
+spread = 180.0
+gravity = Vector2(0, 600)
+initial_velocity_min = 112.0
+initial_velocity_max = 320.0
+scale_amount_min = 3.6
+scale_amount_max = 7.2
+color = Color(0.227451, 0.262745, 0.439216, 1)
+color_ramp = SubResource("Gradient_m62xe")
+
+[node name="Ring2" type="Node2D" parent="."]
+script = ExtResource("2_83aku")
+radius = 90.0
+color = Color(0.486275, 0.952941, 1, 1)
+width = 5.0
+life = 0.6
+delay = 0.0

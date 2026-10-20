@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_mr4mj"]
+
+[sub_resource type="Gradient" id="Gradient_a6xnx"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="PogoSpike" type="Node2D"]
+script = ExtResource("1_mr4mj")
+lifetime = 0.45
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+lifetime = 0.4
+one_shot = true
+explosiveness = 1.0
+direction = Vector2(-4.37114e-08, 1)
+spread = 80.0
+gravity = Vector2(0, 300)
+initial_velocity_min = 70.0
+initial_velocity_max = 200.0
+scale_amount_min = 2.4
+scale_amount_max = 4.8
+color = Color(1, 0.603922, 0.603922, 1)
+color_ramp = SubResource("Gradient_a6xnx")

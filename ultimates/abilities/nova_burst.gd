@@ -24,7 +24,7 @@ func _on_activate(ctx: UltimateContext) -> void:
 	origin = ctx.player.get_center()
 	hit_set = {}
 	Events.ultimate_impact.emit(0.06, 0.7)
-	ctx.effects.burst(origin, {"count": 40, "color": color, "speed": 520.0, "size": 5.0, "gravity": 0.0, "life": 0.45})
+	ctx.effects.play("nova_burst", origin, {"tint": color})
 
 
 func _on_step(delta: float, ctx: UltimateContext) -> void:

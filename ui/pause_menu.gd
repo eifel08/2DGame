@@ -1,8 +1,9 @@
 class_name PauseMenu
 extends CanvasLayer
-## In-game pause menu (Esc / P / gamepad Start): Resume, Inventory, Settings,
-## Quit to title. The game simulation is paused while it is open. Works with
-## mouse and keyboard/gamepad.
+## In-game pause menu (Esc / P / gamepad Start): Resume, Settings, Quit to
+## title. The inventory is not reachable from here, only by its own key
+## (I / Tab). The game simulation is paused while the menu is open. Works
+## with mouse and keyboard/gamepad.
 
 var game: Node
 var root: Control
@@ -28,13 +29,13 @@ func setup(p_game: Node) -> void:
 	box.add_child(MenuKit.label("PAUSED", 24, Color("#ffd43b")))
 	resume_button = MenuKit.button("Resume", close)
 	box.add_child(resume_button)
-	box.add_child(MenuKit.button("Inventory", func() -> void:
-		close()
-		game.inventory.toggle()))
-	box.add_child(MenuKit.button("Settings", func() -> void:
+	var settings_button := MenuKit.button("Settings", func() -> void:
 		panel.visible = false
-		settings.open()))
-	box.add_child(MenuKit.button("Quit to title", func() -> void: game.quit_to_title()))
+		settings.open())
+	var quit_button := MenuKit.button("Quit to title", func() -> void: game.quit_to_title())
+	box.add_child(settings_button)
+	box.add_child(quit_button)
+	MenuKit.link_rows([[resume_button], [settings_button], [quit_button]])
 	root.add_child(MenuKit.center(panel))
 	settings = SettingsPanel.new()
 	settings.visible = false

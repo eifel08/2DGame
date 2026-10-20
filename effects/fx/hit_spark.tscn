@@ -1,0 +1,26 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_0ydpn"]
+
+[sub_resource type="Gradient" id="Gradient_213f1"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="HitSpark" type="Node2D"]
+script = ExtResource("1_0ydpn")
+lifetime = 0.35
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 14
+lifetime = 0.3
+one_shot = true
+explosiveness = 1.0
+spread = 180.0
+gravity = Vector2(0, 600)
+initial_velocity_min = 112.0
+initial_velocity_max = 320.0
+scale_amount_min = 2.4
+scale_amount_max = 4.8
+color = Color(1, 0.952941, 0.768627, 1)
+color_ramp = SubResource("Gradient_213f1")

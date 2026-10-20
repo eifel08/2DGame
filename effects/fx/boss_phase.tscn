@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_xi1ip"]
+[ext_resource type="Script" path="res://effects/fx/placeholders/ring_placeholder.gd" id="2_kto5a"]
+
+[node name="BossPhase" type="Node2D"]
+script = ExtResource("1_xi1ip")
+lifetime = 0.65
+emit_time = 0.0
+
+[node name="Ring1" type="Node2D" parent="."]
+script = ExtResource("2_kto5a")
+radius = 140.0
+color = Color(0.690196, 0.423529, 1, 1)
+width = 8.0
+life = 0.6
+delay = 0.0

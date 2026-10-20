@@ -44,7 +44,7 @@ const ROOM_LAYOUT := [
 	"#.....##..=====...........................K...............##...#",
 	"#.....##................................####....................",
 	"#.......................................####....................",
-	"#..W......S....N...........U..$$.E...T.C####..........E...T.C..D",
+	"#..W...T..S....N...........U..$$.E.....C####..........E.....C..D",
 	"##################^^^^########################^^^^^^^###########",
 	"################################################################",
 ]
@@ -91,7 +91,7 @@ const ARENA_LAYOUT := [
 	"#.........=====.......=====........#",
 	"....................................",
 	"....................................",
-	"D..T.C........w..s..w..u...w.s....XH",
+	"D....C........w..s..w..u...w.s....XH",
 	"####################################",
 	"####################################",
 ]
@@ -205,6 +205,7 @@ const DUMMY_ANIMS := {
 	"move": {"frames": 4, "fps": 6, "loop": true, "color": "#c96b4a", "sx": 1.03, "sy": 0.97, "bob": 2.0},
 	"hurt": {"frames": 2, "fps": 16, "loop": false, "color": "#ffffff", "sx": 1.15, "sy": 0.85},
 	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#4a2f28", "sx": 1.3, "sy": 0.25},
+	"spawn": {"frames": 7, "fps": 20, "loop": false, "color": "#ff9ae6", "sx": 0.7, "sy": 1.2, "fade": [0.1, 0.9]},
 }
 
 const FLYER_ANIMS := {
@@ -212,6 +213,7 @@ const FLYER_ANIMS := {
 	"move": {"frames": 4, "fps": 10, "loop": true, "color": "#b85c9e", "sx": 1.05, "sy": 0.95, "bob": 2.0},
 	"hurt": {"frames": 2, "fps": 16, "loop": false, "color": "#ffffff", "sx": 1.2, "sy": 0.8},
 	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#3d2336", "sx": 0.6, "sy": 0.6},
+	"spawn": {"frames": 7, "fps": 20, "loop": false, "color": "#ff9ae6", "sx": 0.7, "sy": 1.2, "fade": [0.1, 0.9]},
 }
 
 const STRONG_ANIMS := {
@@ -219,6 +221,7 @@ const STRONG_ANIMS := {
 	"move": {"frames": 4, "fps": 6, "loop": true, "color": "#7d8aa6", "sx": 1.03, "sy": 0.97, "bob": 2.0},
 	"hurt": {"frames": 2, "fps": 16, "loop": false, "color": "#ffffff", "sx": 1.08, "sy": 0.92},
 	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#2e3446", "sx": 1.3, "sy": 0.25},
+	"spawn": {"frames": 7, "fps": 20, "loop": false, "color": "#ff9ae6", "sx": 0.7, "sy": 1.2, "fade": [0.1, 0.9]},
 }
 
 ## Boss clips also animate the glowing eyes (telegraphs read clearly).
@@ -230,10 +233,86 @@ const BOSS_ANIMS := {
 	"leap": {"frames": 2, "fps": 8, "loop": false, "color": "#5b5f96", "eyes": "#ffd36b", "sx": 0.86, "sy": 1.16},
 	"volley": {"frames": 3, "fps": 10, "loop": true, "color": "#5b5f96", "eyes": "#7cf3ff", "sx": 0.94, "sy": 1.08},
 	"recover": {"frames": 2, "fps": 4, "loop": true, "color": "#3c3f60", "eyes": "#7a3f4a", "sx": 1.06, "sy": 0.92},
-	"roar": {"frames": 2, "fps": 10, "loop": true, "color": "#8a4fd1", "eyes": "#ffd36b", "sx": 1.15, "sy": 1.08, "bob": 3.0},
+	"roar": {"frames": 7, "fps": 10, "loop": false, "color": "#8a4fd1", "eyes": "#ffffff", "sx": 1.15, "sy": 1.08, "bob": 3.0, "shake": 4.0},
+	"dissolve": {"frames": 15, "fps": 10, "loop": false, "color": "#8a4fd1", "eyes": "#ffd36b", "sx": 1.1, "sy": 0.9, "fade": [1.0, 0.0]},
+	"spawn": {"frames": 7, "fps": 20, "loop": false, "color": "#ff9ae6", "eyes": "#ffffff", "sx": 0.8, "sy": 1.1, "fade": [0.1, 0.9]},
 	"hurt": {"frames": 2, "fps": 16, "loop": false, "color": "#ffffff", "eyes": "#ffffff", "sx": 1.05, "sy": 0.95},
-	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#22243a", "eyes": "#22243a", "sx": 1.3, "sy": 0.3},
+	"dead": {"frames": 1, "fps": 1, "loop": false, "color": "#22243a", "eyes": "#22243a", "sx": 1.3, "sy": 0.3, "fade": [0.0, 0.0]},
 }
+
+## Visual effects: one scene per effect in effects/fx/ (see fx_player.gd).
+## Placeholder parts: particle bursts ("amount" ...), rings ("ring": radius)
+## and the spawn portal ("portal"). Angles in degrees (0 = right, 90 = down);
+## spread is the half-angle (180 = all directions). White parts take the
+## caller's tint (ultimates pass their energy-tier color).
+const FX := {
+	"hit_spark": [{"amount": 14, "color": "#fff3c4", "speed": 320.0, "life": 0.3}],
+	"pogo_spark": [{"amount": 8, "color": "#bff6ff", "speed": 200.0, "angle": 90.0, "spread": 80.0, "gravity": 300.0}],
+	"pogo_spike": [{"amount": 8, "color": "#ff9a9a", "speed": 200.0, "angle": 90.0, "spread": 80.0, "gravity": 300.0}],
+	"player_hurt": [{"amount": 16, "color": "#ff6b6b", "speed": 300.0, "size": 5.0}],
+	"hazard_poof": [{"amount": 18, "color": "#ff6b6b", "speed": 280.0, "size": 5.0}],
+	"safe_return": [{"ring": 40.0, "color": "#bff6ff", "width": 4.0, "life": 0.4}],
+	"jump_dust": [{"amount": 5, "color": "#9aa7c7", "speed": 90.0, "gravity": 100.0, "life": 0.25, "size": 3.0}],
+	"double_jump": [{"ring": 26.0, "color": "#bff6ff", "width": 3.0, "life": 0.25}],
+	"land_dust": [{"amount": 8, "color": "#9aa7c7", "speed": 140.0, "angle": -90.0, "spread": 90.0, "gravity": 400.0, "life": 0.3, "size": 3.0}],
+	"dash_burst": [{"amount": 10, "color": "#d9f6ff", "speed": 200.0, "angle": 180.0, "spread": 23.0, "gravity": 0.0, "life": 0.25, "size": 3.0}],
+	"dash_trail": [{"amount": 3, "color": "#a1e6ff", "speed": 10.0, "gravity": 0.0, "life": 0.18, "size": 6.0, "box": [11.0, 20.0]}],
+	"heal_sparkle": [{"amount": 1, "color": "#8dffb0", "speed": 60.0, "angle": -90.0, "spread": 17.0, "gravity": -200.0, "life": 0.5, "size": 3.0}],
+	"enemy_death": [{"amount": 24, "color": "#ffb36b", "speed": 380.0, "size": 5.0, "life": 0.5}],
+	"coin_pickup": [{"amount": 6, "color": "#ffd36b", "speed": 140.0, "gravity": 200.0, "life": 0.3, "size": 3.0}],
+	"coin_fizzle": [{"amount": 6, "color": "#9aa7c7", "speed": 90.0, "gravity": -60.0, "life": 0.35, "size": 3.0}],
+	"checkpoint_light": [{"ring": 50.0, "color": "#ffb347", "width": 4.0, "life": 0.45}],
+	"save_glow": [{"amount": 20, "color": "#8dffb0", "speed": 120.0, "angle": -90.0, "spread": 40.0, "gravity": -150.0, "life": 0.7, "size": 3.0}],
+	"trance_break": [{"ring": 34.0, "color": "#c9f2ff", "width": 3.0, "life": 0.3}],
+	"player_death": [{"amount": 40, "color": "#ff6b6b", "speed": 400.0, "size": 5.0, "life": 0.45}],
+	"spawn_portal": [{"portal": 34.0, "color": "#ff4dd2", "life": 0.35}],
+	"boss_telegraph": [{"ring": 46.0, "color": "#ffffff", "width": 3.0, "life": 0.3}],
+	"boss_phase": [{"ring": 140.0, "color": "#b06cff", "width": 8.0, "life": 0.6}],
+	"boss_death": [{"amount": 60, "color": "#b06cff", "speed": 480.0, "size": 6.0, "life": 0.8},
+		{"ring": 200.0, "color": "#ffffff", "width": 8.0, "life": 0.7}],
+	"boss_dissolve": [{"amount": 40, "color": "#b06cff", "speed": 80.0, "angle": -90.0, "spread": 35.0, "gravity": -260.0,
+		"life": 0.7, "size": 4.0, "box": [30.0, 36.0], "continuous": 1.5}],
+	"arena_clear": [{"ring": 260.0, "color": "#ffd36b", "width": 8.0, "life": 0.8},
+		{"ring": 160.0, "color": "#ffffff", "width": 5.0, "life": 0.6},
+		{"amount": 18, "color": "#ffd36b", "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0, "at": [-160.0, -120.0]},
+		{"amount": 18, "color": "#8dffb0", "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0, "at": [0.0, -140.0]},
+		{"amount": 18, "color": "#7cf3ff", "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0, "at": [160.0, -120.0]}],
+	"wall_hit": [{"amount": 8, "color": "#56649a", "speed": 220.0, "size": 4.0, "life": 0.4}],
+	"wall_break": [{"amount": 40, "color": "#3a4370", "speed": 320.0, "size": 6.0, "life": 0.7},
+		{"ring": 90.0, "color": "#7cf3ff", "width": 5.0, "life": 0.6}],
+	"relic_pickup": [{"ring": 70.0, "color": "#ff5e7a", "width": 6.0, "life": 0.6},
+		{"amount": 30, "color": "#ff9aae", "speed": 220.0, "gravity": -100.0, "life": 0.8, "size": 4.0}],
+	"nova_burst": [{"amount": 40, "color": "#ffffff", "speed": 520.0, "size": 5.0, "gravity": 0.0, "life": 0.45}],
+	"volley_muzzle": [{"amount": 3, "color": "#ffffff", "speed": 120.0, "gravity": 0.0, "life": 0.2, "size": 3.0}],
+	"ascendant_ring": [{"ring": 120.0, "color": "#ffffff", "width": 8.0, "life": 0.5}],
+	"ascendant_spark": [{"amount": 1, "color": "#ffffff", "speed": 90.0, "angle": -90.0, "spread": 15.0, "gravity": -250.0, "life": 0.45, "size": 3.0}],
+	"comet_impact": [{"ring": 100.0, "color": "#ffffff", "width": 6.0, "life": 0.3},
+		{"amount": 22, "color": "#ffffff", "speed": 360.0, "gravity": 200.0, "life": 0.35, "size": 4.0}],
+}
+
+## Placeholder sounds, written as .wav files to audio/sfx/<name>.wav and
+## wired into audio/sfx.tscn (one AudioStreamPlayer per sound). Replace a
+## sound by overwriting its .wav (same name) or by setting the node's Stream.
+## Tone: [f0, f1, seconds, wave, volume, noise]; a list of tones plays in order.
+const SOUNDS := {
+	"hit": [[420, 180, 0.08, "square", 0.3, 0.3]],
+	"pogo": [[300, 640, 0.09, "sine", 0.4, 0.0]],
+	"hurt": [[220, 90, 0.18, "square", 0.35, 0.4]],
+	"death": [[330, 55, 0.8, "saw", 0.4, 0.25]],
+	"save": [[523, 523, 0.1, "sine", 0.35, 0.0], [784, 784, 0.22, "sine", 0.35, 0.0]],
+	"spawn": [[180, 520, 0.3, "sine", 0.3, 0.2]],
+	"door": [[200, 120, 0.12, "sine", 0.25, 0.7]],
+	"break": [[180, 60, 0.35, "square", 0.45, 0.8]],
+	"secret": [[659, 659, 0.08, "sine", 0.35, 0.0], [831, 831, 0.08, "sine", 0.35, 0.0], [988, 988, 0.08, "sine", 0.35, 0.0], [1319, 1319, 0.3, "sine", 0.35, 0.0]],
+	"relic": [[440, 440, 0.12, "sine", 0.35, 0.0], [880, 880, 0.4, "sine", 0.35, 0.0]],
+	"boss_roar": [[170, 42, 1.5, "saw", 0.6, 0.55]],
+	"victory": [[523, 523, 0.12, "square", 0.28, 0.0], [659, 659, 0.12, "square", 0.28, 0.0], [784, 784, 0.12, "square", 0.28, 0.0], [1047, 1047, 0.5, "square", 0.28, 0.0]],
+	"ui_move": [[880, 880, 0.03, "sine", 0.12, 0.0]],
+	"ui_confirm": [[660, 990, 0.07, "sine", 0.22, 0.0]],
+}
+const SFX_SCENE := "res://audio/sfx.tscn"
+const SFX_DIR := "res://audio/sfx/"
+const MIX_RATE := 22050
 
 var force := false
 
@@ -252,6 +331,9 @@ func _initialize() -> void:
 	_save_library("res://enemies/strong_animations.tres", STRONG_ANIMS, 54.0, false)
 	_save_library("res://enemies/boss_animations.tres", BOSS_ANIMS, 72.0, false)
 	_save_checkpoint_library("res://world/objects/checkpoint_animations.tres")
+	for fx_name in FX:
+		_build_fx(fx_name, FX[fx_name])
+	_build_sounds()
 
 	if not FileAccess.file_exists(TILES_PNG) or force:
 		_build_tile_png()
@@ -265,6 +347,145 @@ func _initialize() -> void:
 		_build_room(room_id, ROOMS[room_id])
 	print("build_assets: done")
 	quit()
+
+
+# ---------- Visual effects (placeholders) ----------
+
+func _build_fx(fx_name: String, parts: Array) -> void:
+	var path := "res://effects/fx/%s.tscn" % fx_name
+	if not _should_write(path):
+		return
+	var root := Node2D.new()
+	root.name = fx_name.to_pascal_case()
+	root.set_script(load("res://effects/fx/fx_player.gd"))
+	var lifetime := 0.1
+	var emit_time := 0.0
+	var i := 0
+	for part in parts:
+		i += 1
+		var node: Node2D
+		var color := Color(part.color)
+		if part.has("ring"):
+			node = Node2D.new()
+			node.set_script(load("res://effects/fx/placeholders/ring_placeholder.gd"))
+			node.set("radius", part.ring)
+			node.set("color", color)
+			node.set("width", part.get("width", 4.0))
+			node.set("life", part.get("life", 0.35))
+			node.name = "Ring%d" % i
+			lifetime = maxf(lifetime, part.get("life", 0.35) + 0.05)
+		elif part.has("portal"):
+			node = Node2D.new()
+			node.set_script(load("res://effects/fx/placeholders/portal_placeholder.gd"))
+			node.set("radius", part.portal)
+			node.set("color", color)
+			node.set("life", part.life)
+			node.name = "Portal"
+			lifetime = maxf(lifetime, part.life)
+		else:
+			var p := CPUParticles2D.new()
+			p.name = "Particles%d" % i
+			var life: float = part.get("life", 0.4)
+			var continuous: float = part.get("continuous", 0.0)
+			p.emitting = false
+			p.amount = part.amount
+			p.lifetime = life
+			p.one_shot = continuous <= 0.0
+			p.explosiveness = 1.0 if continuous <= 0.0 else 0.0
+			p.local_coords = false
+			p.direction = Vector2.from_angle(deg_to_rad(part.get("angle", 0.0)))
+			p.spread = part.get("spread", 180.0)
+			p.gravity = Vector2(0, part.get("gravity", 600.0))
+			p.initial_velocity_min = part.get("speed", 220.0) * 0.35
+			p.initial_velocity_max = part.get("speed", 220.0)
+			var size: float = part.get("size", 4.0)
+			p.scale_amount_min = size * 0.6
+			p.scale_amount_max = size * 1.2
+			p.color = color
+			var ramp := Gradient.new()
+			ramp.set_color(0, Color.WHITE)
+			ramp.set_color(1, Color(1, 1, 1, 0))
+			p.color_ramp = ramp
+			if part.has("box"):
+				p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+				p.emission_rect_extents = Vector2(part.box[0], part.box[1])
+			node = p
+			if continuous > 0.0:
+				emit_time = continuous
+			lifetime = maxf(lifetime, continuous + life + 0.05)
+		if part.has("at"):
+			node.position = Vector2(part.at[0], part.at[1])
+		root.add_child(node)
+		node.owner = root
+	root.set("lifetime", lifetime)
+	root.set("emit_time", emit_time)
+	_save_scene(root, path)
+
+
+# ---------- Sounds (placeholders) ----------
+
+func _build_sounds() -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SFX_DIR))
+	for sound in SOUNDS:
+		var path: String = SFX_DIR + sound + ".wav"
+		if _should_write(path):
+			var samples := PackedFloat32Array()
+			for tone in SOUNDS[sound]:
+				samples.append_array(_tone(tone[0], tone[1], tone[2], tone[3], tone[4], tone[5]))
+			_check(_wav(samples).save_to_wav(path), path)
+	if not _should_write(SFX_SCENE):
+		return
+	# Written as text so it does not need the .wav files imported first.
+	var lines := ["[gd_scene load_steps=%d format=3]" % (SOUNDS.size() + 2), "",
+		'[ext_resource type="Script" path="res://autoload/sfx.gd" id="script"]']
+	var i := 0
+	for sound in SOUNDS:
+		i += 1
+		lines.append('[ext_resource type="AudioStream" path="%s%s.wav" id="s%d"]' % [SFX_DIR, sound, i])
+	lines.append_array(["", '[node name="Sfx" type="Node"]', 'script = ExtResource("script")'])
+	i = 0
+	for sound in SOUNDS:
+		i += 1
+		lines.append_array(["", '[node name="%s" type="AudioStreamPlayer" parent="."]' % sound,
+			'stream = ExtResource("s%d")' % i, "max_polyphony = 4", 'bus = &"SFX"'])
+	var file := FileAccess.open(SFX_SCENE, FileAccess.WRITE)
+	file.store_string("\n".join(lines) + "\n")
+	file.close()
+	print("build_assets: wrote ", SFX_SCENE)
+
+
+## One tone sliding from f0 to f1 Hz. wave: sine / square / saw; noise mixes
+## in white noise (0..1). Short attack, smooth decay.
+func _tone(f0: float, f1: float, duration: float, wave: String, volume: float, noise: float) -> PackedFloat32Array:
+	var n := int(duration * MIX_RATE)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var phase := 0.0
+	for i in n:
+		var t := float(i) / n
+		phase += TAU * lerpf(f0, f1, t) / MIX_RATE
+		var v := sin(phase)
+		if wave == "square":
+			v = signf(v)
+		elif wave == "saw":
+			v = fmod(phase / TAU, 1.0) * 2.0 - 1.0
+		v = lerpf(v, randf_range(-1.0, 1.0), noise)
+		var env := minf(1.0, float(i) / (0.008 * MIX_RATE)) * pow(1.0 - t, 1.6)
+		out[i] = v * env * volume
+	return out
+
+
+func _wav(samples: PackedFloat32Array) -> AudioStreamWAV:
+	var bytes := PackedByteArray()
+	bytes.resize(samples.size() * 2)
+	for i in samples.size():
+		bytes.encode_s16(i * 2, int(clampf(samples[i], -1.0, 1.0) * 32000.0))
+	var wav := AudioStreamWAV.new()
+	wav.format = AudioStreamWAV.FORMAT_16_BITS
+	wav.mix_rate = MIX_RATE
+	wav.stereo = false
+	wav.data = bytes
+	return wav
 
 
 func _should_write(path: String) -> bool:
@@ -454,10 +675,24 @@ func _make_animation(def: Dictionary, height: float, with_arm: bool) -> Animatio
 	# Optional hover (e.g. the trance): the rig floats above the feet and bobs.
 	t = _value_track(anim, "Flip/Rig:position")
 	var lift: float = def.get("float", 0.0)
+	var shake: float = def.get("shake", 0.0)
 	anim.track_insert_key(t, 0.0, Vector2(0, -lift))
-	if lift > 0.0:
+	if shake > 0.0: # Violent shudder (e.g. the boss scream).
+		var steps := int(length * 30.0)
+		for i in range(1, steps):
+			var dx := shake if i % 2 == 0 else -shake
+			anim.track_insert_key(t, length * i / steps, Vector2(dx, -lift + (shake * 0.5 if i % 3 == 0 else 0.0)))
+		anim.track_insert_key(t, length, Vector2(0, -lift))
+	elif lift > 0.0:
 		anim.track_insert_key(t, length * 0.5, Vector2(0, -lift - 5.0))
 		anim.track_insert_key(t, length, Vector2(0, -lift))
+
+	# Rig opacity: spawn fade-in, dissolve fade-out (default fully opaque).
+	t = _value_track(anim, "Flip/Rig:modulate")
+	var fade: Array = def.get("fade", [1.0, 1.0])
+	anim.track_insert_key(t, 0.0, Color(1, 1, 1, fade[0]))
+	if fade[0] != fade[1]:
+		anim.track_insert_key(t, length, Color(1, 1, 1, fade[1]))
 
 	t = _value_track(anim, "Flip/Rig:skew")
 	anim.track_insert_key(t, 0.0, -float(def.get("lean", 0.0)))

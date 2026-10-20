@@ -67,8 +67,7 @@ func _detonate(player: Player) -> void:
 	_ctx.combat.damage_in_circle(c, cfg("burst_radius"), {
 		"damage": cfg("burst_damage"), "knockback": 300.0, "source": id, "strength": 0.6,
 	})
-	_ctx.effects.ring(c, {"radius": cfg("burst_radius"), "color": color, "width": 6.0, "life": 0.3})
-	_ctx.effects.burst(c, {"count": 22, "color": color, "speed": 360.0, "gravity": 200.0, "life": 0.35, "size": 4.0})
+	_ctx.effects.play("comet_impact", c, {"tint": color, "scale": cfg("burst_radius") / 100.0})
 	Events.ultimate_impact.emit(0.05, 0.45)
 
 

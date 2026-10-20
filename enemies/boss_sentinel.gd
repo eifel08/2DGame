@@ -8,8 +8,9 @@ extends Enemy
 ##   volley - aimed shards at the player (spread)
 ## Below half health it enters phase 2: shorter telegraphs, faster moves and
 ## extra shards. Every attack is preceded by a clear telegraph (white eyes).
-## Death: a roar (Sfx "boss_roar"), a violent shudder, then the body
-## dissolves into particles over ~2 seconds. Hitboxes are off from the start.
+## Death: a roar (Sfx "boss_roar") with the "roar" clip (a violent shudder),
+## then the "dissolve" clip fades the body while the "boss_dissolve" effect
+## sheds particles. Hitboxes are off from the start.
 
 const GRAVITY := 2200.0
 const SCREAM_TIME := 0.7
@@ -39,9 +40,11 @@ var _charge_target_x := 0.0
 var _shots_left := 0
 var _shot_index := 0
 var _shot_timer := 0.0
+var _dissolving := false
 
 
 func _on_reset() -> void:
+	_dissolving = false
 	phase = 1
 	cooldown = 1.0
 	pending_attack = ""
@@ -206,22 +209,13 @@ func _die() -> void:
 	Events.ultimate_impact.emit(0.12, 0.9)
 
 
-## Scream (shudder + flashing), then dissolve: fade out while shedding particles.
+## Scream ("roar" clip), then dissolve ("dissolve" clip + particle effect).
 func _step_dead(_delta: float) -> void:
-	if dead_time < SCREAM_TIME:
-		flip.position = Vector2(randf_range(-4, 4), randf_range(-2, 2))
-		flip.modulate = Color(3, 3, 3) if int(dead_time * 30.0) % 2 == 0 else Color.WHITE
-		return
-	var k := clampf((dead_time - SCREAM_TIME) / DISSOLVE_TIME, 0.0, 1.0)
-	flip.position = Vector2.ZERO
-	flip.modulate = Color(1.2, 1.0, 1.4, 1.0 - k)
-	if effects and k < 1.0 and randf() < 0.6:
-		var r := get_rect()
-		effects.burst(Vector2(randf_range(r.position.x, r.end.x), randf_range(r.position.y, r.end.y)), {
-			"count": 2, "color": Color("#b06cff"), "speed": 80.0, "angle": -PI / 2.0, "spread": 1.2,
-			"gravity": -260.0, "life": 0.7, "size": 4.0,
-		})
-	if k >= 1.0:
+	if dead_time >= SCREAM_TIME and not _dissolving:
+		_dissolving = true
+		if effects:
+			effects.play("boss_dissolve", global_position)
+	if dead_time >= SCREAM_TIME + DISSOLVE_TIME:
 		visible = false
 
 
@@ -236,7 +230,9 @@ func _recover(duration: float) -> void:
 
 func _choose_animation() -> String:
 	if not alive:
-		return "roar" if dead_time < SCREAM_TIME else "dead"
+		if dead_time < SCREAM_TIME:
+			return "roar"
+		return "dissolve" if dead_time < SCREAM_TIME + DISSOLVE_TIME else "dead"
 	if flash_timer > 0.0 and state in ["stalk", "recover"]:
 		return "hurt"
 	match state:

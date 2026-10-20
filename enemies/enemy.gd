@@ -11,8 +11,12 @@ extends CharacterBody2D
 ## dealing contact damage. It is false while spawning (telegraph) and from
 ## the very moment an enemy dies; the body collision is disabled too.
 ## The node origin is at the feet (bottom-center).
+##
+## Visuals are pure placeholders: the rig under Flip/Rig is animated by the
+## AnimationPlayer ("idle", "move", "hurt", "dead", "spawn", ...). Swap the
+## rig and the clips for real art; this script only picks clip names.
 
-const SPAWN_TELEGRAPH := 0.9 ## Seconds an event-spawned enemy stays harmless.
+const SPAWN_TELEGRAPH := 0.35 ## Arena wave spawns: seconds harmless (the "spawn" clip).
 
 @export_enum("weak", "strong", "boss") var tier := "weak"
 @export var max_health := 80.0
@@ -44,7 +48,7 @@ func _ready() -> void:
 
 
 ## `telegraph`: appear through a portal (translucent, harmless, untouchable)
-## before becoming active. Used for arena waves and other event spawns.
+## before becoming active. Used only for arena wave spawns.
 func setup(p_room: Room, home_position: Vector2, p_target: Node2D = null, telegraph := false) -> void:
 	room = p_room
 	home = home_position
@@ -137,11 +141,7 @@ func step(delta: float) -> void:
 	else:
 		_step_alive(delta)
 	flip.scale.x = facing
-	if alive:
-		var flash := flash_timer > 0.0
-		var base := Color(4, 4, 4) if flash else Color.WHITE
-		base.a = 0.35 + 0.25 * sin(spawn_timer * 20.0) if spawn_timer > 0.0 else 1.0
-		flip.modulate = base
+	flip.modulate = Color(4, 4, 4) if alive and flash_timer > 0.0 else Color.WHITE # Hit flash tint.
 	var next := _choose_animation()
 	if next != _anim_name and anim.has_animation(next):
 		_anim_name = next
@@ -164,9 +164,8 @@ func _step_alive(_delta: float) -> void:
 	pass
 
 
-## Death visual. Default: the "dead" pose, then hidden after 0.6 s.
+## Death visual. Default: the "dead" clip, then hidden after 0.6 s.
 func _step_dead(_delta: float) -> void:
-	flip.modulate = Color.WHITE
 	if dead_time > 0.6:
 		visible = false # Stays dead until its tier allows a revive.
 
@@ -174,16 +173,16 @@ func _step_dead(_delta: float) -> void:
 func _choose_animation() -> String:
 	if not alive:
 		return "dead"
+	if spawn_timer > 0.0:
+		return "spawn"
 	if flash_timer > 0.0:
 		return "hurt"
 	return "move" if absf(velocity.x) > 5.0 else "idle"
 
 
+## Health bar above the head (HUD element; bosses use the HUD bar instead).
 func _draw() -> void:
-	if spawn_timer > 0.0:
-		_draw_spawn_portal()
-		return
-	if not alive or tier == "boss":
+	if not alive or spawn_timer > 0.0 or tier == "boss":
 		return
 	# Health bar above the head (bosses use the HUD bar instead).
 	var w := size.x + 8.0
@@ -194,12 +193,3 @@ func _draw() -> void:
 		draw_string(ThemeDB.fallback_font, bar.position + Vector2(-20, -3), "%d/%d" % [ceili(health), roundi(max_health)],
 			HORIZONTAL_ALIGNMENT_CENTER, w + 40, 10, Color("#ffd0d0"))
 
-
-## Spawn telegraph: a closing portal ring and a floor rune.
-func _draw_spawn_portal() -> void:
-	var k := 1.0 - spawn_timer / SPAWN_TELEGRAPH
-	var c := Vector2(0, -size.y / 2.0)
-	var col := Color("#ff4dd2")
-	draw_arc(c, size.y * (1.4 - 0.8 * k), 0.0, TAU, 32, Color(col, 0.3 + 0.6 * k), 3.0, true)
-	draw_arc(c, size.y * 0.6, -PI / 2.0, -PI / 2.0 + TAU * k, 32, Color.WHITE, 2.0, true)
-	draw_line(Vector2(-size.x * 0.7, 0), Vector2(size.x * 0.7, 0), Color(col, 0.8), 3.0)

@@ -1,0 +1,35 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_sf4pe"]
+[ext_resource type="Script" path="res://effects/fx/placeholders/ring_placeholder.gd" id="2_gjt62"]
+
+[sub_resource type="Gradient" id="Gradient_41hgy"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="BossDeath" type="Node2D"]
+script = ExtResource("1_sf4pe")
+lifetime = 0.85
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 60
+lifetime = 0.8
+one_shot = true
+explosiveness = 1.0
+spread = 180.0
+gravity = Vector2(0, 600)
+initial_velocity_min = 168.0
+initial_velocity_max = 480.0
+scale_amount_min = 3.6
+scale_amount_max = 7.2
+color = Color(0.690196, 0.423529, 1, 1)
+color_ramp = SubResource("Gradient_41hgy")
+
+[node name="Ring2" type="Node2D" parent="."]
+script = ExtResource("2_gjt62")
+radius = 200.0
+color = Color(1, 1, 1, 1)
+width = 8.0
+life = 0.7
+delay = 0.0

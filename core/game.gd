@@ -27,7 +27,6 @@ const ENEMY_SCENES := {
 	"boss": preload("res://enemies/boss_sentinel.tscn"),
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
-const FADE_TIME := 0.22
 const RESPAWN_FADE_TIME := 0.45
 ## Abilities the player starts with, in hotkey order (keys 1-4).
 const STARTING_ABILITIES: Array[String] = ["nova_burst", "spirit_volley", "ascendant_form", "comet_dash"]
@@ -70,6 +69,7 @@ var current_checkpoint: Checkpoint ## The saved checkpoint, if it is in this roo
 var respawn := {}
 var focused_interactable: Interactable
 var pending_respawn := false
+var _pending_door := {} ## {room, door}: a doorway was entered this step.
 ## Screen fade while moving between rooms or respawning:
 ## {phase: "out"/"in", time, duration, on_black: Callable}.
 var transition := {}
@@ -128,7 +128,9 @@ func _physics_process(delta: float) -> void:
 	_handle_meta_input()
 	Engine.time_scale = Config.debug.time_scale
 
-	# Things that pause the simulation.
+	# Things that pause the simulation (running effects freeze too).
+	effects.set_paused(pause_menu.is_open() or not transition.is_empty() or dialogue.is_open()
+		or inventory.is_open() or debug_overlay.navigating or Config.debug.paused or feedback.hitstop_timer > 0.0)
 	if pause_menu.is_open():
 		input.end_step()
 		return
@@ -165,10 +167,15 @@ func _physics_process(delta: float) -> void:
 	effects.step(delta)
 	camera.follow(player, delta)
 
+	if not _pending_door.is_empty():
+		var door: Dictionary = _pending_door
+		_pending_door = {}
+		load_room(door.room, door.door)
+
 	# Death: wait for the collapse animation, then fade to the checkpoint.
 	if pending_respawn and player.death_finished():
 		pending_respawn = false
-		effects.burst(player.get_center(), {"count": 40, "color": Color("#ff6b6b"), "speed": 400.0, "size": 5.0})
+		effects.play("player_death", player.get_center())
 		_begin_fade(respawn_at_checkpoint, RESPAWN_FADE_TIME)
 	input.end_step()
 
@@ -266,7 +273,7 @@ func load_room(id: String, arrival_door := "") -> void:
 			arrival = door.get_arrival_position()
 			player.facing = door.inward
 	player.global_position = arrival
-	player.velocity = Vector2.ZERO
+	player.velocity.y = 0.0 # Keep running: walking through a door never stops you.
 	player.safe_point = arrival
 	camera.snap_to(player)
 
@@ -281,9 +288,13 @@ func _update_doors() -> void:
 			return
 
 
+## Doorways switch rooms at once, with no fade or wait. The load runs at the
+## end of the current step so nothing is swapped mid-update.
 func begin_transition(target_room: String, target_door: String) -> void:
+	if not _pending_door.is_empty():
+		return
 	Sfx.play("door")
-	_begin_fade(func() -> void: load_room(target_room, target_door), FADE_TIME)
+	_pending_door = {"room": target_room, "door": target_door}
 
 
 ## Fades to black, runs `on_black`, then fades back in.
@@ -311,9 +322,8 @@ func _step_transition(delta: float) -> void:
 
 ## Instantiates an enemy of `kind` (weak / flyer / strong / boss). Returns
 ## null for a boss that is already defeated in this playthrough.
-## `telegraph`: event spawn (arena wave, checkpoint revival while present,
-## debug). The enemy appears through a portal, harmless and untouchable, and
-## never directly on top of the player.
+## `telegraph`: arena wave spawns only. The enemy appears through a short
+## portal, harmless and untouchable, and never directly on top of the player.
 func spawn_enemy_kind(kind: String, at: Vector2, spawn_id := "", telegraph := false) -> Enemy:
 	var enemy: Enemy = ENEMY_SCENES[kind].instantiate()
 	if enemy is BossSentinel and world.is_boss_defeated(enemy.boss_id):
@@ -387,7 +397,7 @@ func _refresh_room_enemies() -> void:
 			remove_enemy(enemy)
 	for spawn in room.get_enemy_spawns():
 		if not living.has(spawn.id) and not world.is_dead(room_id, spawn.id):
-			spawn_enemy_kind(spawn.kind, spawn.position, spawn.id, true)
+			spawn_enemy_kind(spawn.kind, spawn.position, spawn.id)
 
 
 # ---------- Checkpoints ----------
@@ -425,6 +435,7 @@ func save_at_checkpoint(cp: Checkpoint) -> void:
 	world.on_checkpoint_rest()
 	_refresh_room_enemies()
 	Events.player_rested.emit(cp)
+	player.enter_trance() # Saving, loading and respawning all wake from a trance.
 	write_save()
 
 
@@ -466,7 +477,7 @@ func _update_pickups(delta: float) -> void:
 		# Shards that touch a hazard are lost.
 		if room.find_hazard(coin.get_rect()).has_area():
 			coin.collect()
-			effects.burst(coin.global_position + Vector2(0, -11), {"count": 6, "color": Color("#9aa7c7"), "speed": 90.0, "gravity": -60.0, "life": 0.35, "size": 3.0})
+			effects.play("coin_fizzle", coin.global_position + Vector2(0, -11))
 			continue
 		if coin.get_rect().intersects(pr):
 			coin.collect()
@@ -498,11 +509,10 @@ func collect_relic(relic: Relic) -> void:
 
 ## A swing hit a breakable wall; the last hit opens the hidden passage.
 func hit_breakable(wall: BreakableWall, at: Vector2) -> void:
-	effects.burst(at, {"count": 8, "color": Color("#56649a"), "speed": 220.0, "size": 4.0, "life": 0.4})
+	effects.play("wall_hit", at)
 	camera.add_trauma(0.15)
 	if wall.hit():
 		world.open_secret(wall.secret_id)
-		effects.burst(wall.get_rect().get_center(), {"count": 40, "color": Color("#3a4370"), "speed": 320.0, "size": 6.0, "life": 0.7})
 		Events.secret_found.emit(wall.secret_id, wall.get_rect().get_center())
 		write_save()
 	else:
@@ -593,7 +603,7 @@ func spawn_enemy(flying: bool, kind := "") -> void:
 	# Avoid spawning inside walls: fall back to the player's position.
 	if room.is_solid_at(home + Vector2(0, -8)):
 		home = player.global_position + Vector2(0, -30.0 if k == "flyer" else 0.0)
-	spawn_enemy_kind(k, home, "", true)
+	spawn_enemy_kind(k, home)
 
 
 ## Debug: a completely new playthrough (bosses and arenas come back).
@@ -601,6 +611,7 @@ func new_game() -> void:
 	world.new_game()
 	respawn = {}
 	pending_respawn = false
+	_pending_door = {}
 	transition = {}
 	fade.color.a = 0.0
 	_load_room_scene(START_ROOM)

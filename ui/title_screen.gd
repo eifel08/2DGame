@@ -11,6 +11,8 @@ var slots_panel: PanelContainer
 var settings: SettingsPanel
 var play_button: Button
 var settings_button: Button
+var quit_button: Button
+var back_button: Button
 var slot_buttons: Array[Button] = []
 var delete_buttons: Array[Button] = []
 var change_scene := true ## Tests set false and read `chosen_slot` instead.
@@ -49,9 +51,11 @@ func _build_main() -> void:
 	box.add_child(sub)
 	play_button = MenuKit.button("Play", show_slots)
 	settings_button = MenuKit.button("Settings", show_settings)
+	quit_button = MenuKit.button("Quit", func() -> void: get_tree().quit())
 	box.add_child(play_button)
 	box.add_child(settings_button)
-	box.add_child(MenuKit.button("Quit", func() -> void: get_tree().quit()))
+	box.add_child(quit_button)
+	MenuKit.link_rows([[play_button], [settings_button], [quit_button]])
 	var hint := MenuKit.label("Mouse, or arrows + Enter", 11, Color(1, 1, 1, 0.45))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(hint)
@@ -64,6 +68,7 @@ func _build_slots() -> void:
 	box.add_theme_constant_override("separation", 8)
 	slots_panel.add_child(box)
 	box.add_child(MenuKit.label("CHOOSE A SAVE SLOT", 20, Color("#ffd43b")))
+	var rows := []
 	for i in Saves.SLOT_COUNT:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
@@ -75,7 +80,11 @@ func _build_slots() -> void:
 		box.add_child(row)
 		slot_buttons.append(b)
 		delete_buttons.append(d)
-	box.add_child(MenuKit.button("Back", show_main))
+		rows.append([b, d])
+	back_button = MenuKit.button("Back", show_main)
+	box.add_child(back_button)
+	rows.append([back_button])
+	MenuKit.link_rows(rows)
 	add_child(MenuKit.center(slots_panel))
 
 
@@ -128,3 +137,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"ui_cancel") and slots_panel.visible:
 		get_viewport().set_input_as_handled()
 		show_main()
+		return
+	# Safety net: if nothing holds the focus (e.g. a click on the background),
+	# the first arrow or confirm press focuses the panel's first button.
+	var owner := get_viewport().gui_get_focus_owner()
+	if owner != null and owner.is_visible_in_tree():
+		return
+	for action in [&"ui_up", &"ui_down", &"ui_left", &"ui_right", &"ui_accept"]:
+		if event.is_action_pressed(action):
+			get_viewport().set_input_as_handled()
+			_focus_default()
+			return
+
+
+func _focus_default() -> void:
+	if slots_panel.visible:
+		slot_buttons[0].grab_focus()
+	elif settings.visible:
+		settings.focus_first()
+	else:
+		play_button.grab_focus()

@@ -1,0 +1,27 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://effects/fx/fx_player.gd" id="1_ubgbm"]
+
+[sub_resource type="Gradient" id="Gradient_11c0r"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[node name="SaveGlow" type="Node2D"]
+script = ExtResource("1_ubgbm")
+lifetime = 0.75
+emit_time = 0.0
+
+[node name="Particles1" type="CPUParticles2D" parent="."]
+emitting = false
+amount = 20
+lifetime = 0.7
+one_shot = true
+explosiveness = 1.0
+direction = Vector2(-4.37114e-08, -1)
+spread = 40.0
+gravity = Vector2(0, -150)
+initial_velocity_min = 42.0
+initial_velocity_max = 120.0
+scale_amount_min = 1.8
+scale_amount_max = 3.6
+color = Color(0.552941, 1, 0.690196, 1)
+color_ramp = SubResource("Gradient_11c0r")
