@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://world/objects/relic.gd" id="1_relic"]
+
+[node name="Relic" type="Node2D"]
+z_index = 2
+script = ExtResource("1_relic")

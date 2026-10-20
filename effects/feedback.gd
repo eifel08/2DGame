@@ -1,7 +1,8 @@
 class_name Feedback
 extends Node
 ## "Game feel" layer. Listens to gameplay events and answers with hitstop,
-## screen shake and particles. Gameplay code never calls these directly.
+## screen shake, particles and (placeholder) sounds via the Sfx autoload.
+## Gameplay code never calls these directly.
 
 var camera: CameraRig
 var effects: Effects
@@ -29,7 +30,13 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.boss_phase_changed.connect(_on_boss_phase_changed)
 	Events.boss_defeated.connect(_on_boss_defeated)
 	Events.arena_started.connect(func(_id: String) -> void: camera.add_trauma(0.35))
-	Events.arena_cleared.connect(func(_id: String) -> void: camera.add_trauma(0.3))
+	Events.arena_cleared.connect(_on_arena_cleared)
+	Events.enemy_spawning.connect(func(_e: Node) -> void: Sfx.play("spawn"))
+	Events.secret_found.connect(_on_secret_found)
+	Events.relic_collected.connect(_on_relic_collected)
+	Events.player_dying.connect(func(_p: Node) -> void: Sfx.play("death"))
+	Events.trance_broken.connect(func(p: Node) -> void:
+		effects.ring(p.get_center(), {"radius": 34.0, "color": Color("#c9f2ff"), "width": 3.0, "life": 0.3}))
 	Events.health_healed.connect(func(_amount: float) -> void: _heal_sparkle = true)
 
 
@@ -72,6 +79,7 @@ func _on_hit(info: Dictionary) -> void:
 	freeze(c.hitstop_on_hit * s)
 	camera.add_trauma(c.shake_on_hit * s)
 	effects.burst(info.position, {"count": 8 + int(round(6 * s)), "color": Color("#fff3c4"), "speed": 320.0, "life": 0.3})
+	Sfx.play("hit", randf_range(0.92, 1.08))
 	# Exact damage numbers are debug data (see Config.stats_visible()).
 	if Config.stats_visible():
 		var col := Color.WHITE if info.source == "melee" else Color("#ffd36b")
@@ -79,6 +87,7 @@ func _on_hit(info: Dictionary) -> void:
 
 
 func _on_pogo(pos: Vector2, on_hazard: bool) -> void:
+	Sfx.play("pogo")
 	effects.burst(pos, {
 		"count": 8, "color": Color("#ff9a9a") if on_hazard else Color("#bff6ff"), "speed": 200.0,
 		"angle": PI / 2.0, "spread": PI * 0.9, "gravity": 300.0,
@@ -92,6 +101,7 @@ func _on_player_hurt(player: Node, _damage: float) -> void:
 	freeze(Config.combat.hitstop_on_hurt)
 	camera.add_trauma(Config.combat.shake_on_hurt)
 	effects.burst(player.get_center(), {"count": 16, "color": Color("#ff6b6b"), "speed": 300.0, "size": 5.0})
+	Sfx.play("hurt")
 
 
 func _on_hazard_respawn(_player: Node, from_position: Vector2, to_position: Vector2) -> void:
@@ -139,6 +149,7 @@ func _on_checkpoint_activated(checkpoint: Node) -> void:
 
 
 func _on_player_rested(checkpoint: Node) -> void:
+	Sfx.play("save")
 	effects.burst(checkpoint.global_position + Vector2(0, -20), {
 		"count": 20, "color": Color("#8dffb0"), "speed": 120.0, "angle": -PI / 2.0,
 		"spread": 1.4, "gravity": -150.0, "life": 0.7, "size": 3.0,
@@ -159,6 +170,30 @@ func _on_boss_defeated(boss: Node) -> void:
 	camera.add_trauma(0.9)
 	effects.burst(boss.get_center(), {"count": 60, "color": Color("#b06cff"), "speed": 480.0, "size": 6.0, "life": 0.8})
 	effects.ring(boss.get_center(), {"radius": 200.0, "color": Color.WHITE, "width": 8.0, "life": 0.7})
+
+
+## Arena victory: fanfare, flash rings and confetti-like sparks (+ HUD banner).
+func _on_arena_cleared(_arena_id: String) -> void:
+	Sfx.play("victory")
+	camera.add_trauma(0.35)
+	var c := camera.global_position
+	effects.ring(c, {"radius": 260.0, "color": Color("#ffd36b"), "width": 8.0, "life": 0.8})
+	effects.ring(c, {"radius": 160.0, "color": Color.WHITE, "width": 5.0, "life": 0.6})
+	for col in [Color("#ffd36b"), Color("#8dffb0"), Color("#7cf3ff")]:
+		effects.burst(c + Vector2(randf_range(-200, 200), -120), {"count": 18, "color": col, "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0})
+
+
+func _on_secret_found(_secret_id: String, pos: Vector2) -> void:
+	Sfx.play("break")
+	Sfx.play("secret")
+	camera.add_trauma(0.4)
+	effects.ring(pos, {"radius": 90.0, "color": Color("#7cf3ff"), "width": 5.0, "life": 0.6})
+
+
+func _on_relic_collected(_relic_id: String, pos: Vector2) -> void:
+	Sfx.play("relic")
+	effects.ring(pos + Vector2(0, -22), {"radius": 70.0, "color": Color("#ff5e7a"), "width": 6.0, "life": 0.6})
+	effects.burst(pos + Vector2(0, -22), {"count": 30, "color": Color("#ff9aae"), "speed": 220.0, "gravity": -100.0, "life": 0.8, "size": 4.0})
 
 
 func _on_ultimate_impact(hitstop: float, shake: float) -> void:

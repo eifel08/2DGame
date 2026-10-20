@@ -16,6 +16,8 @@ var _rules: Array = []
 func setup(p: Player) -> void:
 	animation_player = p.get_node("AnimationPlayer")
 	_rules = [
+		["dying", func() -> bool: return p.state_name() == "dying"],
+		["trance", func() -> bool: return p.state_name() == "trance"],
 		["hurt", func() -> bool: return p.state_name() == "hurt"],
 		["cast", func() -> bool: return p.state_name() == "cast"],
 		["heal", func() -> bool: return p.state_name() == "heal"],

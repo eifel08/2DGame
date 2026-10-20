@@ -8,7 +8,7 @@ const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down",
 	&"jump", &"attack", &"dash", &"heal",
 	&"ult_1", &"ult_2", &"ult_3", &"ult_4",
-	&"interact", &"inventory", &"toggle_debug", &"debug_navigate", &"reset_room",
+	&"interact", &"inventory", &"pause", &"toggle_debug", &"debug_navigate", &"reset_room",
 ]
 
 var _pressed := {}
@@ -45,6 +45,15 @@ func consume(action: StringName) -> void:
 func end_step() -> void:
 	_pressed.clear()
 	_released.clear()
+
+
+## True if any gameplay action was freshly pressed this step (keys that were
+## already held down do not count). Used to break the checkpoint trance.
+func any_pressed() -> bool:
+	for action in _pressed:
+		if action not in [&"toggle_debug", &"debug_navigate", &"reset_room"]:
+			return true
+	return false
 
 
 func axis_x() -> int:

@@ -65,26 +65,90 @@ const BOSS_LAYOUT := [
 	"#...................v..................#",
 	"#......................................#",
 	"#.....======................======.....#",
-	".......................................#",
-	".......................................#",
-	"D.............w.......s...w...B........#",
+	"........................................",
+	"........................................",
+	"D.............w.......s...w...B........H",
 	"########################################",
 	"########################################",
 ]
 
-## Rooms: layout, output scene, door settings per room and optional arena.
+## Proving Grounds: a wave arena without a boss. Its east wall hides a
+## breakable section ('X') in front of a doorway ('H') to the Hidden Shrine.
+## Arena letters: 'w' weak (wave 1), 'v' flyer / 'u' weak (wave 2), 's' strong (wave 3).
+const ARENA_LAYOUT := [
+	"####################################",
+	"#..................................#",
+	"#..................................#",
+	"#..................................#",
+	"#..................................#",
+	"#..................................#",
+	"#..................................#",
+	"#..................................#",
+	"#..............=======.............#",
+	"#..................................#",
+	"#...............v........v.........#",
+	"#..................................#",
+	"#.........=====.......=====........#",
+	"....................................",
+	"....................................",
+	"D..T.C........w..s..w..u...w.s....XH",
+	"####################################",
+	"####################################",
+]
+
+## Hidden Shrine (secret room): a relic ('R') on an altar, shards and a tablet ('Q').
+const SECRET_LAYOUT := [
+	"################################",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#.......$...............$......#",
+	"#.....=====...........=====....#",
+	"#..............................#",
+	"#..............................#",
+	"...............................#",
+	"................R..............#",
+	"D.........Q...#####..$.$.$.$...#",
+	"################################",
+	"################################",
+]
+
+## Rooms: layout, output scene, doors (per letter) and optional arena.
+## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(hidden wall)-> Hidden Shrine
 const ROOMS := {
 	"test_room": {
 		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn",
-		"door": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1},
+		"doors": {"D": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1}},
 	},
 	"boss_room": {
 		"name": "BossRoom", "layout": BOSS_LAYOUT, "path": "res://world/boss_room.tscn",
-		"door": {"door_id": "west", "target_room": "test_room", "target_door": "east", "inward": 1},
-		"arena": {"arena_id": "sentinel_arena", "trigger_cols": [5, 38], "waves": [["w", "v"], ["s"], ["B"]]},
+		"doors": {
+			"D": {"door_id": "west", "target_room": "test_room", "target_door": "east", "inward": 1},
+			"H": {"door_id": "east", "target_room": "arena_room", "target_door": "west", "inward": -1},
+		},
+		"arena": {"arena_id": "sentinel_arena", "trigger_cols": [5, 34], "waves": [["w", "v"], ["s"], ["B"]]},
+	},
+	"arena_room": {
+		"name": "ArenaRoom", "layout": ARENA_LAYOUT, "path": "res://world/arena_room.tscn",
+		"doors": {
+			"D": {"door_id": "west", "target_room": "boss_room", "target_door": "east", "inward": 1},
+			"H": {"door_id": "east", "target_room": "secret_room", "target_door": "west", "inward": -1},
+		},
+		"arena": {"arena_id": "proving_grounds", "trigger_cols": [9, 32], "waves": [["w"], ["v", "u"], ["s"]]},
+		"secret_id": "proving_grounds_wall",
+	},
+	"secret_room": {
+		"name": "SecretRoom", "layout": SECRET_LAYOUT, "path": "res://world/secret_room.tscn",
+		"doors": {"D": {"door_id": "west", "target_room": "arena_room", "target_door": "east", "inward": 1}},
+		"relic": {"relic_id": "shrine_heart", "stat": "max_health", "amount": 25.0},
 	},
 }
-const ARENA_KINDS := {"w": "weak", "v": "flyer", "s": "strong", "B": "boss"}
+const ARENA_KINDS := {"w": "weak", "u": "weak", "v": "flyer", "s": "strong", "B": "boss"}
 
 ## Dialogue per object letter.
 const LORE := {
@@ -93,12 +157,15 @@ const LORE := {
 	"K": "res://dialogue/lore_spikes.tres",
 	"U": "res://dialogue/lore_ultimates.tres",
 	"T": "res://dialogue/lore_checkpoint.tres",
+	"Q": "res://dialogue/lore_secret.tres",
 }
 const CHECKPOINT_SCENE := "res://world/objects/checkpoint.tscn"
 const LORE_SCENE := "res://world/objects/lore_stone.tscn"
 const NPC_SCENE := "res://world/objects/npc.tscn"
 const COIN_SCENE := "res://world/objects/coin.tscn"
 const DOOR_SCENE := "res://world/objects/door.tscn"
+const BREAKABLE_SCENE := "res://world/objects/breakable_wall.tscn"
+const RELIC_SCENE := "res://world/objects/relic.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -129,6 +196,8 @@ const PLAYER_ANIMS := {
 	"heal": {"frames": 4, "fps": 8, "loop": true, "color": "#8dffb0", "sx": 1.06, "sy": 0.9, "bob": 2.0},
 	"cast": {"frames": 5, "fps": 12, "loop": false, "color": "#d6a8ff", "sx": 0.9, "sy": 1.15, "bob": 2.0},
 	"hurt": {"frames": 2, "fps": 12, "loop": false, "color": "#ff6b6b", "sx": 1.1, "sy": 0.9, "lean": -0.2},
+	"dying": {"frames": 6, "fps": 8, "loop": false, "color": "#ff4d5e", "sx": 1.35, "sy": 0.3, "lean": -0.35},
+	"trance": {"frames": 6, "fps": 4, "loop": true, "color": "#c9f2ff", "sx": 0.95, "sy": 1.02, "bob": 2.0, "float": 14.0},
 }
 
 const DUMMY_ANIMS := {
@@ -238,8 +307,9 @@ func _build_input_map() -> void:
 		"ult_3": [_key(KEY_3), _joy_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)],
 		"ult_4": [_key(KEY_4), _joy_button(JOY_BUTTON_RIGHT_STICK)],
 		"interact": [_key(KEY_E), _key(KEY_F), _joy_button(JOY_BUTTON_B)],
-		"inventory": [_key(KEY_I), _key(KEY_TAB), _key(KEY_ESCAPE), _joy_button(JOY_BUTTON_BACK)],
-		"toggle_debug": [_key(KEY_F1), _key(KEY_QUOTELEFT), _joy_button(JOY_BUTTON_START)],
+		"inventory": [_key(KEY_I), _key(KEY_TAB), _joy_button(JOY_BUTTON_BACK)],
+		"pause": [_key(KEY_ESCAPE), _key(KEY_P), _joy_button(JOY_BUTTON_START)],
+		"toggle_debug": [_key(KEY_F1), _key(KEY_QUOTELEFT)],
 		"reset_room": [_key(KEY_R)],
 		"debug_navigate": [_key(KEY_F2)],
 		# Menu-only actions (inventory). Arrows/Enter/Space use Godot's ui_* actions.
@@ -380,6 +450,14 @@ func _make_animation(def: Dictionary, height: float, with_arm: bool) -> Animatio
 		var b := bob / height
 		anim.track_insert_key(t, length * 0.5, base + Vector2(-b * 0.5, b))
 		anim.track_insert_key(t, length, base)
+
+	# Optional hover (e.g. the trance): the rig floats above the feet and bobs.
+	t = _value_track(anim, "Flip/Rig:position")
+	var lift: float = def.get("float", 0.0)
+	anim.track_insert_key(t, 0.0, Vector2(0, -lift))
+	if lift > 0.0:
+		anim.track_insert_key(t, length * 0.5, Vector2(0, -lift - 5.0))
+		anim.track_insert_key(t, length, Vector2(0, -lift))
 
 	t = _value_track(anim, "Flip/Rig:skew")
 	anim.track_insert_key(t, 0.0, -float(def.get("lean", 0.0)))
@@ -569,10 +647,14 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, COIN_SCENE, "Coin", feet, {})
 				"N":
 					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
-				"W", "K", "U", "T":
+				"W", "K", "U", "T", "Q":
 					_add_object(root, objects, counts, LORE_SCENE, "Lore", feet, {"dialogue": load(LORE[ch])})
-				"D":
-					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.door)
+				"D", "H":
+					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.doors[ch])
+				"X":
+					_add_object(root, objects, counts, BREAKABLE_SCENE, "BreakableWall", feet, {"secret_id": def.secret_id})
+				"R":
+					_add_object(root, objects, counts, RELIC_SCENE, "Relic", feet, def.relic)
 				"E", "F", "G":
 					enemy_count += 1
 					var kind: String = {"E": "weak", "F": "flyer", "G": "strong"}[ch]
@@ -582,7 +664,7 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					m.set_meta("kind", kind)
 					m.set_meta("flying", ch == "F")
 					_add(root, m, spawns)
-				"w", "v", "s", "B":
+				"w", "u", "v", "s", "B":
 					if arena == null:
 						continue
 					for i in arena_def.waves.size():

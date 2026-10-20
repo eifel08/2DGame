@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=15 format=3]
 
 [ext_resource type="Script" path="res://core/game.gd" id="1_game"]
 [ext_resource type="PackedScene" path="res://player/player.tscn" id="3_player"]
@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://ui/background.gd" id="12_background"]
 [ext_resource type="Script" path="res://ui/dialogue_box.gd" id="13_dialogue"]
 [ext_resource type="Script" path="res://ui/inventory_menu.gd" id="14_inventory"]
+[ext_resource type="Script" path="res://ui/pause_menu.gd" id="15_pause"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_game")
@@ -94,6 +95,10 @@ script = ExtResource("13_dialogue")
 [node name="Inventory" type="CanvasLayer" parent="."]
 layer = 9
 script = ExtResource("14_inventory")
+
+[node name="PauseMenu" type="CanvasLayer" parent="."]
+layer = 12
+script = ExtResource("15_pause")
 
 [node name="DebugOverlay" type="CanvasLayer" parent="."]
 layer = 10

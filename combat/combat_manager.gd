@@ -79,13 +79,18 @@ func get_attack_hitbox(dir: String) -> Rect2:
 		"up":
 			var size := Vector2(50, 56) * s
 			return Rect2(r.get_center().x - size.x / 2.0, r.position.y - size.y + 6.0, size.x, size.y)
-		"down":
-			var size := Vector2(46, 58) * s
-			return Rect2(r.get_center().x - size.x / 2.0, r.end.y - 6.0, size.x, size.y)
+		"down": # Generous pogo box: wider and taller than the player.
+			var size: Vector2 = Config.combat.pogo_hitbox * s
+			return Rect2(r.get_center().x - size.x / 2.0, r.end.y - 10.0, size.x, size.y)
 		_:
 			var size := Vector2(60, 38) * s
 			var x := r.end.x - 4.0 if dir == "right" else r.position.x - size.x + 4.0
 			return Rect2(x, r.get_center().y - size.y / 2.0 - 2.0, size.x, size.y)
+
+
+## The downward swing stays active longer (pogo leniency).
+func active_end(dir: String) -> float:
+	return Config.combat.pogo_active_end if dir == "down" else Config.combat.attack_active_end
 
 
 func _start_attack() -> void:
@@ -116,7 +121,7 @@ func _step_attack(delta: float) -> void:
 	if not p.can_attack() or attack.t >= c.attack_duration:
 		_end_attack()
 		return
-	if attack.t < c.attack_active_start or attack.t > c.attack_active_end:
+	if attack.t < c.attack_active_start or attack.t > active_end(attack.dir):
 		return
 
 	var dir: String = attack.dir
@@ -127,7 +132,7 @@ func _step_attack(delta: float) -> void:
 
 	for enemy in get_enemies():
 		var er: Rect2 = enemy.get_rect()
-		if not enemy.alive or attack.hit_set.has(enemy) or not box.intersects(er):
+		if not enemy.hitbox_active() or attack.hit_set.has(enemy) or not box.intersects(er):
 			continue
 		attack.hit_set[enemy] = true
 		var hx := dir_x if dir_x != 0.0 else signf(enemy.get_center().x - p.get_center().x)
@@ -141,6 +146,14 @@ func _step_attack(delta: float) -> void:
 		})
 		if applied > 0.0:
 			connected = true
+
+	# Breakable walls (hidden passages) take hits from any swing.
+	for wall in game.breakables:
+		if wall.intact and not attack.hit_set.has(wall) and box.intersects(wall.get_rect()):
+			attack.hit_set[wall] = true
+			game.hit_breakable(wall, box.intersection(wall.get_rect()).get_center())
+			if dir_x != 0.0:
+				p.velocity.x = -dir_x * c.recoil_velocity
 
 	# Down-attacks also bounce off hazards (spikes).
 	var on_hazard := dir == "down" and get_room().find_hazard(box).has_area()
@@ -177,7 +190,7 @@ func apply_damage(target: Node, opts: Dictionary) -> float:
 func damage_in_circle(center: Vector2, radius: float, opts: Dictionary, hit_set := {}) -> int:
 	var count := 0
 	for enemy in get_enemies():
-		if not enemy.alive or hit_set.has(enemy) or not Geom.circle_overlaps_rect(center, radius, enemy.get_rect()):
+		if not enemy.hitbox_active() or hit_set.has(enemy) or not Geom.circle_overlaps_rect(center, radius, enemy.get_rect()):
 			continue
 		hit_set[enemy] = true
 		var o := opts.duplicate()
@@ -190,7 +203,7 @@ func damage_in_circle(center: Vector2, radius: float, opts: Dictionary, hit_set 
 func damage_in_rect(rect: Rect2, opts: Dictionary, hit_set := {}) -> int:
 	var count := 0
 	for enemy in get_enemies():
-		if not enemy.alive or hit_set.has(enemy) or not rect.intersects(enemy.get_rect()):
+		if not enemy.hitbox_active() or hit_set.has(enemy) or not rect.intersects(enemy.get_rect()):
 			continue
 		hit_set[enemy] = true
 		var o := opts.duplicate()
@@ -270,7 +283,7 @@ func _draw_hitboxes() -> void:
 	draw_line(sp, sp + Vector2(0, -20), Color("#69db7c"), 1.0)
 	draw_string(ThemeDB.fallback_font, sp + Vector2(-30, -24), "safe point", HORIZONTAL_ALIGNMENT_CENTER, 60, 9, Color("#69db7c"))
 	if not attack.is_empty():
-		var active: bool = attack.t >= c.attack_active_start and attack.t <= c.attack_active_end
+		var active: bool = attack.t >= c.attack_active_start and attack.t <= active_end(attack.dir)
 		draw_rect(get_attack_hitbox(attack.dir), Color("#ff3b3b") if active else Color(1, 1, 1, 0.4), false, 1.0)
 
 

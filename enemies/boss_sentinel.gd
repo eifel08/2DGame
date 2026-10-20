@@ -8,8 +8,12 @@ extends Enemy
 ##   volley - aimed shards at the player (spread)
 ## Below half health it enters phase 2: shorter telegraphs, faster moves and
 ## extra shards. Every attack is preceded by a clear telegraph (white eyes).
+## Death: a roar (Sfx "boss_roar"), a violent shudder, then the body
+## dissolves into particles over ~2 seconds. Hitboxes are off from the start.
 
 const GRAVITY := 2200.0
+const SCREAM_TIME := 0.7
+const DISSOLVE_TIME := 1.5
 
 @export var boss_id := "hollow_sentinel"
 @export var display_name := "Hollow Sentinel"
@@ -20,6 +24,7 @@ const GRAVITY := 2200.0
 @export var shockwave_damage := 15.0
 
 var combat: CombatManager
+var effects: Effects
 var phase := 1
 var state := "intro"
 var state_time := 0.0
@@ -194,6 +199,36 @@ func _fire_shard() -> void:
 	_shot_timer = 0.12
 
 
+func _die() -> void:
+	super._die()
+	state = "dying"
+	Sfx.play("boss_roar")
+	Events.ultimate_impact.emit(0.12, 0.9)
+
+
+## Scream (shudder + flashing), then dissolve: fade out while shedding particles.
+func _step_dead(_delta: float) -> void:
+	if dead_time < SCREAM_TIME:
+		flip.position = Vector2(randf_range(-4, 4), randf_range(-2, 2))
+		flip.modulate = Color(3, 3, 3) if int(dead_time * 30.0) % 2 == 0 else Color.WHITE
+		return
+	var k := clampf((dead_time - SCREAM_TIME) / DISSOLVE_TIME, 0.0, 1.0)
+	flip.position = Vector2.ZERO
+	flip.modulate = Color(1.2, 1.0, 1.4, 1.0 - k)
+	if effects and k < 1.0 and randf() < 0.6:
+		var r := get_rect()
+		effects.burst(Vector2(randf_range(r.position.x, r.end.x), randf_range(r.position.y, r.end.y)), {
+			"count": 2, "color": Color("#b06cff"), "speed": 80.0, "angle": -PI / 2.0, "spread": 1.2,
+			"gravity": -260.0, "life": 0.7, "size": 4.0,
+		})
+	if k >= 1.0:
+		visible = false
+
+
+func is_dissolved() -> bool:
+	return not alive and dead_time >= SCREAM_TIME + DISSOLVE_TIME
+
+
 func _recover(duration: float) -> void:
 	recover_time = duration
 	_enter("recover")
@@ -201,7 +236,7 @@ func _recover(duration: float) -> void:
 
 func _choose_animation() -> String:
 	if not alive:
-		return "dead"
+		return "roar" if dead_time < SCREAM_TIME else "dead"
 	if flash_timer > 0.0 and state in ["stalk", "recover"]:
 		return "hurt"
 	match state:

@@ -7,10 +7,17 @@ extends Node2D
 ## Rooms are separate scenes loaded on demand (ROOM_SCENES). Progress that
 ## must survive room loads (dead enemies, bosses, arenas, shards) lives in
 ## WorldState; see core/world_state.gd for the respawn hierarchy.
+##
+## Save slots: when started from the title screen, Saves.active_slot is set
+## and the slot is written at every checkpoint save and on lasting progress
+## (boss, arena, secret, relic). Running this scene directly starts a new
+## game that is not saved (handy for testing).
 
 const ROOM_SCENES := {
 	"test_room": preload("res://world/test_room.tscn"),
 	"boss_room": preload("res://world/boss_room.tscn"),
+	"arena_room": preload("res://world/arena_room.tscn"),
+	"secret_room": preload("res://world/secret_room.tscn"),
 }
 const START_ROOM := "test_room"
 const ENEMY_SCENES := {
@@ -21,6 +28,7 @@ const ENEMY_SCENES := {
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
 const FADE_TIME := 0.22
+const RESPAWN_FADE_TIME := 0.45
 ## Abilities the player starts with, in hotkey order (keys 1-4).
 const STARTING_ABILITIES: Array[String] = ["nova_burst", "spirit_volley", "ascendant_form", "comet_dash"]
 
@@ -38,6 +46,7 @@ const STARTING_ABILITIES: Array[String] = ["nova_burst", "spirit_volley", "ascen
 @onready var dialogue: DialogueBox = $DialogueBox
 @onready var inventory: InventoryMenu = $Inventory
 @onready var debug_overlay: DebugOverlay = $DebugOverlay
+@onready var pause_menu: PauseMenu = $PauseMenu
 @onready var background: Control = $BackgroundLayer/Background
 
 var input := InputState.new()
@@ -51,12 +60,19 @@ var checkpoints: Array[Checkpoint] = []
 var interactables: Array[Interactable] = []
 var doors: Array[Door] = []
 var coins: Array[Coin] = []
+var breakables: Array[BreakableWall] = []
+var relics: Array[Relic] = []
+var playtime := 0.0
+## Set false before adding to the tree to skip the opening trance (tests).
+var start_in_trance := true
 var current_checkpoint: Checkpoint ## The saved checkpoint, if it is in this room.
 ## Where death respawns the player: {room, checkpoint (node name), position}.
 var respawn := {}
 var focused_interactable: Interactable
 var pending_respawn := false
-var transition := {} ## {phase: "out"/"in", time, room, door} while moving between rooms.
+## Screen fade while moving between rooms or respawning:
+## {phase: "out"/"in", time, duration, on_black: Callable}.
+var transition := {}
 
 
 func _ready() -> void:
@@ -73,6 +89,7 @@ func _ready() -> void:
 	hud.boss_provider = active_boss
 	background.setup(camera)
 	inventory.setup(self)
+	pause_menu.setup(self)
 	debug_overlay.setup(self)
 
 	# Energy: only basic attacks fill the shared meter.
@@ -88,13 +105,22 @@ func _ready() -> void:
 	hud.layout_direction = Control.LAYOUT_DIRECTION_LTR
 	fade.color.a = 0.0
 
+	Events.boss_defeated.connect(func(_b: Node) -> void: write_save())
+	Events.arena_cleared.connect(func(_id: String) -> void: write_save())
+
 	_load_room_scene(START_ROOM)
 	player.setup(input, room, room.get_player_spawn())
 	for cp in checkpoints:
 		if cp.is_start:
 			activate_checkpoint(cp, false)
-	player.reset()
-	camera.snap_to(player)
+	if Saves.active_slot >= 0 and not Saves.pending_data.is_empty():
+		apply_save_data(Saves.pending_data)
+	else:
+		player.reset()
+		camera.snap_to(player)
+		if start_in_trance:
+			player.enter_trance()
+		write_save() # A new game in a slot gets its first save right away.
 
 
 func _physics_process(delta: float) -> void:
@@ -103,6 +129,9 @@ func _physics_process(delta: float) -> void:
 	Engine.time_scale = Config.debug.time_scale
 
 	# Things that pause the simulation.
+	if pause_menu.is_open():
+		input.end_step()
+		return
 	if not transition.is_empty():
 		_step_transition(delta)
 		input.end_step()
@@ -115,6 +144,7 @@ func _physics_process(delta: float) -> void:
 		input.end_step()
 		return
 
+	playtime += delta
 	camera.step_shake(delta)
 	# Hitstop: freeze the simulation. Input edges are kept (no end_step) so
 	# presses made during the freeze still register afterwards.
@@ -135,10 +165,11 @@ func _physics_process(delta: float) -> void:
 	effects.step(delta)
 	camera.follow(player, delta)
 
-	if pending_respawn:
+	# Death: wait for the collapse animation, then fade to the checkpoint.
+	if pending_respawn and player.death_finished():
 		pending_respawn = false
 		effects.burst(player.get_center(), {"count": 40, "color": Color("#ff6b6b"), "speed": 400.0, "size": 5.0})
-		reset_player()
+		_begin_fade(respawn_at_checkpoint, RESPAWN_FADE_TIME)
 	input.end_step()
 
 
@@ -149,9 +180,15 @@ func _handle_meta_input() -> void:
 	if input.was_pressed(&"debug_navigate"):
 		input.consume(&"debug_navigate")
 		debug_overlay.set_navigating(not debug_overlay.navigating)
+	if input.was_pressed(&"pause"):
+		input.consume(&"pause")
+		if inventory.is_open():
+			inventory.toggle()
+		elif not dialogue.is_open() and not debug_overlay.navigating and transition.is_empty():
+			pause_menu.toggle()
 	if input.was_pressed(&"inventory"):
 		input.consume(&"inventory")
-		if not dialogue.is_open() and not debug_overlay.navigating and transition.is_empty():
+		if not dialogue.is_open() and not debug_overlay.navigating and transition.is_empty() and not pause_menu.is_open():
 			inventory.toggle()
 	if input.was_pressed(&"reset_room"):
 		input.consume(&"reset_room")
@@ -175,6 +212,8 @@ func _load_room_scene(id: String) -> void:
 	checkpoints.clear()
 	interactables.clear()
 	doors.clear()
+	breakables.clear()
+	relics.clear()
 	current_checkpoint = null
 	focused_interactable = null
 	combat.reset()
@@ -199,6 +238,14 @@ func _load_room_scene(id: String) -> void:
 			interactables.append(node)
 		if node is Door:
 			doors.append(node)
+		if node is BreakableWall:
+			breakables.append(node)
+			if world.is_secret_open(node.secret_id):
+				node.open()
+		if node is Relic:
+			relics.append(node)
+			if world.has_relic(node.relic_id):
+				node.collect()
 		if node is Coin:
 			coins.append(node)
 			if world.is_coin_collected(id, node.name):
@@ -235,16 +282,22 @@ func _update_doors() -> void:
 
 
 func begin_transition(target_room: String, target_door: String) -> void:
-	transition = {"phase": "out", "time": 0.0, "room": target_room, "door": target_door}
+	Sfx.play("door")
+	_begin_fade(func() -> void: load_room(target_room, target_door), FADE_TIME)
+
+
+## Fades to black, runs `on_black`, then fades back in.
+func _begin_fade(on_black: Callable, duration: float) -> void:
+	transition = {"phase": "out", "time": 0.0, "duration": duration, "on_black": on_black}
 
 
 func _step_transition(delta: float) -> void:
 	transition.time += delta
-	var k := clampf(transition.time / FADE_TIME, 0.0, 1.0)
+	var k := clampf(transition.time / transition.duration, 0.0, 1.0)
 	if transition.phase == "out":
 		fade.color.a = k
 		if k >= 1.0:
-			load_room(transition.room, transition.door)
+			transition.on_black.call()
 			transition.phase = "in"
 			transition.time = 0.0
 	else:
@@ -258,18 +311,38 @@ func _step_transition(delta: float) -> void:
 
 ## Instantiates an enemy of `kind` (weak / flyer / strong / boss). Returns
 ## null for a boss that is already defeated in this playthrough.
-func spawn_enemy_kind(kind: String, at: Vector2, spawn_id := "") -> Enemy:
+## `telegraph`: event spawn (arena wave, checkpoint revival while present,
+## debug). The enemy appears through a portal, harmless and untouchable, and
+## never directly on top of the player.
+func spawn_enemy_kind(kind: String, at: Vector2, spawn_id := "", telegraph := false) -> Enemy:
 	var enemy: Enemy = ENEMY_SCENES[kind].instantiate()
 	if enemy is BossSentinel and world.is_boss_defeated(enemy.boss_id):
 		enemy.free()
 		return null
+	if telegraph:
+		at = _spawn_point_away_from_player(at)
 	enemies_root.add_child(enemy)
 	enemy.spawn_id = spawn_id
-	enemy.setup(room, at, player)
+	enemy.setup(room, at, player, telegraph)
 	if enemy is BossSentinel:
 		enemy.combat = combat
+		enemy.effects = effects
 	enemies.append(enemy)
 	return enemy
+
+
+const SPAWN_CLEARANCE := 110.0
+
+
+func _spawn_point_away_from_player(at: Vector2) -> Vector2:
+	if absf(at.x - player.global_position.x) >= SPAWN_CLEARANCE or absf(at.y - player.global_position.y) > 120.0:
+		return at
+	for dir in [signf(at.x - player.global_position.x), -signf(at.x - player.global_position.x)]:
+		var d: float = dir if dir != 0.0 else 1.0
+		var moved := Vector2(player.global_position.x + d * (SPAWN_CLEARANCE + 30.0), at.y)
+		if not room.is_solid_at(moved + Vector2(0, -16)) and room.get_bounds().has_point(moved + Vector2(0, -16)):
+			return moved
+	return at
 
 
 func remove_enemy(enemy: Enemy) -> void:
@@ -301,6 +374,7 @@ func active_boss() -> BossSentinel:
 
 
 ## Re-creates every room enemy that WorldState allows and heals survivors.
+## Revived enemies come back through a spawn telegraph.
 func _refresh_room_enemies() -> void:
 	var living := {}
 	for enemy in enemies.duplicate():
@@ -313,7 +387,7 @@ func _refresh_room_enemies() -> void:
 			remove_enemy(enemy)
 	for spawn in room.get_enemy_spawns():
 		if not living.has(spawn.id) and not world.is_dead(room_id, spawn.id):
-			spawn_enemy_kind(spawn.kind, spawn.position, spawn.id)
+			spawn_enemy_kind(spawn.kind, spawn.position, spawn.id, true)
 
 
 # ---------- Checkpoints ----------
@@ -351,6 +425,7 @@ func save_at_checkpoint(cp: Checkpoint) -> void:
 	world.on_checkpoint_rest()
 	_refresh_room_enemies()
 	Events.player_rested.emit(cp)
+	write_save()
 
 
 # ---------- Interaction & dialogue ----------
@@ -403,6 +478,35 @@ func _update_pickups(delta: float) -> void:
 		if coin.dropped and coin.collected:
 			coins.erase(coin)
 			coin.queue_free()
+	for relic in relics:
+		if not relic.collected and relic.get_rect().intersects(pr):
+			collect_relic(relic)
+
+
+## Permanent upgrade: raises max health or max energy for this save.
+func collect_relic(relic: Relic) -> void:
+	relic.collect()
+	world.take_relic(relic.relic_id)
+	if relic.stat == "max_energy":
+		player.health.max_energy_bonus += relic.amount
+	else:
+		player.health.max_health_bonus += relic.amount
+		player.health.full_heal()
+	Events.relic_collected.emit(relic.relic_id, relic.global_position)
+	write_save()
+
+
+## A swing hit a breakable wall; the last hit opens the hidden passage.
+func hit_breakable(wall: BreakableWall, at: Vector2) -> void:
+	effects.burst(at, {"count": 8, "color": Color("#56649a"), "speed": 220.0, "size": 4.0, "life": 0.4})
+	camera.add_trauma(0.15)
+	if wall.hit():
+		world.open_secret(wall.secret_id)
+		effects.burst(wall.get_rect().get_center(), {"count": 40, "color": Color("#3a4370"), "speed": 320.0, "size": 6.0, "life": 0.7})
+		Events.secret_found.emit(wall.secret_id, wall.get_rect().get_center())
+		write_save()
+	else:
+		Sfx.play("hit", 0.6)
 
 
 ## Bursts `amount` shards out of `origin` (used when enemies die).
@@ -422,7 +526,28 @@ func drop_currency(origin: Vector2, amount: int) -> void:
 
 # ---------- Respawn / reset helpers ----------
 
-## Respawns the player at the saved checkpoint (loading its room if needed).
+## Death respawn and save loading: back at the saved checkpoint, exactly like
+## a checkpoint save (weak and strong enemies return), with 0 energy and the
+## player floating in a trance until a button is pressed.
+func respawn_at_checkpoint() -> void:
+	ultimates.cancel_all()
+	arena_director.abort()
+	world.on_checkpoint_rest()
+	if not respawn.is_empty() and respawn.room != room_id:
+		_load_room_scene(respawn.room)
+	else:
+		_refresh_room_enemies()
+	if not respawn.is_empty():
+		player.spawn_position = respawn.position
+	combat.reset()
+	player.reset() # Full health, energy 0.
+	player.safe_point = player.spawn_position
+	player.enter_trance()
+	camera.snap_to(player)
+	Events.player_respawned.emit(player)
+
+
+## Respawns the player at the saved checkpoint (debug/tests: no revive, no trance).
 func reset_player() -> void:
 	ultimates.cancel_all()
 	arena_director.abort()
@@ -468,13 +593,16 @@ func spawn_enemy(flying: bool, kind := "") -> void:
 	# Avoid spawning inside walls: fall back to the player's position.
 	if room.is_solid_at(home + Vector2(0, -8)):
 		home = player.global_position + Vector2(0, -30.0 if k == "flyer" else 0.0)
-	spawn_enemy_kind(k, home, "")
+	spawn_enemy_kind(k, home, "", true)
 
 
 ## Debug: a completely new playthrough (bosses and arenas come back).
 func new_game() -> void:
 	world.new_game()
 	respawn = {}
+	pending_respawn = false
+	transition = {}
+	fade.color.a = 0.0
 	_load_room_scene(START_ROOM)
 	for cp in checkpoints:
 		if cp.is_start:
@@ -485,3 +613,62 @@ func new_game() -> void:
 func restore_defaults() -> void:
 	Config.restore_defaults()
 	debug_overlay.refresh()
+
+
+# ---------- Save slots ----------
+
+## Everything a save slot stores (respawnable enemies are not stored).
+func make_save_data() -> Dictionary:
+	var pos: Vector2 = respawn.get("position", player.spawn_position)
+	var data := world.to_dict()
+	data.merge({
+		"room": respawn.get("room", room_id),
+		"checkpoint": respawn.get("checkpoint", ""),
+		"position": [pos.x, pos.y],
+		"currency": player_data.currency,
+		"unlocked": player_data.unlocked.duplicate(),
+		"equipped": player_data.equipped.duplicate(),
+		"max_health_bonus": player.health.max_health_bonus,
+		"max_energy_bonus": player.health.max_energy_bonus,
+		"playtime": playtime,
+	})
+	return data
+
+
+func write_save() -> void:
+	if Saves.active_slot >= 0:
+		Saves.write_slot(Saves.active_slot, make_save_data())
+
+
+## Loading a save: progress restored, player at the saved checkpoint with 0
+## energy (in a trance), respawnable enemies reset.
+func apply_save_data(data: Dictionary) -> void:
+	world.from_dict(data)
+	player_data.currency = int(data.get("currency", 0))
+	var unlocked: Array[String] = []
+	for id in data.get("unlocked", STARTING_ABILITIES):
+		unlocked.append(String(id))
+	player_data.unlocked = unlocked
+	var equipped: Array[String] = ["", "", "", ""]
+	var saved_equipped: Array = data.get("equipped", [])
+	for i in mini(saved_equipped.size(), equipped.size()):
+		equipped[i] = String(saved_equipped[i])
+	player_data.equipped = equipped
+	player.health.max_health_bonus = float(data.get("max_health_bonus", 0.0))
+	player.health.max_energy_bonus = float(data.get("max_energy_bonus", 0.0))
+	playtime = float(data.get("playtime", 0.0))
+	var pos: Array = data.get("position", [])
+	respawn = {
+		"room": data.get("room", START_ROOM),
+		"checkpoint": data.get("checkpoint", ""),
+		"position": Vector2(pos[0], pos[1]) if pos.size() == 2 else room.get_player_spawn(),
+	}
+	_load_room_scene(respawn.room)
+	respawn_at_checkpoint()
+	Events.loadout_changed.emit()
+
+
+## Pause menu: leave to the title screen (progress is kept up to the last save).
+func quit_to_title() -> void:
+	Engine.time_scale = 1.0
+	get_tree().change_scene_to_file("res://scenes/title.tscn")

@@ -58,6 +58,8 @@ func _ready() -> void:
 	fsm.add("cast", CastState.new(self))
 	fsm.add("ability", AbilityState.new(self))
 	fsm.add("hurt", HurtState.new(self))
+	fsm.add("trance", TranceState.new(self))
+	fsm.add("dying", DyingState.new(self))
 	health.energy_gain_source = func() -> float: return stat("energy_gain_mul")
 	animator.setup(self)
 
@@ -263,11 +265,33 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 		return false
 	health.take_damage(damage)
 	var dir := 1 if global_position.x >= source_x else -1
-	fsm.change("hurt", {"dir": dir, "knock_up": knock_up})
 	Events.player_hurt.emit(self, damage)
 	if health.health <= 0.0:
-		Events.player_died.emit(self)
+		die(dir)
+	else:
+		fsm.change("hurt", {"dir": dir, "knock_up": knock_up})
 	return true
+
+
+## Starts the death animation; the game respawns the player once it is done.
+func die(dir := 0) -> void:
+	if fsm.is_in("dying"):
+		return
+	fsm.change("dying", {"dir": dir})
+	Events.player_died.emit(self)
+
+
+func is_dying() -> bool:
+	return fsm.is_in("dying")
+
+
+func death_finished() -> bool:
+	return fsm.is_in("dying") and (fsm.current as DyingState).finished
+
+
+## Floating trance after loading into a checkpoint; any fresh press breaks it.
+func enter_trance() -> void:
+	fsm.change("trance")
 
 
 ## Touching a hazard: take damage (unless invulnerable) and teleport back to
@@ -276,13 +300,15 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 ## active checkpoint instead. Teleporting even when invulnerable (dash, god
 ## mode, i-frames) guarantees the player can never get stuck in a hazard.
 func hazard_respawn(damage: float) -> void:
+	if is_dying():
+		return # Already collapsing; the death respawn takes over.
 	var from := global_position
 	var took_damage := not health.is_invulnerable()
 	if took_damage:
 		health.take_damage(damage)
 		if health.health <= 0.0:
 			Events.player_hurt.emit(self, damage)
-			Events.player_died.emit(self)
+			die()
 			return
 	else:
 		health.iframe_timer = maxf(health.iframe_timer, 0.4)

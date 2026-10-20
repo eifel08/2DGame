@@ -50,7 +50,11 @@ class Combat:
 	var attack_active_start := 0.02
 	var attack_active_end := 0.13
 	var attack_cooldown := 0.3
-	var attack_buffer_time := 0.12
+	var attack_buffer_time := 0.16 ## Forgiving: an attack pressed slightly early still fires.
+	## Pogo leniency: the downward swing has a wider/taller hitbox and stays
+	## active longer than side or up swings, so bounces are easy to land.
+	var pogo_hitbox := Vector2(78, 80)
+	var pogo_active_end := 0.2
 	var pogo_velocity := 640.0
 	var recoil_velocity := 170.0 ## Push-back when a side attack connects.
 	var enemy_knockback := 260.0

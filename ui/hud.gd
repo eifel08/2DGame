@@ -21,6 +21,9 @@ var denied_flash := 0.0
 var damage_flash := 0.0
 var shard_pulse := 0.0
 var boss_provider: Callable = func() -> Node: return null ## Returns the active boss or null.
+var banner_text := "" ## Big centered message (arena cleared, boss felled, ...).
+var banner_time := 0.0
+const BANNER_DURATION := 2.6
 
 
 func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -> void:
@@ -30,6 +33,15 @@ func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -
 	Events.ultimate_denied.connect(func(_a: RefCounted, _r: String) -> void: denied_flash = 0.35)
 	Events.health_damaged.connect(func(_amount: float) -> void: damage_flash = 0.3)
 	Events.currency_collected.connect(func(_amount: int, _pos: Vector2) -> void: shard_pulse = 0.25)
+	Events.arena_cleared.connect(func(_id: String) -> void: show_banner("ARENA CLEARED"))
+	Events.boss_defeated.connect(func(b: Node) -> void: show_banner("%s FELLED" % String(b.display_name).to_upper()))
+	Events.secret_found.connect(func(_id: String, _p: Vector2) -> void: show_banner("A HIDDEN PASSAGE"))
+	Events.relic_collected.connect(func(_id: String, _p: Vector2) -> void: show_banner("VITALITY INCREASED"))
+
+
+func show_banner(text: String) -> void:
+	banner_text = text
+	banner_time = BANNER_DURATION
 
 
 func _process(delta: float) -> void:
@@ -37,6 +49,7 @@ func _process(delta: float) -> void:
 		return
 	denied_flash -= delta
 	damage_flash -= delta
+	banner_time -= delta
 	shard_pulse -= delta
 	var hp := player.health.health
 	if smooth_health < 0.0:
@@ -115,6 +128,10 @@ func _draw() -> void:
 		draw_string(font, Vector2(0, 52), "GOD MODE", HORIZONTAL_ALIGNMENT_RIGHT, view.x - 14, 11, Color("#ffd43b"))
 
 	_draw_boss_bar(font)
+	_draw_banner(font)
+	if player.state_name() == "trance":
+		var a := 0.45 + 0.35 * sin(Time.get_ticks_msec() / 260.0)
+		draw_string(font, Vector2(0, size.y * 0.72), "Press any button", HORIZONTAL_ALIGNMENT_CENTER, size.x, 15, Color(0.85, 0.95, 1.0, a))
 
 	# Control hints (bottom).
 	draw_string(font, Vector2(0, view.y - 12),
@@ -163,6 +180,16 @@ func _draw_heal_glow(bar: Rect2, h: HealthEnergy) -> void:
 	# Mark where a heal chunk's cost sits on the bar.
 	var cx := bar.position.x + bar.size.x * clampf(Config.vitals.heal_chunk_energy / h.get_max_energy(), 0.0, 1.0)
 	draw_rect(Rect2(cx - 1.0, bar.end.y + 2.0, 3.0, 3.0), Color(glow, 0.9))
+
+
+func _draw_banner(font: Font) -> void:
+	if banner_time <= 0.0:
+		return
+	var t := BANNER_DURATION - banner_time
+	var a := clampf(minf(t / 0.25, banner_time / 0.5), 0.0, 1.0)
+	var y := size.y * 0.32
+	draw_rect(Rect2(0, y - 34.0, size.x, 52.0), Color(0, 0, 0, 0.45 * a))
+	draw_string(font, Vector2(0, y), banner_text, HORIZONTAL_ALIGNMENT_CENTER, size.x, 30, Color(1.0, 0.86, 0.45, a))
 
 
 ## Boss health bar at the top center while a boss fight runs (no numbers).

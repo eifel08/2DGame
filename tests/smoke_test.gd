@@ -14,7 +14,13 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	game = load("res://scenes/main.tscn").instantiate()
+	# Keep test files away from the player's real saves and settings.
+	Saves.save_dir = "user://test_saves"
+	Settings.config_path = "user://test_settings.cfg"
+	for i in Saves.SLOT_COUNT:
+		Saves.delete_slot(i)
+	game = load("res://scenes/game.tscn").instantiate()
+	game.start_in_trance = false
 	add_child(game)
 	await _frames(30)
 	var p: Player = game.player
@@ -136,6 +142,16 @@ func _run() -> void:
 	Input.action_press(&"attack")
 	await _frames(8)
 	_check("pogo bounce", p.velocity.y < -400.0, p.velocity.y)
+	Input.action_release(&"attack")
+	Input.action_release(&"move_down")
+	await _frames(90)
+	# Forgiving pogo: a wide downward hitbox still connects 50 px off-centre.
+	p.global_position = flyer.global_position + Vector2(50, -flyer.size.y - 30)
+	p.velocity = Vector2(0, 100)
+	Input.action_press(&"move_down")
+	Input.action_press(&"attack")
+	await _frames(8)
+	_check("off-centre pogo still bounces", p.velocity.y < -400.0, p.velocity.y)
 	Input.action_release(&"attack")
 	Input.action_release(&"move_down")
 	await _frames(90)
@@ -313,7 +329,7 @@ func _run() -> void:
 	await _frames(10)
 	p.health.health = 5.0
 	p.global_position = Vector2(pit_left + 40.0, 22.0 * 32.0 - 2.0)
-	await _frames(30)
+	await _await_respawn()
 	_check("lethal spike hit respawns at the checkpoint",
 		p.global_position.distance_to(game.current_checkpoint.get_respawn_position()) < 2.0
 		and is_equal_approx(p.health.health, p.health.get_max_health()), [p.global_position, p.health.health])
@@ -550,7 +566,7 @@ func _run() -> void:
 	p.global_position = mid.global_position + Vector2(-150, 0)
 	await _frames(2)
 	p.receive_hit(1000.0, p.global_position.x, false, true)
-	await _frames(30)
+	await _await_respawn()
 	_check("death respawns at the saved checkpoint", p.global_position.distance_to(mid.get_respawn_position()) < 2.0, p.global_position)
 	await _reset()
 	p.global_position = mid.global_position + Vector2(10, 0)
@@ -562,7 +578,7 @@ func _run() -> void:
 		and absf(p.global_position.x - mid.global_position.x) < 0.5, game.current_checkpoint)
 
 	# --- Layout: no open space beyond walls, camera never shows outside the room ---
-	for rid in ["test_room", "boss_room"]:
+	for rid in ["test_room", "boss_room", "arena_room", "secret_room"]:
 		game.load_room(rid)
 		await _frames(2)
 		var uncovered := []
@@ -758,10 +774,225 @@ func _run() -> void:
 	await _frames(60)
 	_check("arena active again in a new game", director.is_active())
 	p.receive_hit(1000.0, p.global_position.x, false, true)
-	await _frames(30)
+	await _await_respawn()
 	_check("dying in the arena returns to the checkpoint and resets the arena",
 		game.room_id == "test_room" and not game.world.is_arena_cleared("sentinel_arena"), game.room_id)
 	game.new_game()
+
+	# --- Death: collapse animation, then back at the checkpoint like a save ---
+	game.new_game()
+	await _reset()
+	var fallen: DummyEnemy = _first_enemy(false)
+	var fallen_id := fallen.spawn_id
+	fallen.kill()
+	Events.enemy_killed.emit(fallen)
+	var heavy: Enemy = null
+	for e in game.enemies:
+		if e.tier == "strong" and e.alive:
+			heavy = e
+	var heavy_id := heavy.spawn_id
+	heavy.kill()
+	Events.enemy_killed.emit(heavy)
+	await _frames(2)
+	_check("dead enemy has no contact damage or hurtbox", not fallen.deals_contact_damage() and not fallen.hitbox_active())
+	_check("dead enemy cannot be hit", is_zero_approx(fallen.take_hit(10.0, Vector2.ZERO, 0.0)))
+	_check("dead enemy body collision is disabled", fallen.shape.disabled)
+	p.health.set_energy(40.0)
+	var death_sounds := Sfx.count("death")
+	p.receive_hit(1000.0, p.global_position.x, false, true)
+	await _frames(10)
+	_check("a lethal hit plays the death animation before respawning",
+		p.is_dying() and p.animator.current == "dying" and Sfx.count("death") > death_sounds, [p.state_name(), p.animator.current])
+	_check("the dying player is invulnerable", p.health.is_invulnerable())
+	await _await_respawn()
+	_check("after respawning the player floats in a trance", p.state_name() == "trance" and p.animator.current == "trance",
+		[p.state_name(), p.animator.current])
+	_check("energy is 0 after respawning", is_zero_approx(p.health.energy), p.health.energy)
+	var fallen_back := _enemy_by_id(fallen_id)
+	var heavy_back := _enemy_by_id(heavy_id)
+	_check("death respawn revives weak and strong enemies",
+		fallen_back != null and fallen_back.alive and heavy_back != null and heavy_back.alive)
+
+	# --- Trance: a held key does not break it, a fresh press does ---
+	p.fsm.change("normal")
+	Input.action_press(&"move_right")
+	await _frames(5)
+	p.enter_trance()
+	await _frames(30)
+	_check("a key held from before keeps the trance", p.state_name() == "trance", p.state_name())
+	Input.action_press(&"jump")
+	await _frames(3)
+	_check("a fresh button press breaks the trance", p.state_name() != "trance", p.state_name())
+	Input.action_release(&"jump")
+	Input.action_release(&"move_right")
+	await _frames(30)
+
+	# --- Telegraphed spawns ---
+	await _reset()
+	var portal: Enemy = game.spawn_enemy_kind("weak", p.global_position, "", true)
+	_check("a telegraphed spawn never appears on top of the player",
+		absf(portal.global_position.x - p.global_position.x) >= game.SPAWN_CLEARANCE, portal.global_position)
+	_check("a spawning enemy is harmless and untouchable",
+		portal.is_spawning() and not portal.deals_contact_damage() and is_zero_approx(portal.take_hit(5.0, Vector2.ZERO, 0.0)))
+	await _frames(70)
+	_check("after the telegraph the enemy becomes active", not portal.is_spawning() and portal.hitbox_active())
+	game.remove_enemy(portal)
+
+	# --- Boss death: roar and dissolve ---
+	game.new_game()
+	game.world.clear_arena("sentinel_arena")
+	game.load_room("boss_room", "west")
+	var dying_boss: BossSentinel = game.spawn_enemy_kind("boss", Vector2(900, 512), "")
+	p.global_position = Vector2(300, 512)
+	await _frames(5)
+	var roars := Sfx.count("boss_roar")
+	dying_boss.kill()
+	Events.enemy_killed.emit(dying_boss)
+	await _frames(2)
+	_check("the boss roars when it dies", Sfx.count("boss_roar") > roars)
+	_check("the dead boss stops hurting at once", not dying_boss.hitbox_active() and not dying_boss.deals_contact_damage())
+	_check("a boss defeat shows a banner", game.hud.banner_text.contains("FELLED"), game.hud.banner_text)
+	_check("the boss is still visible while it screams", dying_boss.visible and not dying_boss.is_dissolved())
+	for i in 300:
+		await _frames(1)
+		if dying_boss.is_dissolved():
+			break
+	_check("the boss dissolves after the scream", dying_boss.is_dissolved())
+
+	# --- Proving Grounds: a dedicated arena room that stays cleared ---
+	game.new_game()
+	Config.upgrades.god_mode = true
+	game.load_room("arena_room", "west")
+	await _frames(30)
+	var grounds: ArenaDirector = game.arena_director
+	var victories := Sfx.count("victory")
+	p.global_position = Vector2(20 * 32, 512)
+	for i in 900:
+		await _frames(1)
+		if grounds.state == "cleared":
+			break
+		for e in grounds.wave_enemies:
+			if e.alive:
+				e.kill()
+				Events.enemy_killed.emit(e)
+	_check("the Proving Grounds arena runs and clears", grounds.state == "cleared" and game.world.is_arena_cleared("proving_grounds"), grounds.state)
+	_check("clearing an arena plays a victory sound and banner",
+		Sfx.count("victory") > victories and game.hud.banner_text == "ARENA CLEARED", game.hud.banner_text)
+	game.load_room("boss_room", "east")
+	game.load_room("arena_room", "west")
+	await _frames(3)
+	p.global_position = Vector2(20 * 32, 512)
+	await _frames(30)
+	_check("a cleared arena room stays cleared", grounds.state == "cleared" and game.enemies.is_empty(), [grounds.state, game.enemies.size()])
+	await _frames(60)
+
+	# --- Hidden passage: breakable wall to the Hidden Shrine ---
+	var wall: BreakableWall = game.breakables[0]
+	_check("the hidden wall starts intact", wall.intact)
+	p.global_position = Vector2(wall.get_rect().position.x - 24.0, 512)
+	p.facing = 1
+	await _frames(5)
+	for i in 3:
+		Input.action_press(&"attack")
+		await _frames(3)
+		Input.action_release(&"attack")
+		await _frames(30)
+	_check("three hits break the hidden wall", not wall.intact and game.world.is_secret_open("proving_grounds_wall"), wall.hits)
+	Input.action_press(&"move_right")
+	for i in 120:
+		await _frames(1)
+		if game.room_id == "secret_room":
+			break
+	Input.action_release(&"move_right")
+	await _frames(30)
+	_check("the hidden passage leads to the Hidden Shrine", game.room_id == "secret_room", game.room_id)
+	var base_max := p.health.get_max_health()
+	var relic: Relic = game.relics[0]
+	p.global_position = relic.global_position
+	await _frames(5)
+	_check("the relic raises max health", relic.collected and is_equal_approx(p.health.get_max_health(), base_max + 25.0),
+		[relic.collected, p.health.get_max_health()])
+	game.load_room("arena_room", "east")
+	await _frames(2)
+	_check("the broken wall stays open", not game.breakables[0].intact)
+	game.load_room("secret_room", "west")
+	await _frames(2)
+	_check("the relic stays collected", game.relics[0].collected)
+	Config.upgrades.god_mode = false
+
+	# --- Save slots ---
+	game.new_game()
+	await _reset()
+	Saves.active_slot = 0
+	game.player_data.currency = 37
+	game.world.defeat_boss("test_boss")
+	game.world.open_secret("test_secret")
+	game.write_save()
+	var slot0 := Saves.read_slot(0)
+	_check("a save stores currency, bosses, secrets and the checkpoint",
+		int(slot0.get("currency", 0)) == 37 and Array(slot0.get("defeated_bosses", [])).has("test_boss")
+		and Array(slot0.get("secrets", [])).has("test_secret") and slot0.get("room", "") == "test_room", slot0)
+	for s in range(1, Saves.SLOT_COUNT):
+		Saves.active_slot = s
+		game.player_data.currency = s
+		game.write_save()
+	var independent := Saves.SLOT_COUNT == 5
+	for s in range(1, Saves.SLOT_COUNT):
+		independent = independent and int(Saves.read_slot(s).currency) == s
+	_check("5 independent save slots", independent and int(Saves.read_slot(0).currency) == 37)
+	_check("slot summary names the location", Saves.summary(0).contains("Testing Halls"), Saves.summary(0))
+	# Progress made after the save is lost on load; respawnables are reset.
+	Saves.active_slot = 0
+	game.player_data.currency = 999
+	game.world.new_game()
+	var lost: DummyEnemy = _first_enemy(false)
+	var lost_id := lost.spawn_id
+	lost.kill()
+	Events.enemy_killed.emit(lost)
+	p.health.set_energy(50.0)
+	p.global_position += Vector2(300, 0)
+	game.apply_save_data(Saves.read_slot(0))
+	await _frames(3)
+	_check("loading restores the saved currency and progress",
+		game.player_data.currency == 37 and game.world.is_boss_defeated("test_boss") and game.world.is_secret_open("test_secret"))
+	_check("loading places the player at the checkpoint with 0 energy, in a trance",
+		p.global_position.distance_to(game.respawn.position) < 2.0 and is_zero_approx(p.health.energy) and p.state_name() == "trance",
+		[p.global_position, p.health.energy, p.state_name()])
+	var lost_back := _enemy_by_id(lost_id)
+	_check("loading resets respawnable enemies", lost_back != null and lost_back.alive)
+	Saves.active_slot = -1
+	p.fsm.change("normal")
+	game.new_game()
+
+	# --- Pause menu (keyboard and mouse) ---
+	await _reset()
+	Input.action_press(&"pause")
+	await _frames(2)
+	Input.action_release(&"pause")
+	await _frames(1)
+	_check("the pause key opens the pause menu", game.pause_menu.is_open()
+		and get_viewport().gui_get_focus_owner() == game.pause_menu.resume_button)
+	var paused_at := p.global_position
+	Input.action_press(&"move_right")
+	await _frames(10)
+	Input.action_release(&"move_right")
+	_check("the game is paused behind the menu", p.global_position.is_equal_approx(paused_at), p.global_position)
+	await _ui_action(&"ui_accept")
+	_check("Enter on Resume closes the pause menu", not game.pause_menu.is_open())
+	game.pause_menu.toggle()
+	await _frames(2)
+	await _click(game.pause_menu.resume_button)
+	_check("a mouse click on Resume closes the pause menu", not game.pause_menu.is_open())
+
+	# --- Settings: volume and key rebinding ---
+	Settings.set_value("sfx_volume", 0.5)
+	var sfx_bus := AudioServer.get_bus_index("SFX")
+	_check("the SFX volume setting drives the SFX bus", absf(AudioServer.get_bus_volume_db(sfx_bus) - linear_to_db(0.5)) < 0.01)
+	Settings.rebind("jump", KEY_K)
+	_check("a rebound key shows in the controls list", Settings.key_name("jump") == "K", Settings.key_name("jump"))
+	Settings.reset_controls()
+	_check("reset controls restores the default key", Settings.key_name("jump") != "K", Settings.key_name("jump"))
+	Settings.set_value("sfx_volume", 0.9)
 
 	# --- Debug overlay and toggles ---
 	Input.action_press(&"toggle_debug")
@@ -795,6 +1026,38 @@ func _run() -> void:
 	_check("double jump toggle respected", p.air_jumps_used == 0, p.air_jumps_used)
 	Input.action_release(&"jump")
 	game.restore_defaults()
+
+	# --- Title screen: Play -> slot select, Settings (keyboard and mouse) ---
+	game.queue_free()
+	await _frames(3)
+	var title: TitleScreen = load("res://scenes/title.tscn").instantiate()
+	title.change_scene = false
+	add_child(title)
+	await _frames(3)
+	_check("the title screen focuses Play", get_viewport().gui_get_focus_owner() == title.play_button)
+	await _ui_action(&"ui_down")
+	_check("arrow keys move between title buttons", get_viewport().gui_get_focus_owner() == title.settings_button)
+	await _ui_action(&"ui_accept")
+	_check("Enter on Settings opens the settings", title.settings.visible and not title.main_panel.visible)
+	await _ui_action(&"ui_cancel")
+	_check("Esc leaves the settings", title.main_panel.visible and not title.settings.visible)
+	await _ui_action(&"ui_up")
+	await _ui_action(&"ui_accept")
+	_check("Play opens the slot select with 5 slots", title.slots_panel.visible and title.slot_buttons.size() == 5)
+	_check("used slots show their summary", title.slot_buttons[0].text.contains("Testing Halls"), title.slot_buttons[0].text)
+	await _ui_action(&"ui_cancel")
+	_check("Esc returns from the slot select", title.main_panel.visible and not title.slots_panel.visible)
+	await _click(title.settings_button)
+	_check("a mouse click opens the settings", title.settings.visible)
+	await _ui_action(&"ui_cancel")
+	await _click(title.play_button)
+	_check("a mouse click on Play opens the slot select", title.slots_panel.visible)
+	await _click(title.slot_buttons[2])
+	_check("a mouse click chooses a save slot", title.chosen_slot == 2 and Saves.active_slot == 2, title.chosen_slot)
+	Saves.active_slot = -1
+	title.queue_free()
+	for i in Saves.SLOT_COUNT:
+		Saves.delete_slot(i)
 
 	print("\nSMOKE TEST: %d passed, %d failed" % [passed, failures.size()])
 	for f in failures:
@@ -883,6 +1146,35 @@ func _enemy_by_id(spawn_id: String) -> Enemy:
 		if e.spawn_id == spawn_id:
 			return e
 	return null
+
+
+## Waits for the death animation and the fade back to the checkpoint.
+func _await_respawn() -> void:
+	var p: Player = game.player
+	for i in 300:
+		await _frames(1)
+		if p.state_name() == "trance" and game.transition.is_empty():
+			break
+	await _frames(2)
+
+
+## Left mouse click in the middle of a control.
+func _click(control: Control) -> void:
+	var at := control.get_global_rect().get_center()
+	var motion := InputEventMouseMotion.new()
+	motion.position = at
+	motion.global_position = at
+	get_viewport().push_input(motion, true)
+	await _frames(1)
+	for pressed in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.position = at
+		ev.global_position = at
+		ev.pressed = pressed
+		get_viewport().push_input(ev, true)
+		await _frames(1)
+	await _frames(1)
 
 
 func _frames(n: int) -> void:

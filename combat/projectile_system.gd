@@ -41,7 +41,7 @@ func _nearest_enemy(from: Vector2, max_dist := 700.0) -> Node:
 	var best: Node = null
 	var best_d := max_dist * max_dist
 	for e in combat.get_enemies():
-		if not e.alive:
+		if not e.hitbox_active():
 			continue
 		var d := from.distance_squared_to(e.get_center())
 		if d < best_d:
@@ -83,7 +83,7 @@ func step(delta: float) -> void:
 				pr.dead = true
 			continue
 		for e in combat.get_enemies():
-			if not e.alive or not Geom.circle_overlaps_rect(pr.pos, pr.radius, e.get_rect()):
+			if not e.hitbox_active() or not Geom.circle_overlaps_rect(pr.pos, pr.radius, e.get_rect()):
 				continue
 			combat.apply_damage(e, {
 				"damage": pr.damage,

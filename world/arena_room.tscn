@@ -1,0 +1,116 @@
+[gd_scene load_steps=13 format=4]
+
+[ext_resource type="Script" path="res://world/room.gd" id="1_0l1qh"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_ysbux"]
+[ext_resource type="Script" path="res://world/objects/arena_encounter.gd" id="3_6jgun"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="4_s1p41"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="5_8a2mo"]
+[ext_resource type="PackedScene" path="res://world/objects/lore_stone.tscn" id="6_n838m"]
+[ext_resource type="Script" path="res://world/objects/lore_object.gd" id="7_7l548"]
+[ext_resource type="Resource" path="res://dialogue/lore_checkpoint.tres" id="8_1a8kd"]
+[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="9_7wdjx"]
+[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="10_p06mm"]
+[ext_resource type="PackedScene" path="res://world/objects/breakable_wall.tscn" id="11_414qj"]
+[ext_resource type="Script" path="res://world/objects/breakable_wall.gd" id="12_mm4f7"]
+
+[node name="ArenaRoom" type="Node2D"]
+script = ExtResource("1_0l1qh")
+room_id = "arena_room"
+
+[node name="Tiles" type="TileMapLayer" parent="."]
+tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAEAAAAAAAgAAAAAAAEAAAAAAAhAAAAAAAEAAAAAAAiAAAAAAAEAAAAAAAjAAAAAAAAAAAAAAAAAAEAAAACAAAAAAAjAAEAAAAIAAAAAAAAAAIAAAACAAAAAAAjAAIAAAAIAAAAAAAAAAMAAAACAAAAAAAjAAMAAAAIAAAAAAAAAAQAAAACAAAAAAAjAAQAAAAIAAAAAAAAAAUAAAACAAAAAAAjAAUAAAAIAAAAAAAAAAYAAAACAAAAAAAjAAYAAAAIAAAAAAAAAAcAAAACAAAAAAAjAAcAAAAIAAAAAAAAAAgAAAACAAAAAAAPAAgAAAAQAAAAAAAQAAgAAAAQAAAAAAARAAgAAAAQAAAAAAASAAgAAAAQAAAAAAATAAgAAAAQAAAAAAAUAAgAAAAQAAAAAAAVAAgAAAAQAAAAAAAjAAgAAAAIAAAAAAAAAAkAAAACAAAAAAAjAAkAAAAIAAAAAAAAAAoAAAACAAAAAAAjAAoAAAAIAAAAAAAAAAsAAAACAAAAAAAjAAsAAAAIAAAAAAAAAAwAAAAGAAAAAAAKAAwAAAAQAAAAAAALAAwAAAAQAAAAAAAMAAwAAAAQAAAAAAANAAwAAAAQAAAAAAAOAAwAAAAQAAAAAAAWAAwAAAAQAAAAAAAXAAwAAAAQAAAAAAAYAAwAAAAQAAAAAAAZAAwAAAAQAAAAAAAaAAwAAAAQAAAAAAAjAAwAAAAMAAAAAAAAABAAAAABAAAAAAABABAAAAABAAAAAAACABAAAAABAAAAAAADABAAAAABAAAAAAAEABAAAAABAAAAAAAFABAAAAABAAAAAAAGABAAAAABAAAAAAAHABAAAAABAAAAAAAIABAAAAABAAAAAAAJABAAAAABAAAAAAAKABAAAAABAAAAAAALABAAAAABAAAAAAAMABAAAAABAAAAAAANABAAAAABAAAAAAAOABAAAAABAAAAAAAPABAAAAABAAAAAAAQABAAAAABAAAAAAARABAAAAABAAAAAAASABAAAAABAAAAAAATABAAAAABAAAAAAAUABAAAAABAAAAAAAVABAAAAABAAAAAAAWABAAAAABAAAAAAAXABAAAAABAAAAAAAYABAAAAABAAAAAAAZABAAAAABAAAAAAAaABAAAAABAAAAAAAbABAAAAABAAAAAAAcABAAAAABAAAAAAAdABAAAAABAAAAAAAeABAAAAABAAAAAAAfABAAAAABAAAAAAAgABAAAAABAAAAAAAhABAAAAABAAAAAAAiABAAAAABAAAAAAAjABAAAAABAAAAAAAAABEAAAAAAAAAAAABABEAAAAAAAAAAAACABEAAAAAAAAAAAADABEAAAAAAAAAAAAEABEAAAAAAAAAAAAFABEAAAAAAAAAAAAGABEAAAAAAAAAAAAHABEAAAAAAAAAAAAIABEAAAAAAAAAAAAJABEAAAAAAAAAAAAKABEAAAAAAAAAAAALABEAAAAAAAAAAAAMABEAAAAAAAAAAAANABEAAAAAAAAAAAAOABEAAAAAAAAAAAAPABEAAAAAAAAAAAAQABEAAAAAAAAAAAARABEAAAAAAAAAAAASABEAAAAAAAAAAAATABEAAAAAAAAAAAAUABEAAAAAAAAAAAAVABEAAAAAAAAAAAAWABEAAAAAAAAAAAAXABEAAAAAAAAAAAAYABEAAAAAAAAAAAAZABEAAAAAAAAAAAAaABEAAAAAAAAAAAAbABEAAAAAAAAAAAAcABEAAAAAAAAAAAAdABEAAAAAAAAAAAAeABEAAAAAAAAAAAAfABEAAAAAAAAAAAAgABEAAAAAAAAAAAAhABEAAAAAAAAAAAAiABEAAAAAAAAAAAAjABEAAAAAAAAAAAA=")
+tile_set = ExtResource("2_ysbux")
+
+[node name="EnemySpawns" type="Node2D" parent="."]
+
+[node name="Objects" type="Node2D" parent="."]
+
+[node name="Arena" type="Node2D" parent="Objects"]
+script = ExtResource("3_6jgun")
+arena_id = "proving_grounds"
+trigger_rect = Rect2(288, 32, 768, 480)
+gate_rects = Array[Rect2]([Rect2(0, 416, 32, 32), Rect2(1120, 416, 32, 32), Rect2(0, 448, 32, 32), Rect2(1120, 448, 32, 32), Rect2(0, 480, 32, 32), Rect2(1120, 480, 32, 32)])
+
+[node name="Waves" type="Node2D" parent="Objects/Arena"]
+
+[node name="Wave1" type="Node2D" parent="Objects/Arena/Waves"]
+
+[node name="Weak1" type="Marker2D" parent="Objects/Arena/Waves/Wave1"]
+position = Vector2(464, 512)
+metadata/kind = "weak"
+
+[node name="Weak2" type="Marker2D" parent="Objects/Arena/Waves/Wave1"]
+position = Vector2(656, 512)
+metadata/kind = "weak"
+
+[node name="Weak3" type="Marker2D" parent="Objects/Arena/Waves/Wave1"]
+position = Vector2(880, 512)
+metadata/kind = "weak"
+
+[node name="Wave2" type="Node2D" parent="Objects/Arena/Waves"]
+
+[node name="Flyer1" type="Marker2D" parent="Objects/Arena/Waves/Wave2"]
+position = Vector2(528, 352)
+metadata/kind = "flyer"
+
+[node name="Flyer2" type="Marker2D" parent="Objects/Arena/Waves/Wave2"]
+position = Vector2(816, 352)
+metadata/kind = "flyer"
+
+[node name="Weak3" type="Marker2D" parent="Objects/Arena/Waves/Wave2"]
+position = Vector2(752, 512)
+metadata/kind = "weak"
+
+[node name="Wave3" type="Node2D" parent="Objects/Arena/Waves"]
+
+[node name="Strong1" type="Marker2D" parent="Objects/Arena/Waves/Wave3"]
+position = Vector2(560, 512)
+metadata/kind = "strong"
+
+[node name="Strong2" type="Marker2D" parent="Objects/Arena/Waves/Wave3"]
+position = Vector2(944, 512)
+metadata/kind = "strong"
+
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("4_s1p41")]
+z_index = 1
+position = Vector2(16, 512)
+script = ExtResource("5_8a2mo")
+door_id = "west"
+target_room = "boss_room"
+target_door = "east"
+inward = 1
+trigger_size = Vector2(24, 96)
+
+[node name="Lore1" type="Node2D" parent="Objects" instance=ExtResource("6_n838m")]
+z_index = 1
+position = Vector2(112, 512)
+script = ExtResource("7_7l548")
+dialogue = ExtResource("8_1a8kd")
+prompt = "Read"
+interact_size = Vector2(56, 48)
+
+[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("9_7wdjx")]
+z_index = 1
+position = Vector2(176, 512)
+script = ExtResource("10_p06mm")
+is_start = false
+prompt = "Save"
+interact_size = Vector2(56, 64)
+
+[node name="BreakableWall1" type="Node2D" parent="Objects" instance=ExtResource("11_414qj")]
+z_index = 1
+position = Vector2(1104, 512)
+script = ExtResource("12_mm4f7")
+secret_id = "proving_grounds_wall"
+size = Vector2(32, 96)
+hits_required = 3
+
+[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("4_s1p41")]
+z_index = 1
+position = Vector2(1136, 512)
+script = ExtResource("5_8a2mo")
+door_id = "east"
+target_room = "secret_room"
+target_door = "west"
+inward = -1
+trigger_size = Vector2(24, 96)

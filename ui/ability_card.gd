@@ -13,6 +13,10 @@ var key_label: Label
 func _init() -> void:
 	custom_minimum_size = Vector2(76, 76)
 	focus_mode = Control.FOCUS_ALL
+	# Mouse hover moves the keyboard focus, so both input styles agree.
+	mouse_entered.connect(func() -> void:
+		if is_visible_in_tree():
+			grab_focus())
 	icon_view = AbilityIcon.new()
 	icon_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	icon_view.offset_left = 12

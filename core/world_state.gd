@@ -9,12 +9,16 @@ extends RefCounted
 ##   bosses         - never revive in this playthrough
 ## Survivors are re-created on every room load, so an enemy that was damaged
 ## but not killed is back at full health when the player returns.
-## Cleared arenas and collected placed shards also stay that way.
+## Cleared arenas, collected placed shards, opened secrets and relics also
+## stay that way. to_dict()/from_dict() feed the save slots; respawnable
+## enemy deaths are deliberately not saved (loading resets them).
 
 var dead_enemies := {} ## room_id -> {spawn_id: tier}
 var defeated_bosses := {} ## boss_id -> true
 var cleared_arenas := {} ## arena_id -> true
 var collected_coins := {} ## room_id -> {coin_name: true}
+var secrets := {} ## secret_id -> true (broken walls / hidden passages)
+var relics := {} ## relic_id -> true
 
 
 func new_game() -> void:
@@ -22,6 +26,37 @@ func new_game() -> void:
 	defeated_bosses.clear()
 	cleared_arenas.clear()
 	collected_coins.clear()
+	secrets.clear()
+	relics.clear()
+
+
+func to_dict() -> Dictionary:
+	var coins := {}
+	for room_id in collected_coins:
+		coins[room_id] = collected_coins[room_id].keys()
+	return {
+		"defeated_bosses": defeated_bosses.keys(),
+		"cleared_arenas": cleared_arenas.keys(),
+		"collected_coins": coins,
+		"secrets": secrets.keys(),
+		"relics": relics.keys(),
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	new_game()
+	for id in data.get("defeated_bosses", []):
+		defeated_bosses[id] = true
+	for id in data.get("cleared_arenas", []):
+		cleared_arenas[id] = true
+	var coins: Dictionary = data.get("collected_coins", {})
+	for room_id in coins:
+		for coin_name in coins[room_id]:
+			mark_coin(room_id, coin_name)
+	for id in data.get("secrets", []):
+		secrets[id] = true
+	for id in data.get("relics", []):
+		relics[id] = true
 
 
 # ---------- Enemies ----------
@@ -41,7 +76,8 @@ func on_room_entered(room_id: String) -> void:
 	_revive(room_id, ["weak"])
 
 
-## A checkpoint save revives weak and strong enemies everywhere.
+## Returning to a checkpoint (saving, dying or loading) revives weak and
+## strong enemies everywhere.
 func on_checkpoint_rest() -> void:
 	for room_id in dead_enemies.keys():
 		_revive(room_id, ["weak", "strong"])
@@ -93,3 +129,21 @@ func is_coin_collected(room_id: String, coin_name: String) -> bool:
 
 func reset_room_coins(room_id: String) -> void:
 	collected_coins.erase(room_id)
+
+
+# ---------- Secrets & relics ----------
+
+func open_secret(secret_id: String) -> void:
+	secrets[secret_id] = true
+
+
+func is_secret_open(secret_id: String) -> bool:
+	return secrets.has(secret_id)
+
+
+func take_relic(relic_id: String) -> void:
+	relics[relic_id] = true
+
+
+func has_relic(relic_id: String) -> bool:
+	return relics.has(relic_id)

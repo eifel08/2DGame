@@ -63,7 +63,7 @@ func _spawn_next_wave() -> void:
 		_clear()
 		return
 	for spawn in arena.wave_spawns(wave):
-		var enemy: Enemy = game.spawn_enemy_kind(spawn.kind, spawn.position, "")
+		var enemy: Enemy = game.spawn_enemy_kind(spawn.kind, spawn.position, "", true)
 		if enemy:
 			wave_enemies.append(enemy)
 	_timer = WAVE_DELAY
