@@ -23,7 +23,7 @@ const TS := 32
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. The flying dummy above the right pit is for pogo chains.
 const ROOM_LAYOUT := [
-	"################################################################",
+	"##############################O...##############################",
 	"#..............................................................#",
 	"#..............................................................#",
 	"#..............................................................#",
@@ -73,7 +73,7 @@ const BOSS_LAYOUT := [
 ]
 
 ## Proving Grounds: a wave arena without a boss. Its east wall hides a
-## breakable section ('X') in front of a doorway ('H') to the Hidden Shrine.
+## breakable wall ('Z') filling the east wall gap that leads to the Hidden Shrine.
 ## Arena letters: 'w' weak (wave 1), 'v' flyer / 'u' weak (wave 2), 's' strong (wave 3).
 const ARENA_LAYOUT := [
 	"####################################",
@@ -89,9 +89,9 @@ const ARENA_LAYOUT := [
 	"#...............v........v.........#",
 	"#..................................#",
 	"#.........=====.......=====........#",
-	"....................................",
-	"....................................",
-	"D....C........w..s..w..u...w.s....XH",
+	"...................................z",
+	"...................................z",
+	"D....C........w..s..w..u...w.s.....Z",
 	"####################################",
 	"####################################",
 ]
@@ -118,12 +118,42 @@ const SECRET_LAYOUT := [
 	"################################",
 ]
 
+## Upper Galleries: a side room above the Test Room, entered through the
+## ceiling gap ('O' = floor gap here, 4 cells wide). Standard enemies only.
+const UPPER_LAYOUT := [
+	"########################################",
+	"#......................................#",
+	"#......................................#",
+	"#..............F...........F...........#",
+	"#......................................#",
+	"#..........$...........$.........$.....#",
+	"#.........=====......=====......=====..#",
+	"#......................................#",
+	"#......................................#",
+	"#.....................F................#",
+	"#..................................$...#",
+	"#..............======...........#####..#",
+	"#...............................#####..#",
+	"#......................................#",
+	"#......................................#",
+	"#..$........E..........G......E....$...#",
+	"####....################################",
+	"####O...################################",
+]
+
 ## Rooms: layout, output scene, doors (per letter) and optional arena.
+## Door letters: 'D' / 'H' side doorway (bottom cell of a 3-tall wall gap),
+## 'O' ceiling or floor gap ("width" cells from the letter to the right),
+## 'Z' side doorway hidden behind a breakable wall that fills the gap ('z'
+## marks the upper cells of that gap; they count as solid for tile edges).
 ## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(hidden wall)-> Hidden Shrine
 const ROOMS := {
 	"test_room": {
 		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn",
-		"doors": {"D": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1}},
+		"doors": {
+			"D": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1},
+			"O": {"door_id": "ceiling", "target_room": "upper_room", "target_door": "floor", "vertical": -1, "width": 4},
+		},
 	},
 	"boss_room": {
 		"name": "BossRoom", "layout": BOSS_LAYOUT, "path": "res://world/boss_room.tscn",
@@ -137,7 +167,7 @@ const ROOMS := {
 		"name": "ArenaRoom", "layout": ARENA_LAYOUT, "path": "res://world/arena_room.tscn",
 		"doors": {
 			"D": {"door_id": "west", "target_room": "boss_room", "target_door": "east", "inward": 1},
-			"H": {"door_id": "east", "target_room": "secret_room", "target_door": "west", "inward": -1},
+			"Z": {"door_id": "east", "target_room": "secret_room", "target_door": "west", "inward": -1},
 		},
 		"arena": {"arena_id": "proving_grounds", "trigger_cols": [9, 32], "waves": [["w"], ["v", "u"], ["s"]]},
 		"secret_id": "proving_grounds_wall",
@@ -146,6 +176,10 @@ const ROOMS := {
 		"name": "SecretRoom", "layout": SECRET_LAYOUT, "path": "res://world/secret_room.tscn",
 		"doors": {"D": {"door_id": "west", "target_room": "arena_room", "target_door": "east", "inward": 1}},
 		"relic": {"relic_id": "shrine_heart", "stat": "max_health", "amount": 25.0},
+	},
+	"upper_room": {
+		"name": "UpperRoom", "layout": UPPER_LAYOUT, "path": "res://world/upper_room.tscn",
+		"doors": {"O": {"door_id": "floor", "target_room": "test_room", "target_door": "ceiling", "vertical": 1, "width": 4}},
 	},
 }
 const ARENA_KINDS := {"w": "weak", "u": "weak", "v": "flyer", "s": "strong", "B": "boss"}
@@ -268,8 +302,6 @@ const FX := {
 	"spawn_portal": [{"portal": 34.0, "color": "#ff4dd2", "life": 0.35}],
 	"boss_telegraph": [{"ring": 46.0, "color": "#ffffff", "width": 3.0, "life": 0.3}],
 	"boss_phase": [{"ring": 140.0, "color": "#b06cff", "width": 8.0, "life": 0.6}],
-	"boss_death": [{"amount": 60, "color": "#b06cff", "speed": 480.0, "size": 6.0, "life": 0.8},
-		{"ring": 200.0, "color": "#ffffff", "width": 8.0, "life": 0.7}],
 	"boss_dissolve": [{"amount": 40, "color": "#b06cff", "speed": 80.0, "angle": -90.0, "spread": 35.0, "gravity": -260.0,
 		"life": 0.7, "size": 4.0, "box": [30.0, 36.0], "continuous": 1.5}],
 	"arena_clear": [{"ring": 260.0, "color": "#ffd36b", "width": 8.0, "life": 0.8},
@@ -301,7 +333,6 @@ const SOUNDS := {
 	"death": [[330, 55, 0.8, "saw", 0.4, 0.25]],
 	"save": [[523, 523, 0.1, "sine", 0.35, 0.0], [784, 784, 0.22, "sine", 0.35, 0.0]],
 	"spawn": [[180, 520, 0.3, "sine", 0.3, 0.2]],
-	"door": [[200, 120, 0.12, "sine", 0.25, 0.7]],
 	"break": [[180, 60, 0.35, "square", 0.45, 0.8]],
 	"secret": [[659, 659, 0.08, "sine", 0.35, 0.0], [831, 831, 0.08, "sine", 0.35, 0.0], [988, 988, 0.08, "sine", 0.35, 0.0], [1319, 1319, 0.3, "sine", 0.35, 0.0]],
 	"relic": [[440, 440, 0.12, "sine", 0.35, 0.0], [880, 880, 0.4, "sine", 0.35, 0.0]],
@@ -886,7 +917,15 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, LORE_SCENE, "Lore", feet, {"dialogue": load(LORE[ch])})
 				"D", "H":
 					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.doors[ch])
-				"X":
+				"O":
+					var door_def: Dictionary = def.doors[ch].duplicate()
+					var w: float = door_def.get("width", 1) * TS
+					door_def.erase("width")
+					door_def["trigger_size"] = Vector2(w, 24.0 if door_def.vertical == -1 else 40.0)
+					var origin := Vector2(x * TS + w / 2.0, y * TS if door_def.vertical == -1 else (y + 1) * TS)
+					_add_object(root, objects, counts, DOOR_SCENE, "Door", origin, door_def)
+				"Z":
+					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.doors[ch])
 					_add_object(root, objects, counts, BREAKABLE_SCENE, "BreakableWall", feet, {"secret_id": def.secret_id})
 				"R":
 					_add_object(root, objects, counts, RELIC_SCENE, "Relic", feet, def.relic)
@@ -930,7 +969,7 @@ func _edge_mask(layout: Array, x: int, y: int) -> int:
 func _is_solid_char(layout: Array, x: int, y: int) -> bool:
 	if y < 0 or y >= layout.size() or x < 0 or x >= (layout[y] as String).length():
 		return true
-	return layout[y][x] == "#"
+	return layout[y][x] in ["#", "Z", "z"] # A hidden wall shows no edge.
 
 
 ## Arena node: trigger area across the given columns, a gate over the room's
@@ -946,7 +985,7 @@ func _build_arena(root: Node, objects: Node, layout: Array, def: Dictionary, wav
 	for y in layout.size(): # Seal every doorway cell on the room border.
 		var row: String = layout[y]
 		for x in [0, row.length() - 1]:
-			if row[x] != "#":
+			if not row[x] in ["#", "Z", "z"]: # The secret wall gets no gate (no tell).
 				gates.append(Rect2(x * TS, y * TS, TS, TS))
 	arena.set("gate_rects", gates)
 	_add(root, arena, objects)

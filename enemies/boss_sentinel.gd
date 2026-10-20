@@ -206,7 +206,7 @@ func _die() -> void:
 	super._die()
 	state = "dying"
 	Sfx.play("boss_roar")
-	Events.ultimate_impact.emit(0.12, 0.9)
+	Events.ultimate_impact.emit(0.0, 0.5) # A shudder, but no freeze: play goes on.
 
 
 ## Scream ("roar" clip), then dissolve ("dissolve" clip + particle effect).

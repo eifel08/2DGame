@@ -589,7 +589,7 @@ func _run() -> void:
 	await _frames(40)
 
 	# --- Layout: no open space beyond walls, camera never shows outside the room ---
-	for rid in ["test_room", "boss_room", "arena_room", "secret_room"]:
+	for rid in ["test_room", "boss_room", "arena_room", "secret_room", "upper_room"]:
 		game.load_room(rid)
 		await _frames(2)
 		var uncovered := []
@@ -628,18 +628,24 @@ func _run() -> void:
 
 	# --- Room transition through the doorway ---
 	await _reset()
-	var east: Door = game.doors[0]
+	var east: Door = _door("east")
 	p.global_position = east.global_position + Vector2(-90, 0)
 	await _frames(3)
+	var door_sounds := Sfx.count("door")
 	Input.action_press(&"move_right")
+	var crossing_speed := 0.0
 	for i in 120:
+		crossing_speed = p.velocity.x
 		await _frames(1)
 		if game.room_id == "boss_room":
 			break
+	_check("crossing an opening is seamless: no fade, no sound, speed kept",
+		game.transition.is_empty() and game.fade.color.a < 0.01 and Sfx.count("door") == door_sounds
+		and is_equal_approx(p.velocity.x, crossing_speed), [p.velocity.x, crossing_speed])
 	Input.action_release(&"move_right")
 	await _frames(30)
 	_check("walking through the east door enters the boss room", game.room_id == "boss_room", game.room_id)
-	var west: Door = game.doors[0]
+	var west: Door = _door("west")
 	_check("player arrives beside the boss room door",
 		p.global_position.distance_to(west.get_arrival_position()) < 40.0 and game.fade.color.a < 0.01, p.global_position)
 	Input.action_press(&"move_left")
@@ -650,7 +656,63 @@ func _run() -> void:
 	Input.action_release(&"move_left")
 	await _frames(30)
 	_check("walking back through the door returns to the test room", game.room_id == "test_room"
-		and p.global_position.distance_to(game.doors[0].get_arrival_position()) < 40.0, [game.room_id, p.global_position])
+		and p.global_position.distance_to(_door("east").get_arrival_position()) < 40.0, [game.room_id, p.global_position])
+
+	# --- Openings carry no visual markers ---
+	var unmarked := true
+	for rid in game.ROOM_SCENES:
+		var scene_root: Node = (game.ROOM_SCENES[rid] as PackedScene).instantiate()
+		for node in scene_root.get_node("Objects").get_children():
+			if node is Door:
+				unmarked = unmarked and node.get_child_count() == 0 and not node.has_method("_draw")
+		scene_root.free()
+	_check("doors are invisible triggers in wall gaps (nothing drawn)", unmarked)
+
+	# --- Ceiling gap in the first room leads up to the Upper Galleries ---
+	await _reset()
+	var ceiling: Door = _door("ceiling")
+	_check("the first room has a gap in its ceiling", ceiling != null and ceiling.vertical == -1
+		and not game.room.is_solid_at(ceiling.global_position + Vector2(0, 16)), ceiling)
+	var wall_top := Vector2(ceiling.global_position.x, 4.0 * 32.0) # Top of the central hanging wall.
+	p.global_position = wall_top
+	p.velocity = Vector2.ZERO
+	await _frames(10)
+	_check("the central wall top is a ledge under the gap", p.grounded, p.global_position)
+	Input.action_press(&"jump")
+	for i in 60:
+		await _frames(1)
+		if game.room_id == "upper_room":
+			break
+	Input.action_release(&"jump")
+	_check("jumping up through the ceiling gap enters the Upper Galleries", game.room_id == "upper_room" and game.transition.is_empty(), game.room_id)
+	var floor_gap: Door = _door("floor")
+	_check("you rise out of the floor gap, still moving up", p.velocity.y < 0.0 and floor_gap != null
+		and absf(p.global_position.x - floor_gap.global_position.x) < 64.0, [p.velocity, p.global_position])
+	Input.action_press(&"move_right")
+	for i in 90:
+		await _frames(1)
+		if p.grounded:
+			break
+	Input.action_release(&"move_right")
+	_check("steering aside lands on the upper floor", p.grounded and game.room_id == "upper_room", [p.global_position, game.room_id])
+	var kinds := {}
+	for e in game.enemies:
+		kinds[e.tier if not (e is DummyEnemy and e.flying) else "flyer"] = true
+	_check("the Upper Galleries hold standard enemies only (no boss, no arena)",
+		kinds.has("weak") and kinds.has("strong") and kinds.has("flyer") and not kinds.has("boss") and game.room.get_arena() == null, kinds)
+	p.global_position = Vector2(floor_gap.global_position.x, floor_gap.global_position.y - 70.0)
+	p.velocity = Vector2(0, 200)
+	for i in 60:
+		await _frames(1)
+		if game.room_id == "test_room":
+			break
+	_check("dropping through the floor gap falls back into the first room", game.room_id == "test_room" and p.velocity.y > 0.0, game.room_id)
+	for i in 90:
+		await _frames(1)
+		if p.grounded:
+			break
+	_check("the fall lands on the ledge under the gap", p.grounded and absf(p.global_position.y - wall_top.y) < 2.0, p.global_position)
+	await _reset()
 
 	# --- Enemy persistence and respawn hierarchy ---
 	game.new_game()
@@ -752,13 +814,16 @@ func _run() -> void:
 	p.global_position = game.room.get_arena().get_trigger_rect().get_center() + Vector2(0, 200)
 	p.global_position.y = 512
 	await _frames(30) # Lets the boss-defeat hitstop from the previous test run out.
-	_check("entering the arena starts it and seals the door", director.is_active() and game.doors[0].locked and game.room.get_arena().gates_closed,
-		[director.state, game.doors[0].locked, game.room.get_arena().gates_closed, p.global_position, game.room.get_arena().get_trigger_rect()])
+	_check("entering the arena starts it and seals the door", director.is_active() and _door("west").locked and game.room.get_arena().gates_closed,
+		[director.state, _door("west").locked, game.room.get_arena().gates_closed, p.global_position, game.room.get_arena().get_trigger_rect()])
+	var fanfares := Sfx.count("victory")
+	var boss_freeze := 0.0
 	var waves_seen := []
 	for i in 600:
 		await _frames(1)
 		if director.state == "cleared":
 			break
+		boss_freeze = maxf(boss_freeze, game.feedback.hitstop_timer if waves_seen.has(2) else 0.0)
 		for e in director.wave_enemies:
 			if e.alive and e.flash_timer <= 0.0:
 				if not waves_seen.has(director.wave):
@@ -769,7 +834,9 @@ func _run() -> void:
 				Events.enemy_killed.emit(e)
 	_check("arena runs its waves (weak, strong, then the boss)",
 		waves_seen.has("weak") and waves_seen.has("strong") and waves_seen.has("boss") and waves_seen.find("boss") > waves_seen.find("strong"), waves_seen)
-	_check("arena is cleared and the door opens", director.state == "cleared" and not game.doors[0].locked and not game.room.get_arena().gates_closed)
+	_check("a boss defeat has no fanfare, celebration effect or freeze",
+		Sfx.count("victory") == fanfares and game.effects.count("boss_death") == 0 and boss_freeze <= 0.0, [Sfx.count("victory") - fanfares, boss_freeze])
+	_check("arena is cleared and the door opens", director.state == "cleared" and not _door("west").locked and not game.room.get_arena().gates_closed)
 	game.load_room("test_room", "east")
 	game.load_room("boss_room", "west")
 	await _frames(5)
@@ -910,8 +977,16 @@ func _run() -> void:
 	# --- Hidden passage: breakable wall to the Hidden Shrine ---
 	var wall: BreakableWall = game.breakables[0]
 	_check("the hidden wall starts intact", wall.intact)
+	_check("the hidden wall fills the outer wall gap exactly", is_equal_approx(wall.get_rect().end.x, game.room.get_bounds().end.x)
+		and wall.get_rect().size == Vector2(32, 96), wall.get_rect())
 	p.global_position = Vector2(wall.get_rect().position.x - 24.0, 512)
 	p.facing = 1
+	Input.action_press(&"move_right")
+	await _frames(30)
+	Input.action_release(&"move_right")
+	_check("the intact wall blocks the way (no transition)", game.room_id == "arena_room" and p.get_rect().end.x <= wall.get_rect().position.x + 0.5,
+		[game.room_id, p.get_rect().end.x])
+	p.global_position = Vector2(wall.get_rect().position.x - 24.0, 512)
 	await _frames(5)
 	for i in 3:
 		Input.action_press(&"attack")
@@ -1022,7 +1097,7 @@ func _run() -> void:
 
 	# --- Placeholder architecture: sounds and effects are swappable nodes ---
 	var sounds_ok := true
-	for sound in ["hit", "pogo", "hurt", "death", "save", "spawn", "door", "break", "secret", "relic", "boss_roar", "victory", "ui_move", "ui_confirm"]:
+	for sound in ["hit", "pogo", "hurt", "death", "save", "spawn", "break", "secret", "relic", "boss_roar", "victory", "ui_move", "ui_confirm"]:
 		var node := Sfx.get_node_or_null(sound) as AudioStreamPlayer
 		sounds_ok = sounds_ok and node != null and node.stream != null and node.bus == &"SFX"
 	_check("every sound is its own AudioStreamPlayer node with a stream", sounds_ok)
@@ -1213,6 +1288,13 @@ func _focus_pool_card(inv: InventoryMenu, ability_id: String) -> void:
 		if f and f.ability and f.ability.id == ability_id:
 			return
 		await _ui_action(&"ui_right")
+
+
+func _door(door_id: String) -> Door:
+	for d in game.doors:
+		if d.door_id == door_id:
+			return d
+	return null
 
 
 func _first_enemy(flying: bool) -> DummyEnemy:

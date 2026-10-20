@@ -10,6 +10,7 @@ var effects: Effects
 var hitstop_timer := 0.0
 var _trail_timer := 0.0
 var _heal_sparkle := false
+var _boss_fell := false ## The current arena's last foe was a boss.
 
 
 func setup(p_camera: CameraRig, p_effects: Effects) -> void:
@@ -30,7 +31,9 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.boss_telegraph.connect(_on_boss_telegraph)
 	Events.boss_phase_changed.connect(_on_boss_phase_changed)
 	Events.boss_defeated.connect(_on_boss_defeated)
-	Events.arena_started.connect(func(_id: String) -> void: camera.add_trauma(0.35))
+	Events.arena_started.connect(func(_id: String) -> void:
+		_boss_fell = false
+		camera.add_trauma(0.35))
 	Events.arena_cleared.connect(_on_arena_cleared)
 	Events.enemy_spawning.connect(_on_enemy_spawning)
 	Events.secret_found.connect(_on_secret_found)
@@ -152,14 +155,20 @@ func _on_boss_phase_changed(boss: Node, _phase: int) -> void:
 	effects.play("boss_phase", boss.get_center())
 
 
-func _on_boss_defeated(boss: Node) -> void:
-	freeze(0.25)
-	camera.add_trauma(0.9)
-	effects.play("boss_death", boss.get_center())
+## A boss falls quietly: its roar and dissolve are the whole send-off. No
+## freeze, no celebration effect and no fanfare (also not for the arena it
+## ends), so play simply goes on.
+func _on_boss_defeated(_boss: Node) -> void:
+	camera.add_trauma(0.3)
+	_boss_fell = true
 
 
-## Arena victory: fanfare, flash rings and sparks around the camera.
+## Arena victory: fanfare, flash rings and sparks around the camera. Skipped
+## when the arena ended with a boss (see _on_boss_defeated).
 func _on_arena_cleared(_arena_id: String) -> void:
+	if _boss_fell:
+		_boss_fell = false
+		return
 	Sfx.play("victory")
 	camera.add_trauma(0.35)
 	effects.play("arena_clear", camera.global_position)

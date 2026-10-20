@@ -89,16 +89,19 @@ The pogo is forgiving: the downward swing has a wide hitbox (78 × 80 px, `Confi
 
 Checkpoint art is modular. Replace the polygons under `Visual` in `world/objects/checkpoint.tscn`, and edit or replace its animations named `inactive`, `activate` and `active`.
 
-### Rooms and doors
-The world map has four rooms:
+### Rooms and openings
+The world map has five rooms:
 
 ```
-Testing Halls  ⇄  Sentinel's Arena  ⇄  Proving Grounds  ⇄ (hidden wall) ⇄  Hidden Shrine
+                Upper Galleries
+                      ⇅ (gap in the ceiling)
+                Testing Halls  ⇄  Sentinel's Arena  ⇄  Proving Grounds  ⇄ (hidden wall) ⇄  Hidden Shrine
 ```
 
-- Walk into a lit doorway to move through it. The switch is instant: no fade and no wait, and you keep running.
+- **Seamless transitions.** A room exit is simply a place where the wall is missing. There is no light, arrow, sound, fade or pause. Walk, jump or fall through the opening and you are in the next room, at the same height (or the same spot along a ceiling gap), with the same speed.
+- **Ceiling gap:** in the Testing Halls, the ceiling is open above the central hanging wall. Climb the wall (or wall-jump up its side) and jump. You rise out of a gap in the floor of the **Upper Galleries**, a side room with ordinary enemies (weak and strong dummies, flyers), shards and platforms. No boss and no arena. Drop back through the floor gap to return; you land on the wall top.
 - **Proving Grounds** is a dedicated arena room with its own checkpoint and three waves. Once cleared, it stays cleared.
-- **Secret passage:** at the far east end of the Proving Grounds, one wall section is cracked. Strike it three times. It crumbles at once, with no message, and opens the way to the **Hidden Shrine**. The shrine holds a lore tablet, shards and a **relic** that raises max health for this save. The broken wall and the relic are saved.
+- **Secret passage:** at the far east end of the Proving Grounds, the outer wall has a section that is really a breakable wall. It sits exactly where the solid wall would be and looks like it, apart from faint cracks. Strike it three times. It crumbles at once, with no message, and opens the way to the **Hidden Shrine**. The shrine holds a lore tablet, shards and a **relic** that raises max health for this save. The broken wall and the relic are saved.
 - Each room is its own scene in `world/`. They are loaded on demand by `core/game.gd` (`ROOM_SCENES`).
 
 ### Enemy tiers and respawning
@@ -122,7 +125,7 @@ The Sentinel waits in the Boss Room. It always tracks you: it turns to face you,
 - **Volley:** shards aimed at you, in a spread.
 - **Phase 2** (below half health): shorter warnings, faster moves, more shards.
 - Its health bar appears at the top of the screen during the fight. A defeated Sentinel never returns.
-- **Death:** it rears up and screams (a low roar, a heavy shake, a flash), then dissolves into purple particles. There is no text pop-up.
+- **Death:** it rears up and screams (a low roar and a shudder), then dissolves into purple particles. That is all: no freeze, no celebration effect, no fanfare and no text. Play simply goes on.
 
 ### Arena encounters
 The Boss Room is an **arena**. Stepping in seals the doorway with gates, then the waves follow:
@@ -130,7 +133,7 @@ The Boss Room is an **arena**. Stepping in seals the doorway with gates, then th
 2. A strong dummy.
 3. The boss.
 
-Each wave starts once the previous one is defeated. After the last wave the gates open, and the arena is **cleared for good**. A clear plays a victory fanfare with golden rings and sparks. There is no text pop-up. If you die inside, the attempt resets and the arena starts fresh next time.
+Each wave starts once the previous one is defeated. After the last wave the gates open, and the arena is **cleared for good**. Clearing an arena of ordinary enemies (the Proving Grounds) plays a victory fanfare with golden rings and sparks. An arena that ends with a boss (the Sentinel's) ends quietly. There is never a text pop-up. If you die inside, the attempt resets and the arena starts fresh next time.
 
 **Telegraphed spawns (arenas only):** arena wave enemies appear through a short portal. For 0.35 s they fade in, harmless and impossible to hit. No timer or text is shown. They never appear on top of you: a spawn point too close to the player moves aside. Everywhere else enemies simply appear, with no telegraph.
 - Arenas are data: in a room scene, `Objects/Arena` has a trigger rect, gate rects, and `Waves/Wave1`, `Wave2`, ... with marker children (meta `kind`: `weak`, `flyer`, `strong` or `boss`).
@@ -140,7 +143,7 @@ Each wave starts once the previous one is defeated. After the last wave the gate
 - Solid tiles light every face that borders open space, so the drawn edges are exactly the collision edges.
 - The background is dim, with fading tops, so it never looks like something you can stand on. The HUD sits on its own backing panel.
 - The camera, including screen shake, never shows anything outside the room.
-- Every opening in a room's outer wall is a doorway. The automated test checks all of this.
+- Every opening in a room's outer wall (sides, ceiling, floor) is an exit. The automated test checks all of this.
 - With *Hitboxes & Stats* on, the debug view also outlines solid tiles, door triggers and arena areas.
 
 ### Hazards
@@ -206,7 +209,8 @@ The HUD is clean by default: health and energy bars, threshold marks, the hotkey
 | Death and trance | Let health run out: a short collapse plays, then you float at your flame. Press any button to wake. Dummies are back. |
 | Secret passage | Proving Grounds, far east: strike the cracked wall three times, walk through, take the red relic. |
 | Spawn portal | Debug overlay → spawn an enemy, or enter an arena: enemies fade in through a portal and cannot hurt you yet. |
-| Doorway | Walk to the far east end of the Test Room: you move to the Boss Room. Walk back left to return. |
+| Seamless exit | Run to the far east end of the Test Room: you keep running into the Boss Room, with no fade. Run back left to return. |
+| Ceiling gap | Climb the central hanging wall, jump from its top: you rise into the Upper Galleries. Fall back through the floor gap to return. |
 | Arena and boss | In the Boss Room, step forward: gates close, waves come, then the Hollow Sentinel. Clear it, leave and return: nothing repeats. |
 | Boss targeting | Move around the Sentinel: it turns, follows you, and aims charges, leaps and shards at you. |
 | Respawn rules | Defeat a dummy and wait: it stays down. Go to the Boss Room and back: weak dummies return. The strong dummy (upper right) returns only after you save at a flame. |
@@ -251,7 +255,8 @@ enemies/
   boss_sentinel.gd       the intro boss and its attack patterns
 world/
   room.gd                world queries (solid, hazard, ground, safe ground, doors, arena)
-  test_room.tscn         test room: platforms, walls, 2 spike pits, objects, east doorway
+  test_room.tscn         test room: platforms, walls, 2 spike pits, objects, east exit, ceiling gap
+  upper_room.tscn        Upper Galleries: side room above the test room, standard enemies
   boss_room.tscn         boss room: arena with waves and the Hollow Sentinel
   arena_room.tscn        Proving Grounds: arena room with a cracked wall
   secret_room.tscn       Hidden Shrine: relic, tablet, shards
@@ -263,7 +268,7 @@ core/world_state.gd      dead enemies, bosses, arenas, collected shards
 core/arena_director.gd   arena waves: start, next wave, clear, abort
 effects/fx/               one scene per visual effect (placeholders), FxPlayer
 audio/sfx.tscn, sfx/     the Sfx autoload: one AudioStreamPlayer per sound + .wav placeholders
-tests/smoke_test.tscn    automated headless test (207 checks)
+tests/smoke_test.tscn    automated headless test (222 checks)
 ```
 
 ## Extending
@@ -283,4 +288,4 @@ tests/smoke_test.tscn    automated headless test (207 checks)
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It plays the game through real input actions and checks 207 behaviors. New in this version: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.
+It plays the game through real input actions and checks 222 behaviors. New in this version: seamless exits (no fade, sound or marker; speed kept), the ceiling gap to the Upper Galleries and back, its standard enemies, the secret wall sitting in the outer wall and blocking until broken, and a quiet boss defeat (no fanfare, effect or freeze). Earlier: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.

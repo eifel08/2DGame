@@ -18,6 +18,7 @@ const ROOM_SCENES := {
 	"boss_room": preload("res://world/boss_room.tscn"),
 	"arena_room": preload("res://world/arena_room.tscn"),
 	"secret_room": preload("res://world/secret_room.tscn"),
+	"upper_room": preload("res://world/upper_room.tscn"),
 }
 const START_ROOM := "test_room"
 const ENEMY_SCENES := {
@@ -170,7 +171,7 @@ func _physics_process(delta: float) -> void:
 	if not _pending_door.is_empty():
 		var door: Dictionary = _pending_door
 		_pending_door = {}
-		load_room(door.room, door.door)
+		load_room(door.room, door.door, door.offset, door.velocity)
 
 	# Death: wait for the collapse animation, then fade to the checkpoint.
 	if pending_respawn and player.death_finished():
@@ -264,16 +265,22 @@ func _load_room_scene(id: String) -> void:
 
 
 ## Loads `id` and places the player at the door `arrival_door` (or the
-## room's spawn point when empty).
-func load_room(id: String, arrival_door := "") -> void:
+## room's spawn). `offset` and `velocity` carry the player's position along
+## the opening and speed over from the other room, so passing through an
+## opening is seamless: no fade, no stop.
+func load_room(id: String, arrival_door := "", offset := 0.0, velocity := Vector2.ZERO) -> void:
 	_load_room_scene(id)
 	var arrival := room.get_player_spawn()
+	var arrival_velocity := Vector2(velocity.x, 0.0)
 	for door in doors:
 		if door.door_id == arrival_door:
-			arrival = door.get_arrival_position()
-			player.facing = door.inward
+			arrival = door.arrival_for(offset)
+			arrival_velocity = door.arrival_velocity(velocity)
+			if door.vertical == 0:
+				player.facing = door.inward
 	player.global_position = arrival
-	player.velocity.y = 0.0 # Keep running: walking through a door never stops you.
+	player.velocity = arrival_velocity
+	player.is_jumping = false # No jump cut on the far side: the momentum carries over whole.
 	player.safe_point = arrival
 	camera.snap_to(player)
 
@@ -284,17 +291,16 @@ func _update_doors() -> void:
 	for door in doors:
 		door.locked = locked
 		if not locked and door.get_trigger_rect().intersects(pr):
-			begin_transition(door.target_room, door.target_door)
+			begin_transition(door.target_room, door.target_door, door.offset_of(player.global_position))
 			return
 
 
-## Doorways switch rooms at once, with no fade or wait. The load runs at the
-## end of the current step so nothing is swapped mid-update.
-func begin_transition(target_room: String, target_door: String) -> void:
+## Openings switch rooms at once, with no fade, sound or wait. The load
+## runs at the end of the current step so nothing is swapped mid-update.
+func begin_transition(target_room: String, target_door: String, offset := 0.0) -> void:
 	if not _pending_door.is_empty():
 		return
-	Sfx.play("door")
-	_pending_door = {"room": target_room, "door": target_door}
+	_pending_door = {"room": target_room, "door": target_door, "offset": offset, "velocity": player.velocity}
 
 
 ## Fades to black, runs `on_black`, then fades back in.
