@@ -4,8 +4,15 @@ extends UltimateAbility
 ## anything on the way, then slams the ground in a wide shockwave. Brief
 ## i-frames follow the landing. Takes over movement through
 ## Player.begin_ability_control(self), like Comet Dash.
+##
+## Cast on the ground, the player first makes a small hop upward (`hop`
+## phase). The hop is a VULNERABLE wind-up: a hit interrupts it and no slam
+## follows. At the top of the hop the invulnerable dive starts. Cast in the
+## air, the dive starts at once.
 
-var invulnerable := true ## Read by the player's ability state (i-frames while diving).
+var invulnerable := true ## Read every step by the player's ability state: false while hopping.
+var phase := "dive" ## "hop" (ground wind-up) or "dive".
+var hop_left := 0.0
 var time_left := 0.0
 var hit_set := {}
 var cancelled := false
@@ -19,7 +26,7 @@ func _init() -> void:
 	kind = "Dive Strike"
 	color = Color("#8ce99a")
 	icon = "slam"
-	description = "Plunge straight down, untouchable, and smash the ground in a wide shockwave."
+	description = "Plunge straight down, untouchable, and smash the ground in a wide shockwave. From the ground you hop up first, and the hop leaves you open."
 
 
 func _on_activate(ctx: UltimateContext) -> void:
@@ -31,11 +38,34 @@ func _on_activate(ctx: UltimateContext) -> void:
 
 # ----- Ability-control contract (called by the player's AbilityState) -----
 
-func control_start(_player: Player) -> void:
+func control_start(player: Player) -> void:
+	if player.grounded:
+		phase = "hop"
+		invulnerable = false
+		hop_left = cfg("hop_time")
+		player.velocity = Vector2(0.0, -cfg("hop_velocity"))
+		player.grounded = false
+		Events.player_jumped.emit(player, "slam_hop")
+	else:
+		_start_dive()
+
+
+func _start_dive() -> void:
+	phase = "dive"
+	invulnerable = true
 	time_left = cfg("max_time")
 
 
 func control_step(delta: float, player: Player) -> bool:
+	if phase == "hop":
+		# Rise and slow down under gravity; dive at the top (or on a ceiling).
+		player.velocity.x = 0.0
+		player.velocity.y += Config.movement.gravity * delta
+		player.move(delta)
+		hop_left -= delta
+		if player.velocity.y >= 0.0 or hop_left <= 0.0 or player.is_on_ceiling():
+			_start_dive()
+		return false
 	player.velocity = Vector2(0.0, cfg("speed"))
 	player.move(delta)
 	_ctx.combat.damage_in_rect(player.get_rect().grow(8.0), {
@@ -46,8 +76,8 @@ func control_step(delta: float, player: Player) -> bool:
 
 
 func control_finish(player: Player) -> void:
-	# A reset or a hazard teleport ends the dive early: no slam then.
-	if cancelled or (time_left > 0.0 and not player.is_on_floor()):
+	# A reset, a hit during the hop or a hazard teleport ends it early: no slam then.
+	if cancelled or phase == "hop" or (time_left > 0.0 and not player.is_on_floor()):
 		end(_ctx)
 		return
 	_slam(player)

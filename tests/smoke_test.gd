@@ -250,6 +250,9 @@ func _run() -> void:
 	# --- Spell pool and slot capacity (debug overlay) ---
 	await _test_spell_management()
 
+	# --- Meteor Slam ground hop, Stasis cost, camera look up / down ---
+	await _test_slam_hop_and_look()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -696,20 +699,46 @@ func _run() -> void:
 	_check("jumping up through the ceiling gap enters the Upper Galleries", game.room_id == "upper_room" and game.transition.is_empty(), game.room_id)
 	var floor_gap: Door = _door("floor")
 	var gap_floor_y: float = floor_gap.global_position.y - 64.0 # Top of the 2-tile floor.
-	var beside := p.global_position.x < floor_gap.gap_left() - Player.WIDTH / 2.0 or p.global_position.x > floor_gap.gap_right() + Player.WIDTH / 2.0
-	_check("Rule B: the upward exit puts you up and to one side of the gap", floor_gap != null and beside
-		and p.global_position.y < gap_floor_y, [p.global_position, floor_gap.gap_left(), floor_gap.gap_right()])
-	for i in 90:
+	var gap_mid: float = floor_gap.global_position.x
+	_check("Rule B: you emerge at the threshold inside the floor gap, not on the floor",
+		p.state_name() == "eject" and p.global_position.x > floor_gap.gap_left() and p.global_position.x < floor_gap.gap_right()
+		and p.global_position.y > gap_floor_y and not floor_gap.get_trigger_rect().intersects(p.get_rect()),
+		[p.state_name(), p.global_position, gap_floor_y])
+	_check("Rule B: the ejection is not invulnerable", not p.health.is_invulnerable(), p.health.invuln_flags.keys())
+	var target: Vector2 = game.last_ejection.target
+	var side: float = game.last_ejection.side
+	var path: Array[Vector2] = [p.global_position]
+	for i in 120:
 		await _frames(1)
-		if p.grounded:
+		path.append(p.global_position)
+		if p.state_name() != "eject":
 			break
+	var cleared_in_gap := false # Feet above the floor while still over the gap: it climbed out.
+	var apex := INF
+	var mid_air := false # A point between the gap edge and the landing spot, in the air.
+	var backwards := false # Never drifts back toward the gap once moving sideways.
+	var edge: float = floor_gap.gap_left() if side < 0 else floor_gap.gap_right()
+	for i in path.size():
+		var q: Vector2 = path[i]
+		apex = minf(apex, q.y)
+		if q.y < gap_floor_y and absf(q.x - gap_mid) < floor_gap.trigger_size.x / 2.0:
+			cleared_in_gap = true
+		if q.y < gap_floor_y - 10.0 and side * (q.x - edge) > 0.0 and side * (target.x - q.x) > 4.0:
+			mid_air = true
+		if i > 0 and side * (q.x - path[i - 1].x) < -0.01:
+			backwards = true
+	_check("Rule B: the player climbs out through the gap", cleared_in_gap, path.slice(0, 6))
+	_check("Rule B: an arc launches the player up above the floor", gap_floor_y - apex >= 40.0, gap_floor_y - apex)
+	_check("Rule B: the arc crosses the space between the gap and the landing spot",
+		mid_air and not backwards and path.size() > 12, [mid_air, backwards, path.size()])
 	_check("Rule B: with no input you land on the floor beside the gap, not back in it",
-		p.grounded and game.room_id == "upper_room" and absf(p.global_position.y - gap_floor_y) < 1.0, [p.global_position, game.room_id])
+		p.grounded and p.state_name() == "normal" and game.room_id == "upper_room" and absf(p.global_position.y - gap_floor_y) < 1.0
+		and side * (p.global_position.x - edge) >= Player.WIDTH / 2.0, [p.global_position, game.room_id])
 	# Both sides of this gap are standable, so the side is random: both must occur.
 	var sides_seen := {}
 	for i in 24:
 		game.load_room("upper_room", "floor", 0.0, Vector2(0, -500))
-		sides_seen[signf(p.global_position.x - floor_gap.global_position.x)] = true
+		sides_seen[float(game.last_ejection.side)] = true
 		floor_gap = _door("floor")
 	_check("Rule B: with floor on both sides, either side can be chosen", sides_seen.has(-1.0) and sides_seen.has(1.0), sides_seen)
 	await _frames(60)
@@ -1525,6 +1554,100 @@ func _test_spell_management() -> void:
 	game.ultimates.set_capacity(PlayerData.DEFAULT_CAPACITY)
 	data.equipped = loadout
 	Events.loadout_changed.emit()
+	await _reset()
+
+
+func _test_slam_hop_and_look() -> void:
+	var p: Player = game.player
+	var cam: CameraRig = game.camera
+	_check("stasis field costs double (80 energy)", is_equal_approx(Config.ultimates.stasis_field.cost, 80.0), Config.ultimates.stasis_field.cost)
+
+	# Meteor Slam from the ground: a vulnerable hop first, then the invulnerable dive.
+	await _reset()
+	var slam: MeteorSlam = game.ultimates.get_ability("meteor_slam")
+	var ground_y := p.global_position.y
+	_check("slam test starts on the ground", p.grounded)
+	p.health.set_energy(100.0)
+	var slams := slam.slam_count
+	await _cast_slot0("meteor_slam")
+	var hop_seen := false
+	var hop_vulnerable := true
+	var hop_height := 0.0
+	var dive_invulnerable := false
+	for i in 90:
+		if p.state_name() == "ability" and slam.phase == "hop":
+			hop_seen = true
+			hop_vulnerable = hop_vulnerable and not p.health.is_invulnerable()
+			hop_height = maxf(hop_height, ground_y - p.global_position.y)
+		elif p.state_name() == "ability" and slam.phase == "dive":
+			dive_invulnerable = p.health.is_invulnerable()
+		if slam.slam_count > slams:
+			break
+		await _frames(1)
+	_check("a ground cast hops up first", hop_seen and hop_height >= 30.0, hop_height)
+	_check("the hop is a vulnerable wind-up", hop_seen and hop_vulnerable)
+	_check("after the hop the dive is invulnerable and slams", dive_invulnerable and slam.slam_count == slams + 1
+		and p.grounded and absf(p.global_position.y - ground_y) < 1.0, [dive_invulnerable, slam.slam_count, p.global_position.y])
+
+	# A hit during the hop lands and cancels the slam.
+	await _reset()
+	p.health.set_energy(100.0)
+	slams = slam.slam_count
+	await _cast_slot0("meteor_slam")
+	for i in 10:
+		if slam.phase == "hop" and p.state_name() == "ability":
+			break
+		await _frames(1)
+	var hp := p.health.health
+	var hit := p.receive_hit(10.0, p.global_position.x + 20.0, false, false, null, Damage.Source.ENEMY)
+	await _frames(40)
+	_check("a hit during the hop lands and cancels the slam",
+		hit and p.health.health < hp and slam.slam_count == slams and not slam.is_running, [hit, p.health.health, slam.slam_count])
+
+	# Camera look: hold Up / Down while standing still; never outside the room.
+	await _reset()
+	await _frames(40)
+	var base_y := cam.global_position.y
+	var room_rect: Rect2 = game.room.get_bounds().grow(1.0)
+	Input.action_press(&"move_up")
+	await _frames(6)
+	Input.action_release(&"move_up")
+	await _frames(10)
+	_check("a quick tap of Up does not move the camera", absf(cam.global_position.y - base_y) < 2.0, cam.global_position.y - base_y)
+	Input.action_press(&"move_up")
+	var inside := true
+	for i in 80:
+		await _frames(1)
+		inside = inside and room_rect.encloses(cam.view_rect())
+	_check("holding Up while standing still looks up", cam.global_position.y < base_y - 60.0, cam.global_position.y - base_y)
+	Input.action_press(&"move_right")
+	await _frames(40)
+	_check("moving stops the look", absf(cam.look_offset) < 10.0, cam.look_offset)
+	Input.action_release(&"move_right")
+	Input.action_release(&"move_up")
+	await _reset()
+	await _frames(40)
+	base_y = cam.global_position.y
+	Input.action_press(&"move_up")
+	await _frames(60)
+	Input.action_release(&"move_up")
+	for i in 90:
+		await _frames(1)
+		inside = inside and room_rect.encloses(cam.view_rect())
+	_check("releasing Up brings the camera back", absf(cam.global_position.y - base_y) < 3.0, cam.global_position.y - base_y)
+	# Look down from the top of the central hanging wall.
+	p.global_position = Vector2(_door("ceiling").global_position.x, 4.0 * 32.0)
+	p.velocity = Vector2.ZERO
+	await _frames(40)
+	base_y = cam.global_position.y
+	Input.action_press(&"move_down")
+	for i in 80:
+		await _frames(1)
+		inside = inside and room_rect.encloses(cam.view_rect())
+	Input.action_release(&"move_down")
+	_check("holding Down while standing still looks down", cam.global_position.y > base_y + 60.0 and p.grounded, cam.global_position.y - base_y)
+	_check("the look never shows anything outside the room", inside)
+	await _frames(30)
 	await _reset()
 
 

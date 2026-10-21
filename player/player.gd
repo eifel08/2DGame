@@ -8,6 +8,7 @@ extends CharacterBody2D
 ##   cast    - ultimate wind-up, frozen in place, invulnerable
 ##   ability - movement handed to an ability (e.g. Comet Dash)
 ##   hurt    - short knockback stun after taking damage
+##   eject   - carried up out of a floor gap after an upward room transition
 ##
 ## The node origin is at the feet (bottom-center). Game calls step() from
 ## its own fixed-step loop, so hitstop can freeze everything in one place.
@@ -64,6 +65,7 @@ func _ready() -> void:
 	fsm.add("hurt", HurtState.new(self))
 	fsm.add("trance", TranceState.new(self))
 	fsm.add("dying", DyingState.new(self))
+	fsm.add("eject", EjectState.new(self))
 	health.energy_gain_source = func() -> float: return stat("energy_gain_mul")
 	animator.setup(self)
 
@@ -149,6 +151,19 @@ func can_attack() -> bool:
 
 func can_cast() -> bool:
 	return fsm.is_in("normal")
+
+
+## Look up / down request for the camera: -1 (Up held), 1 (Down held) or 0.
+## Only while standing still on the ground, not attacking or turning.
+func look_request() -> int:
+	if not fsm.is_in("normal") or not grounded or attack_dir != "" \
+			or input.axis_x() != 0 or absf(velocity.x) > 5.0:
+		return 0
+	var up := input.is_down(&"move_up")
+	var down := input.is_down(&"move_down")
+	if up == down:
+		return 0
+	return -1 if up else 1
 
 
 # ---------- Per-step update ----------
@@ -262,6 +277,12 @@ func pogo(pogo_velocity: float) -> void:
 
 func start_cast(duration: float, on_release: Callable) -> void:
 	fsm.change("cast", {"duration": duration, "on_release": on_release})
+
+
+## Upward room transition: climb out of the floor gap from the threshold,
+## then arc onto the floor at `target` (feet position). See EjectState.
+func begin_ejection(target: Vector2) -> void:
+	fsm.change("eject", {"target": target})
 
 
 ## Hands movement to `controller`, an object with

@@ -73,6 +73,7 @@ var respawn := {}
 var focused_interactable: Interactable
 var pending_respawn := false
 var _pending_door := {} ## {room, door}: a doorway was entered this step.
+var last_ejection := {} ## The last upward arrival (Rule B): {side, target, start}. Tests, debug.
 ## Screen fade while moving between rooms or respawning:
 ## {phase: "out"/"in", time, duration, on_black: Callable}.
 var transition := {}
@@ -287,9 +288,15 @@ func load_room(id: String, arrival_door := "", offset := 0.0, velocity := Vector
 				1: # Arriving from below (an upward transition): Rule B.
 					var eject := _ejection_arrival(door)
 					if not eject.is_empty():
-						arrival = eject.position
-						arrival_velocity = eject.velocity
+						# Emerge at the threshold inside the gap; EjectState carries
+						# the player out and arcs them onto the floor beside it.
+						player.global_position = arrival
+						player.safe_point = eject.target
 						player.facing = eject.side
+						player.begin_ejection(eject.target)
+						last_ejection = {"side": eject.side, "target": eject.target, "start": arrival}
+						camera.snap_to(player)
+						return
 	player.global_position = arrival
 	player.velocity = arrival_velocity
 	player.is_jumping = false # No jump cut on the far side: the momentum carries over whole.
@@ -301,9 +308,7 @@ func load_room(id: String, arrival_door := "", offset := 0.0, velocity := Vector
 
 const TILE := 32.0
 const LANDING_DEPTH := 128.0 ## Rule A: ground must lie at most this far below a drop-in point.
-const EJECT_MARGIN := 24.0 ## Rule B: distance from the gap edge to the player's center.
-const EJECT_LIFT := 24.0 ## Rule B: the player appears this far above the floor ("offset up").
-const EJECT_HOP := Vector2(60.0, -280.0) ## Rule B: small hop away from the gap.
+const EJECT_MARGIN := 24.0 ## Rule B: landing distance from the gap edge to the player's center.
 
 
 ## Rule A (downward transitions): the player must land on solid ground right
@@ -336,10 +341,11 @@ func _has_ground_below(feet: Vector2) -> bool:
 	return true
 
 
-## Rule B (upward transitions): the player appears up and to ONE side of
-## the floor gap, over standable floor, so they never drop straight back
-## into the transition zone. With floor on both sides the side is random.
-## Returns {position, velocity, side}, or {} if neither side can be stood on.
+## Rule B (upward transitions): the player emerges through the floor gap and
+## is ejected in an arc up and to ONE side, onto standable floor, so they
+## never drop straight back into the transition zone. With floor on both
+## sides the side is random. Returns {target (landing feet position), side},
+## or {} if neither side can be stood on.
 func _ejection_arrival(door: Door) -> Dictionary:
 	var options := []
 	for side in [-1, 1]:
@@ -352,8 +358,7 @@ func _ejection_arrival(door: Door) -> Dictionary:
 		return {}
 	var pick: Dictionary = options[randi() % options.size()]
 	return {
-		"position": Vector2(pick.x, pick.surface - EJECT_LIFT),
-		"velocity": Vector2(pick.side * EJECT_HOP.x, EJECT_HOP.y),
+		"target": Vector2(pick.x, pick.surface),
 		"side": pick.side,
 	}
 

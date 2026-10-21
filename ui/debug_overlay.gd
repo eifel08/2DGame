@@ -49,6 +49,9 @@ const SLIDERS := [
 	{"path": "vitals.heal_chunk_energy", "label": "Heal Chunk Energy", "min": 5, "max": 100, "step": 1},
 	{"path": "vitals.heal_chunk_time", "label": "Heal Chunk Time", "min": 0.2, "max": 3, "step": 0.05},
 	{"path": "vitals.heal_chunk_pause", "label": "Heal Pause", "min": 0.05, "max": 1.5, "step": 0.05},
+	{"group": "Camera"},
+	{"path": "camera.look_delay", "label": "Look Delay", "min": 0, "max": 1, "step": 0.05},
+	{"path": "camera.look_distance", "label": "Look Distance", "min": 0, "max": 300, "step": 5},
 	{"group": "Time"},
 	{"path": "debug.time_scale", "label": "Time Scale", "min": 0.1, "max": 1.5, "step": 0.05},
 ]

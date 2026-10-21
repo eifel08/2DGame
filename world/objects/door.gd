@@ -10,9 +10,10 @@ extends Node2D
 ## Room-design rules (full text: GUIDELINES.md in the project root):
 ##   Rule A - a DOWNWARD exit must have solid ground right below its arrival
 ##            point, so the player lands safely (Game._landing_arrival).
-##   Rule B - an UPWARD exit puts the player up and to ONE side of the floor
-##            gap, onto standable floor (random side if both are standable),
-##            never back over the gap (Game._ejection_arrival).
+##   Rule B - an UPWARD exit: the player emerges at the threshold of the floor
+##            gap and is ejected in an arc up and to ONE side, onto standable
+##            floor (random side if both are standable), never back over the
+##            gap (Game._ejection_arrival, EjectState).
 ##   Rule C - a door behind a breakable wall (`secret`) is never locked by an
 ##            arena; the wall can be broken and used mid-fight.
 ##
@@ -56,8 +57,8 @@ func arrival_for(offset: float) -> Vector2:
 	match vertical:
 		-1: # Dropping in from above: just below the ceiling gap.
 			return global_position + Vector2(_clamp_along(offset), trigger_size.y + 42.0)
-		1: # Rising in from below. Game applies Rule B (to one side, on the floor);
-			# this point inside the gap is only the fallback.
+		1: # Rising in from below: the threshold, inside the gap just above the
+			# trigger. Game applies Rule B from here (EjectState arcs the player out).
 			return global_position + Vector2(_clamp_along(offset), -trigger_size.y - 2.0)
 	return global_position + Vector2(inward * SIDE_ARRIVAL, clampf(offset, -trigger_size.y + 40.0, 0.0))
 

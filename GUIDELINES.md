@@ -32,15 +32,18 @@ The same rules are repeated in the code, at the places that enforce them:
 
 ## Rule B — Upward transitions: out and to one side
 
-**Whenever a room transition leads upward, the spawn point offsets the player UP and slightly to ONE SIDE: toward a side with standable floor, or a random side if both are standable. The player must never fall straight back into the transition zone.**
+**Whenever a room transition leads upward, the player physically emerges through the floor gap and is ejected UP and to ONE SIDE: toward a side with standable floor, or a random side if both are standable. The player must never fall straight back into the transition zone, and is never simply placed on the floor.**
 
 - An upward transition is any exit the player jumps into. It ends at the **floor gap** of the room above (`'O'` in the bottom row, `vertical = 1`).
 - At least one side of the floor gap must have **standable floor**: solid under the player's full width, with head room above (2 open tiles).
-- The player appears just beside the gap edge on that side (`EJECT_MARGIN`), a little above the floor (`EJECT_LIFT`), with a small hop away from the gap (`EJECT_HOP`). They then land on that floor.
+- The player appears at the **threshold** of the opening: inside the gap, just above its trigger. The `eject` state (`player/states/eject_state.gd`) then moves them through real space:
+  1. **Rise:** straight up out of the gap until the feet clear the floor surface. There is no sideways motion yet, so the gap's edges are never clipped.
+  2. **Arc:** a ballistic launch (real gravity and collisions) that peaks above the floor and lands just beside the gap edge on the chosen side (`EJECT_MARGIN`).
+- Input is ignored until the landing, so the arc never drifts back over the gap. The player is not invulnerable while ejected.
 - If both sides are standable, the side is chosen at random.
 - Example: in the Upper Galleries the floor gap spans columns 4–7. Columns 1–3 and 8+ are floor, so the player comes out on the left or the right at random.
 
-**In code.** `Game._ejection_arrival()` finds the standable sides with `_floor_surface()` and picks one. If neither side is standable, it logs a warning and falls back to a strong upward boost inside the gap. That fallback is not acceptable in a finished layout.
+**In code.** `Game._ejection_arrival()` finds the standable sides with `_floor_surface()` and picks one; `Player.begin_ejection()` starts the climb and arc. If neither side is standable, it logs a warning and falls back to a strong upward boost inside the gap. That fallback is not acceptable in a finished layout.
 
 **At build time.** `tools/build_assets.gd` reports `Rule B violated …` as an error if neither side of a floor gap is standable.
 

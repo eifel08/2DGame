@@ -151,8 +151,9 @@ const UPPER_LAYOUT := [
 ##            (Testing Halls: the cap of the central wall spans the full gap.)
 ##   Rule B - Upward transitions: wherever an exit leads UP into a room (that
 ##            room's floor gap), at least one side of the gap needs standable
-##            floor. The player is placed up and to that side (random side if
-##            both are standable), never back over the gap.
+##            floor. The player emerges through the gap and is ejected in an arc
+##            onto that side (random side if both are standable), never back
+##            over the gap.
 ##   Rule C - Secret breakable walls in arenas stay breakable and their door
 ##            stays open while the arena locks every other door ('Z' doors
 ##            get `secret = true`; no gate is drawn over them).

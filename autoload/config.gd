@@ -84,6 +84,13 @@ class Vitals:
 	var heal_chunk_pause := 0.4 ## Safe window after a chunk before the next one starts.
 
 
+class CameraCfg:
+	## Look up / down: hold Up or Down while standing still to pan the view.
+	var look_delay := 0.3 ## Hold this long first, so quick taps (aimed attacks) never move the view.
+	var look_distance := 160.0 ## How far the view pans; always clamped to the room bounds.
+	var look_speed := 4.0 ## Easing rate toward the look offset (twice as fast back).
+
+
 class DebugFlags:
 	var show_hitboxes := false
 	var show_anim_labels := false
@@ -98,6 +105,7 @@ var movement: Movement
 var combat: Combat
 var vitals: Vitals
 var debug: DebugFlags
+var camera: CameraCfg
 ## One block per ultimate, keyed by ability id. `cost` is fully configurable.
 var ultimates: Dictionary
 
@@ -112,6 +120,7 @@ func restore_defaults() -> void:
 	combat = Combat.new()
 	vitals = Vitals.new()
 	debug = DebugFlags.new()
+	camera = CameraCfg.new()
 	ultimates = {
 		"nova_burst": {"cost": 33.0, "cast_time": 0.35, "damage": 45.0, "radius": 230.0, "expand_time": 0.3},
 		"spirit_volley": {"cost": 50.0, "cast_time": 0.2, "count": 10.0, "damage": 12.0, "interval": 0.04, "speed": 460.0, "homing": 7.0},
@@ -122,9 +131,13 @@ func restore_defaults() -> void:
 		# must be cast right before an enemy touches you. Enemy contact only.
 		"repulse_aegis": {"cost": 20.0, "cast_time": 0.0, "window": 0.2, "counter_range": 6.0, "reflect_mul": 1.5, "guard_iframes": 0.6},
 		# Stasis Field: a short-range emergency escape, not area control.
-		"stasis_field": {"cost": 40.0, "cast_time": 0.05, "radius": 90.0, "duration": 0.8},
+		"stasis_field": {"cost": 80.0, "cast_time": 0.05, "radius": 90.0, "duration": 0.8},
 		"radiant_lance": {"cost": 60.0, "cast_time": 0.2, "damage": 55.0, "length": 560.0, "width": 26.0, "duration": 0.3},
-		"meteor_slam": {"cost": 30.0, "cast_time": 0.1, "speed": 1400.0, "max_time": 1.2, "dive_damage": 20.0, "slam_damage": 50.0, "slam_radius": 140.0, "land_iframes": 0.35},
+		# Meteor Slam: cast on the ground, it first hops up (`hop_velocity`, at
+		# most `hop_time`) - a VULNERABLE wind-up - then dives invulnerable.
+		# No cast wind-up: in the air it dives at once.
+		"meteor_slam": {"cost": 30.0, "cast_time": 0.0, "hop_velocity": 520.0, "hop_time": 0.3, "speed": 1400.0, "max_time": 1.2,
+			"dive_damage": 20.0, "slam_damage": 50.0, "slam_radius": 140.0, "land_iframes": 0.35},
 	}
 
 
