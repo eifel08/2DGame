@@ -8,14 +8,24 @@ extends Node2D
 ## Any painted tile that is neither one-way nor hazard counts as solid.
 
 @export var room_id := "" ## Key used by WorldState and doors.
+## The room's normal area, when the tiles reach further (e.g. a hidden pocket
+## built outside it). Empty = all tiles. The camera stays inside it until a
+## hidden pocket out there is found (see Game._refresh_camera_bounds).
+@export var main_rect := Rect2()
 
 @onready var tiles: TileMapLayer = $Tiles
 
 
+## The normal room area: the camera's limits and the layout checks.
 func get_bounds() -> Rect2:
+	return main_rect if main_rect.has_area() else get_full_bounds()
+
+
+## Every tile, including hidden pockets beyond the normal area.
+func get_full_bounds() -> Rect2:
 	var used := tiles.get_used_rect()
 	var size := Vector2(tiles.tile_set.tile_size)
-	return Rect2(Vector2(used.position) * size, Vector2(used.size) * size)
+	return Rect2(tiles.to_global(Vector2(used.position) * size), Vector2(used.size) * size)
 
 
 ## Player spawn marker, or the first door's arrival point, or the room center.

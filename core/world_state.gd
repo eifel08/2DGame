@@ -17,7 +17,7 @@ var dead_enemies := {} ## room_id -> {spawn_id: tier}
 var defeated_bosses := {} ## boss_id -> true
 var cleared_arenas := {} ## arena_id -> true
 var collected_coins := {} ## room_id -> {coin_name: true}
-var secrets := {} ## secret_id -> true (broken walls, hidden passages, found illusion walls)
+var secrets := {} ## secret_id -> true (broken walls, found Type 1 hidden pockets)
 var relics := {} ## relic_id -> true
 
 

@@ -12,8 +12,9 @@ The same rules are repeated in the code, at the places that enforce them:
 | B | `core/game.gd` → `_ejection_arrival()` | `tools/build_assets.gd` → `_check_room_rules()`, smoke test "Rule B" |
 | C | `core/game.gd` → `_update_doors()`, `hit_breakable()`; `combat/combat_manager.gd` (breakable hits) | smoke test "Rule C" |
 | D | `effects/feedback.gd` (boss, arena, secret, relic handlers); `tools/build_assets.gd` (`FX`, `SOUNDS`) | smoke test "no celebration …" |
+| Secret walls (Type 1 / Type 2) | `world/objects/hidden_pocket_wall.gd`, `secret_doorway.gd` (base `secret_wall.gd`); `core/game.gd` → `_update_secret_walls()`, `_refresh_camera_bounds()` | `tools/build_assets.gd` → `_pocket_rect()` (pocket must be closed), smoke test "Type 1" / "secret doorway" |
 
-`world/objects/door.gd` and the room section of `tools/build_assets.gd` carry a short summary of all three rules.
+`world/objects/door.gd` and the room section of `tools/build_assets.gd` carry a short summary of the rules. The secret wall scripts each start with the rules of their type.
 
 ---
 
@@ -69,10 +70,51 @@ Feedback stays strictly environmental, and play continues at once:
 | Arena cleared | The gates open with a mechanical clunk (`gate`). No more enemies come. |
 | Secret wall broken | A crash (`break`), falling debris (`wall_break`, particles only), a light shake. |
 | Relic taken | A soft pickup sound (`pickup`) and a small puff (`relic_pickup`). The relic is gone. |
-| Illusion wall found | Nothing at all. The player simply walked through it; it quietly stays passable. |
+| Hidden pocket found (Type 1) | Nothing at all. The disguise and the cover simply are no longer there. |
+| Secret doorway used (Type 2) | Nothing beyond an ordinary room transition. |
 
 - Do not add sounds such as `victory`, `fanfare`, `secret` or `jingle`, nor effects such as `arena_clear` or `boss_death`. The smoke test fails if they exist.
 - The HUD has no banner or pop-up text system. Do not add one for these events.
+
+---
+
+## Secret walls — two types, never mixed
+
+A secret wall is a piece of "wall" the player can walk through **without attacking it**. (A wall you strike until it crumbles is a breakable wall: `Z`, Rule C.) There are exactly two types. They differ in purpose, lifetime and look, so each has its own script, scene and art nodes. Both extend `SecretWall` (`world/objects/secret_wall.gd`).
+
+| | Type 1 — Hidden Pocket | Type 2 — Secret Doorway |
+| --- | --- | --- |
+| Leads to | A pocket or alcove of the **same** room | A **different** room (a room transition) |
+| Script / scene | `HiddenPocketWall` — `world/objects/hidden_pocket_wall.gd` / `.tscn` | `SecretDoorway` — `world/objects/secret_doorway.gd` / `.tscn` (plus an ordinary `Door`) |
+| Layout letter | `I` (one wall per vertical run) | `X` bottom cell, `x` upper cells of the 3-tall gap |
+| Lifetime | Revealed **once and for good** by the first pass. Saved (`WorldState.secrets`). | **Never consumed.** Usable back and forth, as often as you like. Not saved. |
+| Before / after | Disguised, then gone: wall and cover disappear | Always the same |
+| Collision | One-way until found (entry side only), then open both ways. Enemies never pass. | None. The `Door` behind it does the transition. |
+| Look | Disguise drawn semi-transparent (placeholder, 50 %). The pocket's contents are covered. | Entry side: **semi-transparent**. Exit side (inside the secret room): **looks exactly like the wall**. |
+| Art nodes | `Visual` (the disguise), `Cover` (hides the pocket), optional `AnimationPlayer` clip `reveal` | `EntryVisual`, `ExitVisual`, optional `AnimationPlayer` clip `pass` |
+
+### Type 1 — Hidden Pocket (alcove inside the room)
+
+**A hidden pocket wall hides a small pocket of the current room. The pocket and everything in it stay completely hidden until the player first passes through the wall; from then on the pocket is permanently revealed.**
+
+- **Hidden until found.** The `Cover` node lies over the whole pocket (`pocket_rect`, found by flood fill at build time). Items, shards, enemies and doors inside cannot be seen. The cover is drawn above pickups and enemies, below the player.
+- **One-way until found.** From the entry side (`pass_dir`) the player walks straight in. From the pocket side the wall is solid. The pocket must be closed on every other side; the generator reports an error if it leaks into the room.
+- **Found by passing through.** The first full pass reveals it **for good**: the disguise and the cover disappear, the wall is open both ways, and `WorldState.secrets` stores its `secret_id`. A room change, a death or a save load never hides it again. Finding it is silent (Rule D).
+- **Camera.** A pocket outside the room's normal area (`Room.main_rect`, set by `origin_x` in a layout) is kept off-screen: the camera limits stop at the normal room edge until the pocket is found. `Game._refresh_camera_bounds()` then adds the pocket, and the camera may scroll into it. A pocket inside the normal area changes nothing.
+- **Shards inside** use `*` (named `PocketCoinN`), so adding a pocket never renames the room's other shards (saves refer to them by name).
+- Current instances:
+  - **Upper Galleries, east:** the alcove under the east block, near the room's right edge, entered from the left. It holds two shards and a training dummy.
+  - **Testing Halls, far west:** the west wall at floor level hides a pocket **beyond the room's normal left edge** (the layout's `origin_x = -7` columns). Before it is found, the camera never scrolls left of the room. It holds two shards.
+
+### Type 2 — Secret Doorway (hidden room transition)
+
+**A secret doorway is a standard side door to another room, disguised as wall. It works like any room transition and never disappears.**
+
+- It sits in an ordinary 3-tall side-door gap with a `Door` node; walking into the "wall" moves the player to the other room. No attack, no key.
+- **Reusable:** back and forth, as often as you like. Nothing is saved and nothing changes after use.
+- **Visual asymmetry:** the room you discover it from has the **entry** side (`side = "entry"`): drawn **semi-transparent**, so an attentive player can spot it. The secret room has the **exit** side (`side = "exit"`): it looks **exactly like the surrounding wall**, using the same tile, because the player already knows the way back.
+- A secret doorway is the one exception to "no visual markers on exits": its disguise is drawn on purpose.
+- Current instance: **Upper Galleries, west wall (entry) ⇄ Hidden Vault, east wall (exit).**
 
 ---
 
@@ -82,7 +124,8 @@ Feedback stays strictly environmental, and play continues at once:
 2. Exit going **down** into this room (ceiling gap): ground under the whole gap within 4 tiles (**Rule A**).
 3. Exit going **up** into this room (floor gap): standable floor on at least one side of the gap (**Rule B**).
 4. Secret exit: `Z` / `z` in the outer wall, never a normal door; keep it usable during arenas (**Rule C**).
-5. No visual markers on exits: an exit is just a missing piece of wall.
+5. No visual markers on exits: an exit is just a missing piece of wall. (Only a Type 2 secret doorway is drawn, as a disguise.)
 6. No celebration when anything in the room is won or found (**Rule D**).
-7. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
-8. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.
+7. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
+8. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
+9. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.

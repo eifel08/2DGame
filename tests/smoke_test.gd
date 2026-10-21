@@ -253,8 +253,8 @@ func _run() -> void:
 	# --- Meteor Slam ground hop, Stasis cost, camera look up / down ---
 	await _test_slam_hop_and_look()
 
-	# --- Hidden / illusion walls: one-way, found by walking through, persistent ---
-	await _test_hidden_wall()
+	# --- Secret walls: Type 1 hidden pockets (incl. camera limits), Type 2 secret doorways ---
+	await _test_secret_walls()
 
 	# --- Contact damage + i-frames ---
 	await _reset()
@@ -604,7 +604,7 @@ func _run() -> void:
 	await _frames(40)
 
 	# --- Layout: no open space beyond walls, camera never shows outside the room ---
-	for rid in ["test_room", "boss_room", "arena_room", "secret_room", "upper_room"]:
+	for rid in ["test_room", "boss_room", "arena_room", "secret_room", "upper_room", "hidden_vault"]:
 		game.load_room(rid)
 		await _frames(2)
 		var uncovered := []
@@ -617,7 +617,11 @@ func _run() -> void:
 			if not covered:
 				uncovered.append(cell)
 		_check("%s: every border opening is a door" % rid, uncovered.is_empty(), uncovered)
-		var bounds: Rect2 = game.room.get_bounds()
+		# The camera limits: the room's normal area plus any found hidden pocket,
+		# never beyond the room's tiles.
+		var bounds: Rect2 = game.camera.bounds
+		_check("%s: camera limits lie within the room's tiles" % rid,
+			game.room.get_full_bounds().grow(0.5).encloses(bounds) and bounds.encloses(game.room.get_bounds()), [bounds, game.room.get_full_bounds()])
 		var view_ok := true
 		for corner in [bounds.position + Vector2(40, 40), Vector2(bounds.end.x - 40, bounds.position.y + 40),
 				Vector2(bounds.position.x + 40, bounds.end.y - 40), bounds.end - Vector2(40, 40)]:
@@ -1654,33 +1658,58 @@ func _test_slam_hop_and_look() -> void:
 	await _reset()
 
 
-func _test_hidden_wall() -> void:
+func _test_secret_walls() -> void:
+	await _test_hidden_pocket()
+	await _test_west_pocket_camera()
+	await _test_secret_doorway()
+	# The two types are documented for designers and AI assistants alike.
+	var doc := FileAccess.get_file_as_string("res://GUIDELINES.md")
+	var documented := true
+	for needle in ["## Secret walls", "Type 1", "Type 2", "Hidden Pocket", "Secret Doorway",
+			"HiddenPocketWall", "SecretDoorway", "camera", "semi-transparent", "back and forth"]:
+		documented = documented and doc.contains(needle)
+	_check("GUIDELINES.md documents both secret wall types", documented)
+
+
+## Type 1 in the Upper Galleries: the alcove under the east block.
+func _test_hidden_pocket() -> void:
 	var p: Player = game.player
-	game.world.secrets.erase("galleries_illusion")
+	game.world.secrets.erase("galleries_alcove")
 	var wall := await _enter_galleries(-120.0)
-	_check("the Upper Galleries have an illusion wall", wall != null and wall.secret_id == "galleries_illusion" and wall.pass_dir == 1)
+	_check("the Upper Galleries have a Type 1 hidden pocket", wall != null and wall.secret_id == "galleries_alcove" and wall.pass_dir == 1)
 	if wall == null:
 		return
 	var visual := wall.get_node("Visual") as CanvasItem
-	_check("illusion wall placeholder is drawn at 50% opacity", is_equal_approx(visual.modulate.a, 0.5), visual.modulate)
-	_check("illusion wall is not a tile (no attack or tile collision involved)",
-		not game.room.is_solid_at(wall.get_rect().get_center()))
-	_check("enemies always collide with illusion walls",
-		(game.enemies.is_empty() or game.enemies[0].collision_mask & (1 << (HiddenWall.ENEMY_LAYER - 1)) != 0)
-		and p.collision_mask & (1 << (HiddenWall.PLAYER_LAYER - 1)) != 0)
+	_check("Type 1 placeholder wall is drawn at 50% opacity", is_equal_approx(visual.modulate.a, 0.5) and visual.visible, visual.modulate)
+	_check("Type 1 is not a tile (no attack or tile collision involved)", not game.room.is_solid_at(wall.get_rect().get_center()))
+	_check("enemies always collide with hidden pocket walls",
+		game.enemies[0].collision_mask & (1 << (HiddenPocketWall.ENEMY_LAYER - 1)) != 0
+		and p.collision_mask & (1 << (HiddenPocketWall.PLAYER_LAYER - 1)) != 0)
+	# Everything inside the pocket is covered until it is found.
+	var cover := wall.get_node("Cover") as Node2D
+	var inside := []
+	for c in game.coins:
+		if wall.pocket_rect.has_point(c.global_position - Vector2(0, 4)):
+			inside.append(c.name)
+	var spawn_inside := false
+	for sp in game.room.get_enemy_spawns():
+		spawn_inside = spawn_inside or wall.pocket_rect.has_point(sp.position - Vector2(0, 4))
+	_check("the pocket holds shards and an enemy", inside.size() == 2 and spawn_inside, [inside, wall.pocket_rect])
+	_check("an unfound pocket is covered: its shards and enemies are hidden",
+		wall.is_covered() and cover.z_index > 2 and cover.get_child_count() >= 6, [cover.z_index, cover.get_child_count()])
 	var left_edge := wall.get_rect().position.x
 	var right_edge := wall.get_rect().end.x
 
-	# Undiscovered and approached from the far side (inside the alcove): solid.
+	# Unfound and approached from the pocket side: solid.
 	await _place_galleries(wall, 70.0)
 	await _hold(&"move_left", 45)
-	_check("an unfound illusion wall is solid from the far side",
+	_check("an unfound pocket wall is solid from the pocket side",
 		p.global_position.x >= right_edge + Player.WIDTH / 2.0 - 1.0 and wall.player_blocked and not wall.discovered, p.global_position)
 
-	# From the entry side: walk straight through, no attack. That finds it.
+	# From the entry side: walk straight through, no attack. Found for good.
 	var found := []
 	var on_found := func(id: String) -> void: found.append(id)
-	Events.hidden_wall_found.connect(on_found)
+	Events.hidden_pocket_found.connect(on_found)
 	await _place_galleries(wall, -90.0)
 	var hp := p.health.health
 	var fx_before: Dictionary = game.effects.play_counts.duplicate()
@@ -1692,55 +1721,178 @@ func _test_hidden_wall() -> void:
 		if p.global_position.x > right_edge + Player.WIDTH:
 			break
 	Input.action_release(&"move_right")
-	Events.hidden_wall_found.disconnect(on_found)
-	_check("the player walks through an illusion wall from the entry side",
+	Events.hidden_pocket_found.disconnect(on_found)
+	_check("the player walks through a Type 1 wall from the entry side",
 		passed_inside and p.global_position.x > right_edge + Player.WIDTH / 2.0 and p.attack_dir == "" and is_equal_approx(p.health.health, hp), p.global_position)
-	_check("walking through finds it and saves it to the world state",
-		wall.discovered and game.world.is_secret_open("galleries_illusion") and found == ["galleries_illusion"], [wall.discovered, found])
-	_check("finding an illusion wall plays no effect (Rule D)", game.effects.play_counts == fx_before, game.effects.play_counts)
+	_check("passing through finds the pocket and saves it",
+		wall.discovered and game.world.is_secret_open("galleries_alcove") and found == ["galleries_alcove"], [wall.discovered, found])
+	_check("a found pocket is permanently un-hidden (wall and cover gone)", not wall.is_covered() and not visual.visible)
+	_check("finding a pocket plays no effect (Rule D)", game.effects.play_counts == fx_before, game.effects.play_counts)
 	await _hold(&"move_left", 45)
-	_check("a found illusion wall is passable from the far side too", p.global_position.x < left_edge - Player.WIDTH / 2.0, p.global_position)
+	_check("a found pocket wall is passable both ways", p.global_position.x < left_edge - Player.WIDTH / 2.0, p.global_position)
 
-	# Room transition: leave and come back; it stays found.
+	# Room transition: it stays revealed.
 	game.load_room("test_room", "ceiling", 0.0, Vector2(0, 100))
 	await _frames(20)
 	wall = await _enter_galleries(70.0)
-	_check("after a room transition the illusion wall is still found", wall.discovered and not wall.player_blocked, wall.discovered)
+	_check("after a room transition the pocket is still revealed", wall.discovered and not wall.is_covered() and not wall.player_blocked)
 	await _hold(&"move_left", 45)
-	_check("after a room transition it is still passable from the far side", p.global_position.x < wall.get_rect().position.x - Player.WIDTH / 2.0, p.global_position)
+	_check("after a room transition its wall is still open", p.global_position.x < wall.get_rect().position.x - Player.WIDTH / 2.0, p.global_position)
 
 	# Save data: lost on a new game, restored by loading the save.
 	var data: Dictionary = game.make_save_data()
-	_check("the save file lists the found illusion wall", (data.secrets as Array).has("galleries_illusion"), data.secrets)
+	_check("the save file lists the found pocket", (data.secrets as Array).has("galleries_alcove"), data.secrets)
 	game.world.new_game()
 	wall = await _enter_galleries(70.0)
-	_check("without the save it is a mystery again (sanity check)", not wall.discovered)
+	_check("without the save it is hidden again (sanity check)", not wall.discovered and wall.is_covered())
 	game.apply_save_data(data)
 	await _frames(5)
 	wall = await _enter_galleries(70.0)
-	_check("loading the save restores the found illusion wall", wall.discovered and not wall.player_blocked, wall.discovered)
-
-	# Strictly one-way variant: found, yet still solid from the far side.
-	wall.opens_both_ways = false
-	await _place_galleries(wall, 70.0)
-	await _hold(&"move_left", 45)
-	_check("a strictly one-way illusion wall stays solid from the far side",
-		p.global_position.x >= wall.get_rect().end.x + Player.WIDTH / 2.0 - 1.0 and wall.player_blocked, p.global_position)
-	wall.opens_both_ways = true
+	_check("loading the save restores the revealed pocket", wall.discovered and not wall.is_covered() and not wall.player_blocked)
 	await _reset()
 
 
-## Loads the Upper Galleries (no door), clears its enemies and puts the player
-## on the floor `dx` px from the illusion wall. Returns the wall.
-func _enter_galleries(dx: float) -> HiddenWall:
+## Type 1 beyond the room's normal area: the Testing Halls' west pocket.
+## The camera may not scroll there until the player has broken through.
+func _test_west_pocket_camera() -> void:
+	var p: Player = game.player
+	var cam: CameraRig = game.camera
+	game.world.secrets.erase("halls_west_alcove")
+	game.load_room("test_room")
+	var wall: HiddenPocketWall = game.hidden_pockets[0] if not game.hidden_pockets.is_empty() else null
+	_check("the Testing Halls have a west Type 1 pocket", wall != null and wall.secret_id == "halls_west_alcove" and wall.pass_dir == -1)
+	if wall == null:
+		return
+	var floor_y: float = wall.global_position.y
+	_check("the west pocket lies outside the room's normal area",
+		is_zero_approx(game.room.get_bounds().position.x) and game.room.get_full_bounds().position.x < 0.0
+		and wall.pocket_rect.end.x <= 0.0 and wall.is_covered(), [game.room.get_bounds(), wall.pocket_rect])
+	_check("unfound, the camera limits stop at the normal room edge", is_zero_approx(cam.bounds.position.x), cam.bounds)
+	p.fsm.change("normal")
+	p.global_position = Vector2(60.0, floor_y)
+	p.velocity = Vector2.ZERO
+	cam.snap_to(p)
+	await _frames(30)
+	_check("standing at the west wall, the camera shows nothing left of the room", cam.view_rect().position.x >= -0.5, cam.view_rect())
+
+	# From inside the pocket (unfound): solid toward the room.
+	p.global_position = Vector2(wall.pocket_rect.get_center().x, floor_y)
+	p.velocity = Vector2.ZERO
+	await _frames(8)
+	await _hold(&"move_right", 45)
+	_check("the unfound west wall is solid from the pocket side",
+		p.global_position.x <= wall.get_rect().position.x - Player.WIDTH / 2.0 + 1.0 and not wall.discovered, p.global_position)
+
+	# Break through from the room: found, and the camera may now follow.
+	p.global_position = Vector2(90.0, floor_y)
+	p.velocity = Vector2.ZERO
+	cam.snap_to(p)
+	await _frames(8)
+	Input.action_press(&"move_left")
+	var clamped_while_entering := true
+	for i in 90:
+		await _frames(1)
+		if not wall.discovered:
+			clamped_while_entering = clamped_while_entering and cam.view_rect().position.x >= -0.5
+		if p.global_position.x < wall.pocket_rect.get_center().x:
+			break
+	Input.action_release(&"move_left")
+	_check("the camera stays clamped until the player breaks through", clamped_while_entering)
+	_check("breaking through finds the west pocket", wall.discovered and not wall.is_covered() and game.world.is_secret_open("halls_west_alcove"))
+	_check("once found, the camera limits include the pocket", cam.bounds.position.x <= wall.pocket_rect.position.x, cam.bounds)
+	await _frames(60)
+	var full: Rect2 = game.room.get_full_bounds().grow(1.0)
+	_check("the camera scrolls left to show the pocket, never past the tiles",
+		cam.view_rect().position.x < 0.0 and full.encloses(cam.view_rect()), cam.view_rect())
+
+	# The reveal is permanent: after leaving and coming back, the camera may still go there.
 	game.load_room("upper_room")
-	var wall: HiddenWall = game.hidden_walls[0] if not game.hidden_walls.is_empty() else null
+	game.load_room("test_room")
+	wall = game.hidden_pockets[0]
+	_check("after a room transition the west pocket stays found and in camera range",
+		wall.discovered and not wall.is_covered() and cam.bounds.position.x <= wall.pocket_rect.position.x, cam.bounds)
+	await _reset()
+
+
+## Type 2 between the Upper Galleries (entry side) and the Hidden Vault (exit side).
+func _test_secret_doorway() -> void:
+	var p: Player = game.player
+	game.load_room("upper_room")
+	var doorway: SecretDoorway = game.secret_doorways[0] if not game.secret_doorways.is_empty() else null
+	_check("the Upper Galleries have a Type 2 secret doorway", doorway != null and doorway.is_entry())
+	if doorway == null:
+		return
+	var entry := doorway.get_node("EntryVisual") as CanvasItem
+	var exit := doorway.get_node("ExitVisual") as CanvasItem
+	_check("entry side: semi-transparent", entry.visible and not exit.visible and is_equal_approx(entry.modulate.a, 0.5), entry.modulate)
+	_check("a secret doorway has no collision and no tile",
+		not game.room.is_solid_at(doorway.get_rect().get_center()) and doorway.find_children("*", "CollisionObject2D").is_empty())
+	var secrets_before: int = game.world.secrets.size()
+	var trips := 0
+	for trip in 2: # Back and forth twice: it never disappears.
+		await _walk_galleries_to_vault(doorway)
+		if game.room_id != "hidden_vault":
+			break
+		var back: SecretDoorway = game.secret_doorways[0]
+		var exit_visual := back.get_node("ExitVisual") as CanvasItem
+		var tiles: TileMapLayer = game.room.tiles
+		var wall_cell := tiles.local_to_map(tiles.to_local(back.get_rect().position + Vector2(16, -16)))
+		var sprite := exit_visual.get_child(0) as Sprite2D if exit_visual.get_child_count() > 0 else null
+		_check("exit side (trip %d): looks exactly like the wall next to it" % (trip + 1),
+			not back.is_entry() and exit_visual.visible and is_equal_approx(exit_visual.modulate.a, 1.0)
+			and not (back.get_node("EntryVisual") as CanvasItem).visible and sprite != null
+			and int(sprite.region_rect.position.x / 32.0) == tiles.get_cell_atlas_coords(wall_cell).x,
+			[exit_visual.modulate, sprite.region_rect if sprite else null, tiles.get_cell_atlas_coords(wall_cell)])
+		p.global_position = back.global_position + Vector2(-90.0, 0.0)
+		p.velocity = Vector2.ZERO
+		await _frames(8)
+		Input.action_press(&"move_right")
+		for i in 90:
+			await _frames(1)
+			if game.room_id == "upper_room":
+				break
+		Input.action_release(&"move_right")
+		if game.room_id != "upper_room":
+			break
+		doorway = game.secret_doorways[0]
+		trips += 1
+	_check("a secret doorway works back and forth, again and again", trips == 2, [trips, game.room_id])
+	_check("the entry side stays semi-transparent after use (never consumed)",
+		doorway.is_entry() and (doorway.get_node("EntryVisual") as CanvasItem).visible
+		and is_equal_approx((doorway.get_node("EntryVisual") as CanvasItem).modulate.a, 0.5))
+	_check("a secret doorway is not saved as a found secret", game.world.secrets.size() == secrets_before, game.world.secrets)
+	await _reset()
+
+
+func _walk_galleries_to_vault(doorway: SecretDoorway) -> void:
+	var p: Player = game.player
+	for e in game.enemies:
+		e.kill()
+	p.fsm.change("normal")
+	p.global_position = doorway.global_position + Vector2(90.0, 0.0)
+	p.velocity = Vector2.ZERO
+	await _frames(8)
+	Input.action_press(&"move_left")
+	for i in 90:
+		await _frames(1)
+		if game.room_id == "hidden_vault":
+			break
+	Input.action_release(&"move_left")
+	await _frames(4)
+	_check("walking into the secret doorway enters the Hidden Vault", game.room_id == "hidden_vault", game.room_id)
+
+
+## Loads the Upper Galleries (no door), clears its enemies and puts the player
+## on the floor `dx` px from the hidden pocket wall. Returns the wall.
+func _enter_galleries(dx: float) -> HiddenPocketWall:
+	game.load_room("upper_room")
+	var wall: HiddenPocketWall = game.hidden_pockets[0] if not game.hidden_pockets.is_empty() else null
 	if wall:
 		await _place_galleries(wall, dx)
 	return wall
 
 
-func _place_galleries(wall: HiddenWall, dx: float) -> void:
+func _place_galleries(wall: HiddenPocketWall, dx: float) -> void:
 	var p: Player = game.player
 	for e in game.enemies:
 		e.kill()

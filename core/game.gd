@@ -19,6 +19,7 @@ const ROOM_SCENES := {
 	"arena_room": preload("res://world/arena_room.tscn"),
 	"secret_room": preload("res://world/secret_room.tscn"),
 	"upper_room": preload("res://world/upper_room.tscn"),
+	"hidden_vault": preload("res://world/hidden_vault.tscn"),
 }
 const START_ROOM := "test_room"
 const ENEMY_SCENES := {
@@ -63,7 +64,8 @@ var interactables: Array[Interactable] = []
 var doors: Array[Door] = []
 var coins: Array[Coin] = []
 var breakables: Array[BreakableWall] = []
-var hidden_walls: Array[HiddenWall] = []
+var hidden_pockets: Array[HiddenPocketWall] = [] ## Type 1 secret walls in this room.
+var secret_doorways: Array[SecretDoorway] = [] ## Type 2 secret walls in this room.
 var relics: Array[Relic] = []
 var playtime := 0.0
 ## Set false before adding to the tree to skip the opening trance (tests).
@@ -159,7 +161,7 @@ func _physics_process(delta: float) -> void:
 	if feedback.step_hitstop(delta):
 		return
 
-	_update_hidden_walls() # Before the player moves: sets each wall solid or passable.
+	_update_secret_walls() # Before the player moves: sets each pocket wall solid or passable.
 	player.step(delta)
 	for enemy in enemies:
 		enemy.step(delta)
@@ -227,7 +229,8 @@ func _load_room_scene(id: String) -> void:
 	interactables.clear()
 	doors.clear()
 	breakables.clear()
-	hidden_walls.clear()
+	hidden_pockets.clear()
+	secret_doorways.clear()
 	relics.clear()
 	current_checkpoint = null
 	focused_interactable = null
@@ -257,10 +260,12 @@ func _load_room_scene(id: String) -> void:
 			breakables.append(node)
 			if world.is_secret_open(node.secret_id):
 				node.open()
-		if node is HiddenWall:
-			hidden_walls.append(node)
+		if node is HiddenPocketWall:
+			hidden_pockets.append(node)
 			if world.is_secret_open(node.secret_id):
-				node.reveal() # Found before: never a mystery again.
+				node.reveal() # Found before: never hidden again.
+		if node is SecretDoorway:
+			secret_doorways.append(node)
 		if node is Relic:
 			relics.append(node)
 			if world.has_relic(node.relic_id):
@@ -272,6 +277,7 @@ func _load_room_scene(id: String) -> void:
 	_spawn_room_enemies()
 	arena_director.setup(self, room.get_arena())
 	camera.setup(room.get_bounds())
+	_refresh_camera_bounds()
 	Events.room_entered.emit(id)
 
 
@@ -399,15 +405,30 @@ func _update_doors() -> void:
 			return
 
 
-## Illusion walls: one-way until walked through, then found for good
-## (saved like a broken wall). Finding one is silent (Rule D).
-func _update_hidden_walls() -> void:
+## Secret walls (GUIDELINES.md). Type 1 hidden pockets: one-way until walked
+## through, then found for good (saved like a broken wall) and the camera may
+## show the pocket. Type 2 secret doorways are ordinary doors underneath;
+## they only get the chance to animate. Finding a pocket is silent (Rule D).
+func _update_secret_walls() -> void:
 	var pr := player.get_rect()
-	for wall in hidden_walls:
+	for wall in hidden_pockets:
 		if wall.update_for(pr):
 			world.open_secret(wall.secret_id)
-			Events.hidden_wall_found.emit(wall.secret_id)
+			Events.hidden_pocket_found.emit(wall.secret_id)
+			_refresh_camera_bounds()
 			write_save()
+	for doorway in secret_doorways:
+		doorway.update_for(pr)
+
+
+## Camera limits: the room's normal area, plus every FOUND hidden pocket that
+## lies outside it. An unfound pocket out there stays off-screen.
+func _refresh_camera_bounds() -> void:
+	var bounds := room.get_bounds()
+	for wall in hidden_pockets:
+		if wall.discovered:
+			bounds = bounds.merge(wall.camera_rect())
+	camera.bounds = bounds
 
 
 ## Openings switch rooms at once, with no fade, sound or wait. The load

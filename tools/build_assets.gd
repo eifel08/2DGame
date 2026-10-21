@@ -22,31 +22,34 @@ const TS := 32
 ## 'N' guide NPC  'W' / 'K' / 'U' lore tablets  'T' checkpoint info tablet (see LORE)
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. The flying dummy above the right pit is for pogo chains.
+## The first 7 columns lie LEFT of the normal room (origin_x = -7): solid rock
+## around a hidden pocket (Type 1) behind the west wall. The camera only goes
+## there once the pocket is found.
 const ROOM_LAYOUT := [
-	"##############################O...##############################",
-	"#..............................................................#",
-	"#..............................................................#",
-	"#..............................................................#",
-	"#..$..........................####.............................#",
-	"#=====..................#####.##.......................$.G.....#",
-	"#.....##......................##....................########...#",
-	"#.....##......................##..........................##...#",
-	"#.....##.....$................##..............$...........##...#",
-	"#.....##...======.............##............======........##...#",
-	"#.....##..................F...##..........................##...#",
-	"#.....##................$.....##..........................##...#",
-	"#.....##..............=====...##.....$....................##...#",
-	"#.....##......................##...####...................##...#",
-	"#.....##..........$...........##..........................##...#",
-	"#.....##........=====.........##..........................##...#",
-	"#.....##......................##..........................##...#",
-	"#.....##....$.................##.................F........##...#",
-	"#.....##..=====...........................K...............##...#",
-	"#.....##................................####....................",
-	"#.......................................####....................",
-	"#..W...T..S....N...........U..$$.E.....C####..........E.....C..D",
-	"##################^^^^########################^^^^^^^###########",
-	"################################################################",
+	"#####################################O...##############################",
+	"########..............................................................#",
+	"########..............................................................#",
+	"########..............................................................#",
+	"########..$..........................####.............................#",
+	"########=====..................#####.##.......................$.G.....#",
+	"########.....##......................##....................########...#",
+	"########.....##......................##..........................##...#",
+	"########.....##.....$................##..............$...........##...#",
+	"########.....##...======.............##............======........##...#",
+	"########.....##..................F...##..........................##...#",
+	"########.....##................$.....##..........................##...#",
+	"########.....##..............=====...##.....$....................##...#",
+	"########.....##......................##...####...................##...#",
+	"########.....##..........$...........##..........................##...#",
+	"########.....##........=====.........##..........................##...#",
+	"########.....##......................##..........................##...#",
+	"########.....##....$.................##.................F........##...#",
+	"########.....##..=====...........................K...............##...#",
+	"##.....#.....##................................####....................",
+	"##.....I.......................................####....................",
+	"##.*.*.I..W...T..S....N...........U..$$.E.....C####..........E.....C..D",
+	"#########################^^^^########################^^^^^^^###########",
+	"#######################################################################",
 ]
 
 ## Boss room: a sealed arena. Letters are arena wave markers:
@@ -120,6 +123,8 @@ const SECRET_LAYOUT := [
 
 ## Upper Galleries: a side room above the Test Room, entered through the
 ## ceiling gap ('O' = floor gap here, 4 cells wide). Standard enemies only.
+## West wall: a secret doorway (Type 2, 'X'/'x') to the Hidden Vault.
+## East: a hidden pocket (Type 1, 'I') under the block, with shards and a dummy.
 const UPPER_LAYOUT := [
 	"########################################",
 	"#......................................#",
@@ -134,11 +139,35 @@ const UPPER_LAYOUT := [
 	"#..................................$...#",
 	"#..............======...........########",
 	"#...............................########",
-	"#...............................I......#",
-	"#...............................I......#",
-	"#..$........E..........G......E.I..$.$.#",
+	"x...............................I......#",
+	"x...............................I......#",
+	"X..$........E..........G......E.I..*E*.#",
 	"####....################################",
 	"####O...################################",
+]
+
+## Hidden Vault: a secret room behind the Upper Galleries' west wall (at
+## least one screen in size, like every room, so the camera stays inside).
+## Its east doorway is the exit side of the secret doorway: it looks like wall.
+const VAULT_LAYOUT := [
+	"################################",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............................#",
+	"#..............$$..............#",
+	"#............======............#",
+	"#..............................#",
+	"#..............................#",
+	"#.........$..........$.........#",
+	"#.......=====......=====.......#",
+	"#..............................#",
+	"#..............................x",
+	"#..............................x",
+	"#....$......$.....$......$.....X",
+	"################################",
+	"################################",
 ]
 
 ## Rooms: layout, output scene, doors (per letter) and optional arena.
@@ -162,16 +191,28 @@ const UPPER_LAYOUT := [
 ## 'O' ceiling or floor gap ("width" cells from the letter to the right),
 ## 'Z' side doorway hidden behind a breakable wall that fills the gap ('z'
 ## marks the upper cells of that gap; they count as solid for tile edges).
-## 'I' illusion wall cells (HiddenWall): no tile, one object per vertical run,
-## passable from the side given by the room's "hidden_walls" entry.
-## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(hidden wall)-> Hidden Shrine
+## Secret walls (GUIDELINES.md, "Secret walls"):
+## 'I' Type 1 hidden pocket wall (HiddenPocketWall): no tile, one object per
+##     vertical run; the room's "hidden_pocket" entry gives its secret_id and
+##     entry side. The pocket behind it is found by flood fill and covered.
+## 'X' Type 2 secret doorway: a side door (bottom cell, like 'D') disguised by
+##     a SecretDoorway; 'x' marks the upper cells of its gap. The door's
+##     "secret_doorway" key is "entry" (semi-transparent) or "exit" (looks solid).
+## "origin_x" (optional, negative): the layout starts that many columns left
+## of x = 0; the room's normal area (camera limits) starts at x = 0.
+## '*' a shard inside a hidden pocket (named PocketCoinN, so adding a pocket
+##     never renames the room's other shards, which saves refer to by name).
+## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(breakable wall)-> Hidden Shrine
+##             Test Room <-(ceiling gap)-> Upper Galleries <-(secret doorway)-> Hidden Vault
 const ROOMS := {
 	"test_room": {
-		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn",
+		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn", "origin_x": -7,
 		"doors": {
 			"D": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1},
 			"O": {"door_id": "ceiling", "target_room": "upper_room", "target_door": "floor", "vertical": -1, "width": 4},
 		},
+		# Type 1: the west wall hides a pocket beyond the room's normal area.
+		"hidden_pocket": {"secret_id": "halls_west_alcove", "pass_dir": -1},
 	},
 	"boss_room": {
 		"name": "BossRoom", "layout": BOSS_LAYOUT, "path": "res://world/boss_room.tscn",
@@ -197,9 +238,16 @@ const ROOMS := {
 	},
 	"upper_room": {
 		"name": "UpperRoom", "layout": UPPER_LAYOUT, "path": "res://world/upper_room.tscn",
-		"doors": {"O": {"door_id": "floor", "target_room": "test_room", "target_door": "ceiling", "vertical": 1, "width": 4}},
-		# Illusion wall into the alcove under the east block: enter from the left.
-		"hidden_wall": {"secret_id": "galleries_illusion", "pass_dir": 1},
+		"doors": {
+			"O": {"door_id": "floor", "target_room": "test_room", "target_door": "ceiling", "vertical": 1, "width": 4},
+			"X": {"door_id": "west", "target_room": "hidden_vault", "target_door": "east", "inward": 1, "secret_doorway": "entry"},
+		},
+		# Type 1: the alcove under the east block, entered from the left.
+		"hidden_pocket": {"secret_id": "galleries_alcove", "pass_dir": 1},
+	},
+	"hidden_vault": {
+		"name": "HiddenVault", "layout": VAULT_LAYOUT, "path": "res://world/hidden_vault.tscn",
+		"doors": {"X": {"door_id": "east", "target_room": "upper_room", "target_door": "west", "inward": -1, "secret_doorway": "exit"}},
 	},
 }
 const ARENA_KINDS := {"w": "weak", "u": "weak", "v": "flyer", "s": "strong", "B": "boss"}
@@ -220,7 +268,8 @@ const COIN_SCENE := "res://world/objects/coin.tscn"
 const DOOR_SCENE := "res://world/objects/door.tscn"
 const BREAKABLE_SCENE := "res://world/objects/breakable_wall.tscn"
 const RELIC_SCENE := "res://world/objects/relic.tscn"
-const HIDDEN_WALL_SCENE := "res://world/objects/hidden_wall.tscn"
+const HIDDEN_POCKET_SCENE := "res://world/objects/hidden_pocket_wall.tscn"
+const SECRET_DOORWAY_SCENE := "res://world/objects/secret_doorway.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -900,6 +949,10 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 	_add(root, objects)
 	var counts := {}
 
+	var ox: int = def.get("origin_x", 0) # Layout column 0 is at cell ox.
+	if ox != 0:
+		root.set("main_rect", Rect2(0.0, 0.0, ((layout[0] as String).length() + ox) * TS, layout.size() * TS))
+
 	var arena_def: Dictionary = def.get("arena", {})
 	var arena: Node2D = null
 	var wave_nodes := []
@@ -911,8 +964,8 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 		var row: String = layout[y]
 		for x in row.length():
 			var ch := row[x]
-			var cell := Vector2i(x, y)
-			var feet := Vector2(x * TS + TS / 2.0, (y + 1) * TS)
+			var cell := Vector2i(x + ox, y)
+			var feet := Vector2((x + ox) * TS + TS / 2.0, (y + 1) * TS)
 			match ch:
 				"#":
 					tiles.set_cell(cell, 0, Vector2i(_edge_mask(layout, x, y), 0))
@@ -931,6 +984,8 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, CHECKPOINT_SCENE, "Checkpoint", feet, {})
 				"$":
 					_add_object(root, objects, counts, COIN_SCENE, "Coin", feet, {})
+				"*": # A shard inside a hidden pocket: own names, so other shards keep theirs.
+					_add_object(root, objects, counts, COIN_SCENE, "PocketCoin", feet, {})
 				"N":
 					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
 				"W", "K", "U", "T", "Q":
@@ -942,7 +997,7 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					var w: float = door_def.get("width", 1) * TS
 					door_def.erase("width")
 					door_def["trigger_size"] = Vector2(w, 24.0 if door_def.vertical == -1 else 40.0)
-					var origin := Vector2(x * TS + w / 2.0, y * TS if door_def.vertical == -1 else (y + 1) * TS)
+					var origin := Vector2((x + ox) * TS + w / 2.0, y * TS if door_def.vertical == -1 else (y + 1) * TS)
 					_add_object(root, objects, counts, DOOR_SCENE, "Door", origin, door_def)
 				"Z": # Rule C: a secret door is never locked by the arena.
 					var secret_def: Dictionary = def.doors[ch].duplicate()
@@ -951,15 +1006,23 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, BREAKABLE_SCENE, "BreakableWall", feet, {"secret_id": def.secret_id})
 				"R":
 					_add_object(root, objects, counts, RELIC_SCENE, "Relic", feet, def.relic)
-				"I": # One HiddenWall per vertical run, placed at its bottom cell.
+				"I": # Type 1: one HiddenPocketWall per vertical run, at its bottom cell.
 					if y + 1 < layout.size() and x < (layout[y + 1] as String).length() and layout[y + 1][x] == "I":
 						continue
 					var run := 1
 					while y - run >= 0 and layout[y - run][x] == "I":
 						run += 1
-					var hw: Dictionary = def.hidden_wall.duplicate()
-					hw["size"] = Vector2(TS, run * TS)
-					_add_object(root, objects, counts, HIDDEN_WALL_SCENE, "HiddenWall", feet, hw)
+					var hp: Dictionary = def.hidden_pocket.duplicate()
+					hp["size"] = Vector2(TS, run * TS)
+					hp["pocket_rect"] = _pocket_rect(layout, x, y - run + 1, y, hp.pass_dir, ox)
+					_add_object(root, objects, counts, HIDDEN_POCKET_SCENE, "HiddenPocketWall", feet, hp)
+				"X": # Type 2: an ordinary side door, disguised by a SecretDoorway.
+					var sd_def: Dictionary = def.doors[ch].duplicate()
+					var sd_side: String = sd_def.secret_doorway
+					sd_def.erase("secret_doorway")
+					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, sd_def)
+					_add_object(root, objects, counts, SECRET_DOORWAY_SCENE, "SecretDoorway", feet,
+						{"side": sd_side, "inward": sd_def.inward, "size": Vector2(TS, 3 * TS)})
 				"E", "F", "G":
 					enemy_count += 1
 					var kind: String = {"E": "weak", "F": "flyer", "G": "strong"}[ch]
@@ -1035,7 +1098,39 @@ func _edge_mask(layout: Array, x: int, y: int) -> int:
 func _is_solid_char(layout: Array, x: int, y: int) -> bool:
 	if y < 0 or y >= layout.size() or x < 0 or x >= (layout[y] as String).length():
 		return true
-	return layout[y][x] in ["#", "Z", "z", "I"] # Hidden and illusion walls show no edge.
+	return layout[y][x] in ["#", "Z", "z", "I", "X", "x"] # Secret walls show no edge.
+
+
+## Type 1 hidden pocket: the open cells reachable from the far side of the
+## wall in column `wx` (rows top..bottom), as a global rect. Its contents are
+## covered until the pocket is found.
+func _pocket_rect(layout: Array, wx: int, top: int, bottom: int, pass_dir: int, ox: int) -> Rect2:
+	var open := func(cx: int, cy: int) -> bool:
+		return cy >= 0 and cy < layout.size() and cx >= 0 and cx < (layout[cy] as String).length() \
+			and not (layout[cy][cx] in ["#", "I", "X", "x", "Z", "z", "^"])
+	var queue: Array[Vector2i] = []
+	var seen := {}
+	for cy in range(top, bottom + 1):
+		if open.call(wx + pass_dir, cy):
+			queue.append(Vector2i(wx + pass_dir, cy))
+	var lo := Vector2i(1 << 20, 1 << 20)
+	var hi := Vector2i(-(1 << 20), -(1 << 20))
+	while not queue.is_empty() and seen.size() < 400:
+		var c: Vector2i = queue.pop_back()
+		if seen.has(c):
+			continue
+		seen[c] = true
+		lo = Vector2i(mini(lo.x, c.x), mini(lo.y, c.y))
+		hi = Vector2i(maxi(hi.x, c.x), maxi(hi.y, c.y))
+		for d in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var n: Vector2i = c + d
+			if not seen.has(n) and open.call(n.x, n.y):
+				queue.append(n)
+	if seen.size() >= 400:
+		push_error("Hidden pocket at column %d is not closed: it leaks into the room" % wx)
+	if seen.is_empty():
+		return Rect2()
+	return Rect2((lo.x + ox) * TS, lo.y * TS, (hi.x - lo.x + 1) * TS, (hi.y - lo.y + 1) * TS)
 
 
 ## Arena node: trigger area across the given columns, a gate over the room's
