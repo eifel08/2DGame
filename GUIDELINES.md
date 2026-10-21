@@ -69,6 +69,7 @@ Feedback stays strictly environmental, and play continues at once:
 | Arena cleared | The gates open with a mechanical clunk (`gate`). No more enemies come. |
 | Secret wall broken | A crash (`break`), falling debris (`wall_break`, particles only), a light shake. |
 | Relic taken | A soft pickup sound (`pickup`) and a small puff (`relic_pickup`). The relic is gone. |
+| Illusion wall found | Nothing at all. The player simply walked through it; it quietly stays passable. |
 
 - Do not add sounds such as `victory`, `fanfare`, `secret` or `jingle`, nor effects such as `arena_clear` or `boss_death`. The smoke test fails if they exist.
 - The HUD has no banner or pop-up text system. Do not add one for these events.

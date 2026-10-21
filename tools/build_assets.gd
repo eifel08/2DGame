@@ -132,11 +132,11 @@ const UPPER_LAYOUT := [
 	"#......................................#",
 	"#.....................F................#",
 	"#..................................$...#",
-	"#..............======...........#####..#",
-	"#...............................#####..#",
-	"#......................................#",
-	"#......................................#",
-	"#..$........E..........G......E....$...#",
+	"#..............======...........########",
+	"#...............................########",
+	"#...............................I......#",
+	"#...............................I......#",
+	"#..$........E..........G......E.I..$.$.#",
 	"####....################################",
 	"####O...################################",
 ]
@@ -162,6 +162,8 @@ const UPPER_LAYOUT := [
 ## 'O' ceiling or floor gap ("width" cells from the letter to the right),
 ## 'Z' side doorway hidden behind a breakable wall that fills the gap ('z'
 ## marks the upper cells of that gap; they count as solid for tile edges).
+## 'I' illusion wall cells (HiddenWall): no tile, one object per vertical run,
+## passable from the side given by the room's "hidden_walls" entry.
 ## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(hidden wall)-> Hidden Shrine
 const ROOMS := {
 	"test_room": {
@@ -196,6 +198,8 @@ const ROOMS := {
 	"upper_room": {
 		"name": "UpperRoom", "layout": UPPER_LAYOUT, "path": "res://world/upper_room.tscn",
 		"doors": {"O": {"door_id": "floor", "target_room": "test_room", "target_door": "ceiling", "vertical": 1, "width": 4}},
+		# Illusion wall into the alcove under the east block: enter from the left.
+		"hidden_wall": {"secret_id": "galleries_illusion", "pass_dir": 1},
 	},
 }
 const ARENA_KINDS := {"w": "weak", "u": "weak", "v": "flyer", "s": "strong", "B": "boss"}
@@ -216,6 +220,7 @@ const COIN_SCENE := "res://world/objects/coin.tscn"
 const DOOR_SCENE := "res://world/objects/door.tscn"
 const BREAKABLE_SCENE := "res://world/objects/breakable_wall.tscn"
 const RELIC_SCENE := "res://world/objects/relic.tscn"
+const HIDDEN_WALL_SCENE := "res://world/objects/hidden_wall.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -946,6 +951,15 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, BREAKABLE_SCENE, "BreakableWall", feet, {"secret_id": def.secret_id})
 				"R":
 					_add_object(root, objects, counts, RELIC_SCENE, "Relic", feet, def.relic)
+				"I": # One HiddenWall per vertical run, placed at its bottom cell.
+					if y + 1 < layout.size() and x < (layout[y + 1] as String).length() and layout[y + 1][x] == "I":
+						continue
+					var run := 1
+					while y - run >= 0 and layout[y - run][x] == "I":
+						run += 1
+					var hw: Dictionary = def.hidden_wall.duplicate()
+					hw["size"] = Vector2(TS, run * TS)
+					_add_object(root, objects, counts, HIDDEN_WALL_SCENE, "HiddenWall", feet, hw)
 				"E", "F", "G":
 					enemy_count += 1
 					var kind: String = {"E": "weak", "F": "flyer", "G": "strong"}[ch]
@@ -1021,7 +1035,7 @@ func _edge_mask(layout: Array, x: int, y: int) -> int:
 func _is_solid_char(layout: Array, x: int, y: int) -> bool:
 	if y < 0 or y >= layout.size() or x < 0 or x >= (layout[y] as String).length():
 		return true
-	return layout[y][x] in ["#", "Z", "z"] # A hidden wall shows no edge.
+	return layout[y][x] in ["#", "Z", "z", "I"] # Hidden and illusion walls show no edge.
 
 
 ## Arena node: trigger area across the given columns, a gate over the room's

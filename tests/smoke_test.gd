@@ -253,6 +253,9 @@ func _run() -> void:
 	# --- Meteor Slam ground hop, Stasis cost, camera look up / down ---
 	await _test_slam_hop_and_look()
 
+	# --- Hidden / illusion walls: one-way, found by walking through, persistent ---
+	await _test_hidden_wall()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -1649,6 +1652,110 @@ func _test_slam_hop_and_look() -> void:
 	_check("the look never shows anything outside the room", inside)
 	await _frames(30)
 	await _reset()
+
+
+func _test_hidden_wall() -> void:
+	var p: Player = game.player
+	game.world.secrets.erase("galleries_illusion")
+	var wall := await _enter_galleries(-120.0)
+	_check("the Upper Galleries have an illusion wall", wall != null and wall.secret_id == "galleries_illusion" and wall.pass_dir == 1)
+	if wall == null:
+		return
+	var visual := wall.get_node("Visual") as CanvasItem
+	_check("illusion wall placeholder is drawn at 50% opacity", is_equal_approx(visual.modulate.a, 0.5), visual.modulate)
+	_check("illusion wall is not a tile (no attack or tile collision involved)",
+		not game.room.is_solid_at(wall.get_rect().get_center()))
+	_check("enemies always collide with illusion walls",
+		(game.enemies.is_empty() or game.enemies[0].collision_mask & (1 << (HiddenWall.ENEMY_LAYER - 1)) != 0)
+		and p.collision_mask & (1 << (HiddenWall.PLAYER_LAYER - 1)) != 0)
+	var left_edge := wall.get_rect().position.x
+	var right_edge := wall.get_rect().end.x
+
+	# Undiscovered and approached from the far side (inside the alcove): solid.
+	await _place_galleries(wall, 70.0)
+	await _hold(&"move_left", 45)
+	_check("an unfound illusion wall is solid from the far side",
+		p.global_position.x >= right_edge + Player.WIDTH / 2.0 - 1.0 and wall.player_blocked and not wall.discovered, p.global_position)
+
+	# From the entry side: walk straight through, no attack. That finds it.
+	var found := []
+	var on_found := func(id: String) -> void: found.append(id)
+	Events.hidden_wall_found.connect(on_found)
+	await _place_galleries(wall, -90.0)
+	var hp := p.health.health
+	var fx_before: Dictionary = game.effects.play_counts.duplicate()
+	var passed_inside := false
+	Input.action_press(&"move_right")
+	for i in 60:
+		await _frames(1)
+		passed_inside = passed_inside or wall.get_rect().intersects(p.get_rect())
+		if p.global_position.x > right_edge + Player.WIDTH:
+			break
+	Input.action_release(&"move_right")
+	Events.hidden_wall_found.disconnect(on_found)
+	_check("the player walks through an illusion wall from the entry side",
+		passed_inside and p.global_position.x > right_edge + Player.WIDTH / 2.0 and p.attack_dir == "" and is_equal_approx(p.health.health, hp), p.global_position)
+	_check("walking through finds it and saves it to the world state",
+		wall.discovered and game.world.is_secret_open("galleries_illusion") and found == ["galleries_illusion"], [wall.discovered, found])
+	_check("finding an illusion wall plays no effect (Rule D)", game.effects.play_counts == fx_before, game.effects.play_counts)
+	await _hold(&"move_left", 45)
+	_check("a found illusion wall is passable from the far side too", p.global_position.x < left_edge - Player.WIDTH / 2.0, p.global_position)
+
+	# Room transition: leave and come back; it stays found.
+	game.load_room("test_room", "ceiling", 0.0, Vector2(0, 100))
+	await _frames(20)
+	wall = await _enter_galleries(70.0)
+	_check("after a room transition the illusion wall is still found", wall.discovered and not wall.player_blocked, wall.discovered)
+	await _hold(&"move_left", 45)
+	_check("after a room transition it is still passable from the far side", p.global_position.x < wall.get_rect().position.x - Player.WIDTH / 2.0, p.global_position)
+
+	# Save data: lost on a new game, restored by loading the save.
+	var data: Dictionary = game.make_save_data()
+	_check("the save file lists the found illusion wall", (data.secrets as Array).has("galleries_illusion"), data.secrets)
+	game.world.new_game()
+	wall = await _enter_galleries(70.0)
+	_check("without the save it is a mystery again (sanity check)", not wall.discovered)
+	game.apply_save_data(data)
+	await _frames(5)
+	wall = await _enter_galleries(70.0)
+	_check("loading the save restores the found illusion wall", wall.discovered and not wall.player_blocked, wall.discovered)
+
+	# Strictly one-way variant: found, yet still solid from the far side.
+	wall.opens_both_ways = false
+	await _place_galleries(wall, 70.0)
+	await _hold(&"move_left", 45)
+	_check("a strictly one-way illusion wall stays solid from the far side",
+		p.global_position.x >= wall.get_rect().end.x + Player.WIDTH / 2.0 - 1.0 and wall.player_blocked, p.global_position)
+	wall.opens_both_ways = true
+	await _reset()
+
+
+## Loads the Upper Galleries (no door), clears its enemies and puts the player
+## on the floor `dx` px from the illusion wall. Returns the wall.
+func _enter_galleries(dx: float) -> HiddenWall:
+	game.load_room("upper_room")
+	var wall: HiddenWall = game.hidden_walls[0] if not game.hidden_walls.is_empty() else null
+	if wall:
+		await _place_galleries(wall, dx)
+	return wall
+
+
+func _place_galleries(wall: HiddenWall, dx: float) -> void:
+	var p: Player = game.player
+	for e in game.enemies:
+		e.kill()
+	p.fsm.change("normal")
+	p.global_position = Vector2(wall.global_position.x + dx, wall.global_position.y)
+	p.velocity = Vector2.ZERO
+	p.health.iframe_timer = 0.0
+	await _frames(8)
+
+
+func _hold(action: StringName, frames: int) -> void:
+	Input.action_press(action)
+	await _frames(frames)
+	Input.action_release(action)
+	await _frames(4)
 
 
 ## Damage.Source rules: ENEMY and PROJECTILE respect i-frames; HAZARD never does.

@@ -88,6 +88,8 @@ signal enemy_spawning(enemy: Node)
 @warning_ignore("unused_signal")
 signal secret_found(secret_id: String, position: Vector2)
 @warning_ignore("unused_signal")
+signal hidden_wall_found(secret_id: String) ## An illusion wall was walked through (no feedback: Rule D).
+@warning_ignore("unused_signal")
 signal relic_collected(relic_id: String, position: Vector2)
 
 # Animation (frame events from method tracks, e.g. "footstep", "swing")

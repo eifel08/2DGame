@@ -63,6 +63,7 @@ var interactables: Array[Interactable] = []
 var doors: Array[Door] = []
 var coins: Array[Coin] = []
 var breakables: Array[BreakableWall] = []
+var hidden_walls: Array[HiddenWall] = []
 var relics: Array[Relic] = []
 var playtime := 0.0
 ## Set false before adding to the tree to skip the opening trance (tests).
@@ -158,6 +159,7 @@ func _physics_process(delta: float) -> void:
 	if feedback.step_hitstop(delta):
 		return
 
+	_update_hidden_walls() # Before the player moves: sets each wall solid or passable.
 	player.step(delta)
 	for enemy in enemies:
 		enemy.step(delta)
@@ -225,6 +227,7 @@ func _load_room_scene(id: String) -> void:
 	interactables.clear()
 	doors.clear()
 	breakables.clear()
+	hidden_walls.clear()
 	relics.clear()
 	current_checkpoint = null
 	focused_interactable = null
@@ -254,6 +257,10 @@ func _load_room_scene(id: String) -> void:
 			breakables.append(node)
 			if world.is_secret_open(node.secret_id):
 				node.open()
+		if node is HiddenWall:
+			hidden_walls.append(node)
+			if world.is_secret_open(node.secret_id):
+				node.reveal() # Found before: never a mystery again.
 		if node is Relic:
 			relics.append(node)
 			if world.has_relic(node.relic_id):
@@ -390,6 +397,17 @@ func _update_doors() -> void:
 		if not door.locked and door.get_trigger_rect().intersects(pr):
 			begin_transition(door.target_room, door.target_door, door.offset_of(player.global_position))
 			return
+
+
+## Illusion walls: one-way until walked through, then found for good
+## (saved like a broken wall). Finding one is silent (Rule D).
+func _update_hidden_walls() -> void:
+	var pr := player.get_rect()
+	for wall in hidden_walls:
+		if wall.update_for(pr):
+			world.open_secret(wall.secret_id)
+			Events.hidden_wall_found.emit(wall.secret_id)
+			write_save()
 
 
 ## Openings switch rooms at once, with no fade, sound or wait. The load

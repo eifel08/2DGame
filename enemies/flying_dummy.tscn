@@ -9,7 +9,7 @@ size = Vector2(36, 30)
 
 [node name="FlyingDummy" type="CharacterBody2D"]
 collision_layer = 8
-collision_mask = 1
+collision_mask = 33
 script = ExtResource("1_enemy")
 flying = true
 patrol_range = 70.0
