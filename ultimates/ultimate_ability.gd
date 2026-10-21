@@ -4,6 +4,9 @@ extends RefCounted
 ##   1. extend this class and override the _on_* hooks it needs,
 ##   2. add a config block to Config.ultimates (at least "cost" and "cast_time"),
 ##   3. register it in ultimate_registry.gd.
+## Optional hooks: pay_cost() for special energy rules (e.g. "consume all"),
+## and the ability-control contract (see Player.begin_ability_control) for
+## abilities that take over movement.
 ##
 ## Lifecycle (driven by UltimateManager):
 ##   energy check -> player cast wind-up (cast_time) -> activate() -> step() each frame
@@ -13,7 +16,7 @@ var id := ""
 var display_name := ""
 var kind := "" ## Short label shown in the HUD and debug overlay.
 var color := Color.WHITE
-var icon := "" ## Symbol drawn by ui/ability_icon.gd ("nova", "volley", "ascend", "comet").
+var icon := "" ## Symbol drawn by ui/ability_icon.gd ("nova", "volley", "ascend", "comet", "aegis", "stasis", "beam", "slam").
 var description := ""
 var is_running := false
 
@@ -29,6 +32,13 @@ func get_cost() -> float:
 
 func get_cast_time() -> float:
 	return cfg("cast_time")
+
+
+## Takes the energy for one cast. `get_cost()` is the threshold shown on the
+## HUD; the default spends exactly that. Return false (spending nothing) when
+## the player cannot afford it. Override for special rules (RepulseAegis).
+func pay_cost(health: HealthEnergy) -> bool:
+	return health.spend_energy(get_cost())
 
 
 ## Override to add extra activation rules.

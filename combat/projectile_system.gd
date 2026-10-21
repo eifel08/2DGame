@@ -17,7 +17,8 @@ func clear() -> void:
 
 
 ## opts: position, velocity, radius, damage, life, homing, color, source, knockback,
-## delay, hostile (hits the player), shape ("orb" or "wave")
+## delay, hostile (hits the player), shape ("orb" or "wave"), owner (the enemy
+## that fired it, so a counter can strike back)
 func spawn(opts: Dictionary) -> void:
 	list.append({
 		"pos": opts.position,
@@ -32,6 +33,8 @@ func spawn(opts: Dictionary) -> void:
 		"delay": opts.get("delay", 0.0),
 		"hostile": opts.get("hostile", false),
 		"shape": opts.get("shape", "orb"),
+		"owner": opts.get("owner"),
+		"frozen": 0.0, ## > 0: held in place and harmless (Stasis Field).
 		"trail": [],
 		"dead": false,
 	})
@@ -50,9 +53,23 @@ func _nearest_enemy(from: Vector2, max_dist := 700.0) -> Node:
 	return best
 
 
+## Holds hostile projectiles inside the circle in place for `duration`.
+## Frozen projectiles neither move, age nor hurt. Returns how many froze.
+func freeze_in_circle(center: Vector2, radius: float, duration: float) -> int:
+	var count := 0
+	for pr in list:
+		if pr.hostile and center.distance_to(pr.pos) <= radius + pr.radius:
+			pr.frozen = maxf(pr.frozen, duration)
+			count += 1
+	return count
+
+
 func step(delta: float) -> void:
 	var room := combat.get_room()
 	for pr in list:
+		if pr.frozen > 0.0:
+			pr.frozen -= delta
+			continue
 		pr.life -= delta
 		if pr.life <= 0.0:
 			pr.dead = true
@@ -79,7 +96,8 @@ func step(delta: float) -> void:
 		if pr.hostile:
 			var player: Player = combat.get_player()
 			if Geom.circle_overlaps_rect(pr.pos, pr.radius, player.get_rect()):
-				player.receive_hit(pr.damage, pr.pos.x - signf(pr.vel.x))
+				var shooter: Node = pr.owner if is_instance_valid(pr.owner) else null
+				player.receive_hit(pr.damage, pr.pos.x - signf(pr.vel.x), false, false, shooter)
 				pr.dead = true
 			continue
 		for e in combat.get_enemies():
@@ -101,6 +119,8 @@ func step(delta: float) -> void:
 
 func _draw() -> void:
 	for pr in list:
+		if pr.frozen > 0.0:
+			draw_arc(pr.pos, pr.radius + 5.0, 0.0, TAU, 16, Color("#bfe6ff"), 2.0, true)
 		if pr.shape == "wave":
 			var h: float = pr.radius * 2.4
 			draw_rect(Rect2(pr.pos.x - 5.0, pr.pos.y + pr.radius - h, 10.0, h), pr.color)

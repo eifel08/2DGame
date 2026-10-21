@@ -3,7 +3,8 @@ extends Control
 ## Screen-space HUD, clean by default:
 ##   - smooth health bar (no numbers)
 ##   - energy bar with a color-coded threshold mark per equipped ultimate,
-##     plus a left-to-right hotkey strip (bound keys, 1 2 3 4 by default) underneath
+##     plus a left-to-right hotkey strip (bound keys, 1 2 3 4 by default) underneath;
+##     it shows as many slots as the slot capacity allows
 ##     Colors follow energy tiers (Config.ENERGY_TIERS), not specific spells,
 ##     so whatever is slotted later shows its minimum energy clearly.
 ##   - shard (currency) counter, top-right
@@ -121,7 +122,7 @@ func _draw() -> void:
 
 	# Control hints (bottom).
 	draw_string(font, Vector2(0, view.y - 12),
-		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Ultimates 1-4 · Interact E · Inventory I/Tab · Debug F1/`",
+		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Ultimates 1-%d · Interact E · Inventory I/Tab · Debug F1/`" % ultimates.slot_count(),
 		HORIZONTAL_ALIGNMENT_RIGHT, view.x - 14, 10, Color(1, 1, 1, 0.5))
 	if Config.debug.paused:
 		draw_string(font, Vector2(0, view.y / 2.0), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, view.x, 22)
@@ -131,7 +132,7 @@ func _draw() -> void:
 ## tier (no numbers). Bright when affordable, dim when not. Empty slots have
 ## no mark, so the bar always reflects the current loadout.
 func _draw_thresholds(_font: Font, bx: float, ey: float, h: HealthEnergy) -> void:
-	for slot in PlayerData.SLOT_COUNT:
+	for slot in ultimates.slot_count():
 		var ability := ultimates.get_slot(slot)
 		if ability == null:
 			continue
@@ -184,7 +185,7 @@ func _draw_boss_bar(font: Font) -> void:
 
 
 ## Screen rect of a hotkey box in the slot strip. Slots always run
-## left-to-right: 1, 2, 3, 4.
+## left-to-right: 1, 2, 3, 4 (up to 8 with a larger capacity).
 func slot_rect(slot: int) -> Rect2:
 	return Rect2(48.0 + slot * (SLOT_BOX + 6.0), 66.0, SLOT_BOX, SLOT_BOX)
 
@@ -193,7 +194,7 @@ func slot_rect(slot: int) -> Rect2:
 ## rebinding in Settings), border in the ability's tier color, bright when
 ## there is enough energy.
 func _draw_slot_strip(font: Font, h: HealthEnergy) -> void:
-	for slot in PlayerData.SLOT_COUNT:
+	for slot in ultimates.slot_count():
 		var r := slot_rect(slot)
 		var ability := ultimates.get_slot(slot)
 		draw_rect(r, Color(0, 0, 0, 0.55))

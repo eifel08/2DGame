@@ -48,6 +48,26 @@ static func draw_symbol(c: CanvasItem, symbol: String, center: Vector2, r: float
 				var off := Vector2(-r, r).normalized().orthogonal() * (i - 1) * r * 0.28
 				c.draw_line(head + off, head + off + Vector2(-r, r) * 1.1, Color(col, 0.5), maxf(1.0, r * 0.1), true)
 			c.draw_circle(head, r * 0.34, col)
+		"aegis": # Hexagonal shield with a core.
+			var pts := PackedVector2Array()
+			for i in 7:
+				pts.append(center + Vector2.from_angle(TAU * i / 6.0 - PI / 2.0) * r * 0.9)
+			c.draw_polyline(pts, col, maxf(1.5, r * 0.14), true)
+			c.draw_circle(center, r * 0.25, col)
+		"stasis": # Snowflake: three crossed bars with tips.
+			for i in 3:
+				var d := Vector2.from_angle(PI / 2.0 + i * PI / 3.0) * r * 0.9
+				c.draw_line(center - d, center + d, col, maxf(1.5, r * 0.12), true)
+				c.draw_circle(center + d, r * 0.12, col)
+				c.draw_circle(center - d, r * 0.12, col)
+		"beam": # Emitter with a long beam.
+			c.draw_rect(Rect2(center.x - r * 0.9, center.y - r * 0.14, r * 1.8, r * 0.28), col)
+			c.draw_rect(Rect2(center.x - r * 0.9, center.y - r * 0.3, r * 1.8, r * 0.6), Color(col, 0.35))
+			c.draw_circle(Vector2(center.x - r * 0.75, center.y), r * 0.3, col)
+		"slam": # Downward arrow onto a ground line.
+			c.draw_line(center + Vector2(0, -r * 0.9), center + Vector2(0, r * 0.35), col, maxf(1.5, r * 0.16), true)
+			c.draw_colored_polygon(PackedVector2Array([center + Vector2(-r * 0.45, r * 0.15), center + Vector2(r * 0.45, r * 0.15), center + Vector2(0, r * 0.6)]), col)
+			c.draw_line(center + Vector2(-r * 0.95, r * 0.8), center + Vector2(r * 0.95, r * 0.8), col, maxf(1.5, r * 0.12), true)
 		"empty": # Empty slot.
 			c.draw_arc(center, r * 0.7, 0.0, TAU, 24, Color(col, 0.45), 1.5, true)
 			c.draw_line(center + Vector2(-r * 0.45, r * 0.45), center + Vector2(r * 0.45, -r * 0.45), Color(col, 0.45), 1.5, true)

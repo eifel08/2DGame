@@ -567,6 +567,11 @@ func _build_input_map() -> void:
 		"ult_2": [_key(KEY_2), _joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)],
 		"ult_3": [_key(KEY_3), _joy_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)],
 		"ult_4": [_key(KEY_4), _joy_button(JOY_BUTTON_RIGHT_STICK)],
+		# Extra slots, usable when the slot capacity allows (keyboard only).
+		"ult_5": [_key(KEY_5)],
+		"ult_6": [_key(KEY_6)],
+		"ult_7": [_key(KEY_7)],
+		"ult_8": [_key(KEY_8)],
 		"interact": [_key(KEY_E), _key(KEY_F), _joy_button(JOY_BUTTON_B)],
 		"inventory": [_key(KEY_I), _key(KEY_TAB), _joy_button(JOY_BUTTON_BACK)],
 		"pause": [_key(KEY_ESCAPE), _key(KEY_P), _joy_button(JOY_BUTTON_START)],

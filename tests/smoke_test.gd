@@ -244,6 +244,12 @@ func _run() -> void:
 	Input.action_release(ascendant_key)
 	_check("ultimate refused without energy", is_equal_approx(p.health.energy, 50.0) and p.state_name() == "normal", p.health.energy)
 
+	# --- New spells: Repulse Aegis, Stasis Field, Radiant Lance, Meteor Slam ---
+	await _test_new_spells()
+
+	# --- Spell pool and slot capacity (debug overlay) ---
+	await _test_spell_management()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -533,7 +539,7 @@ func _run() -> void:
 	await _frames(2)
 	Input.action_release(&"inventory")
 	_check("inventory opens", game.inventory.is_open())
-	_check("inventory shows swap restriction", game.inventory.pool_grid.get_child_count() == 4 and game.inventory.notice_label.text.contains("only"), game.inventory.notice_label.text)
+	_check("inventory shows swap restriction", game.inventory.pool_grid.get_child_count() == game.ultimates.unlocked_abilities().size() and game.inventory.notice_label.text.contains("only"), game.inventory.notice_label.text)
 	var frozen_x := p.global_position.x
 	Input.action_press(&"move_right")
 	await _frames(10)
@@ -1305,6 +1311,191 @@ func _run() -> void:
 	for f in failures:
 		print("  FAIL ", f)
 	get_tree().quit(0 if failures.is_empty() else 1)
+
+
+func _test_new_spells() -> void:
+	var p: Player = game.player
+	var data: PlayerData = game.player_data
+	var loadout := data.equipped.duplicate()
+	_check("eight spells are registered and known from the start",
+		game.ultimates.abilities.size() == 8 and data.unlocked.size() == 8, data.unlocked)
+
+	# Repulse Aegis: consumes all energy, negates the next hit, strikes back x1.5.
+	await _reset()
+	var aegis: RepulseAegis = game.ultimates.get_ability("repulse_aegis")
+	p.health.set_energy(10.0)
+	await _cast_slot0("repulse_aegis")
+	_check("aegis refused below its threshold", is_equal_approx(p.health.energy, 10.0) and not aegis.is_running, p.health.energy)
+	p.health.set_energy(80.0)
+	await _cast_slot0("repulse_aegis")
+	_check("aegis consumes all energy", is_zero_approx(p.health.energy) and is_equal_approx(aegis.consumed, 80.0), [p.health.energy, aegis.consumed])
+	await _frames(15)
+	_check("aegis shield is up", aegis.is_running and p.hit_guards.has(RepulseAegis.GUARD_ID))
+	var striker: Enemy = game.spawn_enemy_kind("strong", p.global_position + Vector2(200, 0))
+	await _frames(3)
+	var striker_hp := striker.health
+	p.health.iframe_timer = 0.0
+	p.global_position = striker.global_position
+	await _frames(2)
+	_check("aegis negates contact damage", is_equal_approx(p.health.health, p.health.get_max_health()), p.health.health)
+	_check("aegis strikes back with one and a half times the energy",
+		is_equal_approx(aegis.last_reflected, 120.0) and is_equal_approx(striker_hp - striker.health, minf(120.0, striker_hp)),
+		[aegis.last_reflected, striker_hp, striker.health])
+	_check("aegis is spent after one counter", not aegis.is_running and p.hit_guards.is_empty())
+	await _reset()
+	p.health.set_energy(40.0)
+	await _cast_slot0("repulse_aegis")
+	await _frames(15)
+	p.health.iframe_timer = 0.0
+	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(30, 0), "velocity": Vector2(-200, 0), "hostile": true, "damage": 20.0})
+	await _frames(15)
+	_check("aegis negates a projectile hit", is_equal_approx(p.health.health, p.health.get_max_health()) and not aegis.is_running, p.health.health)
+
+	# Stasis Field: enemies and hostile projectiles in range freeze in place.
+	await _reset()
+	var stasis: StasisField = game.ultimates.get_ability("stasis_field")
+	var frozen: DummyEnemy = _first_enemy(false)
+	p.global_position = frozen.global_position + Vector2(-90, 0)
+	p.health.set_energy(100.0)
+	var far: Enemy = game.spawn_enemy_kind("weak", p.global_position + Vector2(-420, 0))
+	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(0, -80), "velocity": Vector2(0, -20), "hostile": true, "life": 9.0})
+	await _cast_slot0("stasis_field")
+	await _frames(20)
+	_check("stasis spends its cost", is_equal_approx(p.health.energy, 100.0 - Config.ultimates.stasis_field.cost), p.health.energy)
+	var frozen_at := frozen.global_position
+	var shot: Dictionary = game.combat.projectiles.list[0] if not game.combat.projectiles.list.is_empty() else {}
+	var shot_at: Vector2 = shot.get("pos", Vector2.ZERO)
+	await _frames(30)
+	_check("stasis freezes enemies in range", frozen.is_frozen() and frozen.global_position == frozen_at and stasis.frozen_enemies >= 1,
+		[frozen.freeze_timer, frozen_at, frozen.global_position])
+	_check("frozen enemies deal no contact damage", not frozen.deals_contact_damage())
+	_check("stasis freezes projectiles in range", stasis.frozen_projectiles == 1 and shot.get("pos") == shot_at, [stasis.frozen_projectiles, shot_at, shot.get("pos")])
+	_check("stasis leaves enemies out of range alone", not far.is_frozen(), far.global_position)
+	game.ultimates.cancel_all()
+	await _frames(int(Config.ultimates.stasis_field.duration * 60.0))
+	_check("stasis wears off", not frozen.is_frozen(), frozen.freeze_timer)
+
+	# Radiant Lance: a forward beam that damages; aiming up fires it vertically.
+	await _reset()
+	var lance: RadiantLance = game.ultimates.get_ability("radiant_lance")
+	var beam_target: DummyEnemy = _first_enemy(false)
+	beam_target.patrol = false
+	await _frames(3)
+	p.global_position = beam_target.global_position + Vector2(-160, 0)
+	p.facing = 1
+	p.health.set_energy(100.0)
+	await _cast_slot0("radiant_lance")
+	await _frames(20)
+	_check("lance spends its cost", is_equal_approx(p.health.energy, 100.0 - Config.ultimates.radiant_lance.cost), p.health.energy)
+	_check("lance fires forward and damages", lance.dir == Vector2.RIGHT and beam_target.health < beam_target.max_health, [lance.dir, beam_target.health])
+	await _frames(30)
+	p.health.set_energy(100.0)
+	Input.action_press(&"move_up")
+	await _cast_slot0("radiant_lance")
+	await _frames(16)
+	var rect := lance.beam_rect()
+	Input.action_release(&"move_up")
+	_check("lance aims straight up while holding up", lance.dir == Vector2.UP and rect.size.y > rect.size.x, [lance.dir, rect])
+
+	# Meteor Slam: invulnerable dive, then a ground shockwave and landing i-frames.
+	await _reset()
+	var slam: MeteorSlam = game.ultimates.get_ability("meteor_slam")
+	var slam_target: DummyEnemy = _first_enemy(false)
+	slam_target.patrol = false
+	await _frames(3)
+	p.global_position = slam_target.global_position + Vector2(-50, -90)
+	p.health.set_energy(100.0)
+	var slams := slam.slam_count
+	await _cast_slot0("meteor_slam")
+	var dive_invulnerable := false
+	for i in 30:
+		if p.state_name() == "ability":
+			dive_invulnerable = p.health.is_invulnerable()
+			break
+		await _frames(1)
+	_check("slam dives with i-frames", dive_invulnerable, p.state_name())
+	for i in 60:
+		if slam.slam_count > slams:
+			break
+		await _frames(1)
+	_check("slam lands on the ground", slam.slam_count == slams + 1 and p.grounded and p.state_name() == "normal", [slam.slam_count, p.grounded, p.state_name()])
+	_check("slam grants landing i-frames", p.health.has_iframes(), p.health.iframe_timer)
+	_check("slam shockwave damages nearby enemies", slam_target.health < slam_target.max_health, slam_target.health)
+
+	await _reset()
+	data.equipped = loadout
+	Events.loadout_changed.emit()
+
+
+func _test_spell_management() -> void:
+	var p: Player = game.player
+	var data: PlayerData = game.player_data
+	var dbg: DebugOverlay = game.debug_overlay
+	var loadout := data.equipped.duplicate()
+	await _reset()
+
+	# Capacity: fewer slots empties the extra ones and disables their keys.
+	game.ultimates.set_capacity(2)
+	_check("capacity limits the usable slots", game.ultimates.slot_count() == 2 and data.equipped[2] == "" and data.equipped[3] == ""
+		and game.ultimates.get_slot(2) == null, data.equipped)
+	_check("no equipping past the capacity", not game.ultimates.equip(2, "comet_dash"), data.equipped)
+	p.health.set_energy(100.0)
+	Input.action_press(&"ult_3")
+	await _frames(2)
+	Input.action_release(&"ult_3")
+	_check("a key past the capacity does nothing", is_equal_approx(p.health.energy, 100.0), p.health.energy)
+	game.inventory.toggle()
+	await _frames(2)
+	var shown: int = game.inventory.slot_cards.filter(func(c: Control) -> bool: return c.visible).size()
+	game.inventory.toggle()
+	_check("the inventory shows only usable slots", shown == 2, shown)
+
+	# More slots than the default: keys 5-8 exist and work.
+	game.ultimates.set_capacity(6)
+	_check("capacity can grow past four", game.ultimates.equip(5, "stasis_field") and game.ultimates.get_slot(5) != null, data.equipped)
+	await _frames(3)
+	Input.action_press(&"ult_6")
+	await _frames(2)
+	Input.action_release(&"ult_6")
+	_check("slot six casts with its own key", is_equal_approx(p.health.energy, 100.0 - Config.ultimates.stasis_field.cost), p.health.energy)
+	_check("hotkeys 1-8 exist and are rebindable", InputMap.has_action(&"ult_8") and Settings.REBINDABLE.has("ult_8"))
+	_check("capacity is saved", int(game.make_save_data().get("slot_capacity", 0)) == 6)
+	game.ultimates.set_capacity(99)
+	_check("capacity is clamped to the hotkey count", data.slot_capacity == PlayerData.MAX_SLOTS, data.slot_capacity)
+
+	# Known spells: forgetting removes from the pool and the loadout.
+	game.ultimates.set_capacity(4)
+	game.ultimates.equip(0, "radiant_lance", true)
+	game.ultimates.set_known("radiant_lance", false)
+	_check("a forgotten spell leaves the pool and its slot",
+		not data.is_unlocked("radiant_lance") and data.equipped[0] == "" and not game.ultimates.equip(0, "radiant_lance"), data.equipped)
+
+	# Debug overlay controls drive the same rules.
+	dbg.toggle()
+	await _frames(2)
+	_check("debug overlay lists every spell", dbg._known_checks.size() == game.ultimates.abilities.size())
+	_check("debug checkbox mirrors a forgotten spell", not dbg._known_checks["radiant_lance"].button_pressed)
+	dbg._known_checks["radiant_lance"].button_pressed = true
+	_check("debug checkbox teaches a spell", data.is_unlocked("radiant_lance"))
+	dbg._known_checks["meteor_slam"].button_pressed = false
+	_check("debug checkbox forgets a spell", not data.is_unlocked("meteor_slam"))
+	dbg._capacity_slider.value = 3
+	_check("debug slider sets the capacity", data.slot_capacity == 3 and game.ultimates.slot_count() == 3, data.slot_capacity)
+	dbg.toggle()
+
+	game.ultimates.set_known("meteor_slam", true)
+	game.ultimates.set_capacity(PlayerData.DEFAULT_CAPACITY)
+	data.equipped = loadout
+	Events.loadout_changed.emit()
+	await _reset()
+
+
+## Puts an ability in slot 1 (ignoring the checkpoint rule) and presses its key.
+func _cast_slot0(ability_id: String) -> void:
+	game.ultimates.equip(0, ability_id, true)
+	Input.action_press(&"ult_1")
+	await _frames(2)
+	Input.action_release(&"ult_1")
 
 
 func _jump_height(hold_frames: int) -> float:

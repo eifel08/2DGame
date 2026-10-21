@@ -1,14 +1,26 @@
 class_name PlayerData
 extends RefCounted
-## Persistent player progression: currency, unlocked abilities and the four
+## Persistent player progression: currency, unlocked abilities and the
 ## equipped ultimate slots. It survives deaths and room resets.
 ## Gameplay rules (e.g. "swap only at a checkpoint") live in UltimateManager.
+##
+## There are MAX_SLOTS hotkeys (ult_1 .. ult_8). Only the first
+## `slot_capacity` of them can hold an ability; the rest stay empty.
 
-const SLOT_COUNT := 4
+const MAX_SLOTS := 8
+const DEFAULT_CAPACITY := 4
 
 var currency := 0
 var unlocked: Array[String] = [] ## Every ability the player has discovered.
-var equipped: Array[String] = ["", "", "", ""] ## Ability id per hotkey slot ("" = empty).
+var equipped: Array[String] = empty_slots() ## Ability id per hotkey slot ("" = empty).
+var slot_capacity := DEFAULT_CAPACITY ## How many slots may hold an ability (1..MAX_SLOTS).
+
+
+static func empty_slots() -> Array[String]:
+	var slots: Array[String] = []
+	slots.resize(MAX_SLOTS)
+	slots.fill("")
+	return slots
 
 
 func add_currency(amount: int) -> void:
@@ -29,6 +41,21 @@ func unlock(ability_id: String) -> void:
 
 func is_unlocked(ability_id: String) -> bool:
 	return unlocked.has(ability_id)
+
+
+## Forgets an ability (debug): it leaves the pool and its slot.
+func lock(ability_id: String) -> void:
+	unlocked.erase(ability_id)
+	var slot := equipped.find(ability_id)
+	if slot != -1:
+		equipped[slot] = ""
+
+
+## Sets how many slots are usable. Abilities beyond the new limit are unequipped.
+func set_capacity(count: int) -> void:
+	slot_capacity = clampi(count, 1, MAX_SLOTS)
+	for slot in range(slot_capacity, MAX_SLOTS):
+		equipped[slot] = ""
 
 
 func unequip(slot: int) -> void:

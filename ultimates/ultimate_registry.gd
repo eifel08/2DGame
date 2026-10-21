@@ -9,5 +9,9 @@ static func create_default() -> Array[UltimateAbility]:
 		SpiritVolley.new(),
 		AscendantForm.new(),
 		CometDash.new(),
+		RepulseAegis.new(),
+		StasisField.new(),
+		RadiantLance.new(),
+		MeteorSlam.new(),
 	]
 	return list

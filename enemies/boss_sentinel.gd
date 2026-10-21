@@ -180,7 +180,7 @@ func _slam() -> void:
 				"position": global_position + Vector2(dir * size.x * 0.5, -12.0),
 				"velocity": Vector2(dir * 360.0 * speed_mul(), 0.0),
 				"radius": 12.0, "damage": shockwave_damage, "life": 1.6, "hostile": true,
-				"color": Color("#ffb347"), "shape": "wave",
+				"color": Color("#ffb347"), "shape": "wave", "owner": self,
 			})
 	Events.ultimate_impact.emit(0.03, 0.45)
 	_recover(0.6)
@@ -195,7 +195,7 @@ func _fire_shard() -> void:
 	if combat:
 		combat.projectiles.spawn({
 			"position": from, "velocity": Vector2.from_angle(aim + spread) * 380.0 * speed_mul(),
-			"radius": 8.0, "damage": shard_damage, "life": 3.0, "hostile": true, "color": Color("#ff7a9a"),
+			"radius": 8.0, "damage": shard_damage, "life": 3.0, "hostile": true, "color": Color("#ff7a9a"), "owner": self,
 		})
 	_shot_index += 1
 	_shots_left -= 1

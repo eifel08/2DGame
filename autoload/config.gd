@@ -117,6 +117,11 @@ func restore_defaults() -> void:
 		"spirit_volley": {"cost": 50.0, "cast_time": 0.2, "count": 10.0, "damage": 12.0, "interval": 0.04, "speed": 460.0, "homing": 7.0},
 		"ascendant_form": {"cost": 100.0, "cast_time": 0.6, "duration": 8.0, "damage_mul": 2.0, "speed_mul": 1.25, "range_mul": 1.45},
 		"comet_dash": {"cost": 25.0, "cast_time": 0.08, "speed": 1150.0, "duration": 0.3, "damage": 30.0, "burst_damage": 18.0, "burst_radius": 100.0},
+		# Repulse Aegis: `cost` is the minimum; a cast consumes the whole meter.
+		"repulse_aegis": {"cost": 20.0, "cast_time": 0.1, "duration": 6.0, "reflect_mul": 1.5, "guard_iframes": 0.6},
+		"stasis_field": {"cost": 40.0, "cast_time": 0.25, "radius": 210.0, "duration": 2.5},
+		"radiant_lance": {"cost": 60.0, "cast_time": 0.2, "damage": 55.0, "length": 560.0, "width": 26.0, "duration": 0.3},
+		"meteor_slam": {"cost": 30.0, "cast_time": 0.1, "speed": 1400.0, "max_time": 1.2, "dive_damage": 20.0, "slam_damage": 50.0, "slam_radius": 140.0, "land_iframes": 0.35},
 	}
 
 

@@ -223,7 +223,7 @@ func _resolve_contact_damage() -> void:
 	var pr := p.get_rect()
 	for enemy in get_enemies():
 		if enemy.deals_contact_damage() and pr.intersects(enemy.get_rect()):
-			if p.receive_hit(Config.combat.contact_damage * enemy.contact_damage_mul, enemy.get_center().x):
+			if p.receive_hit(Config.combat.contact_damage * enemy.contact_damage_mul, enemy.get_center().x, false, false, enemy):
 				return
 
 

@@ -40,6 +40,7 @@ var flash_timer := 0.0
 var stun_timer := 0.0
 var dead_time := 0.0
 var spawn_timer := 0.0 ## > 0 while the spawn telegraph runs.
+var freeze_timer := 0.0 ## > 0 while held by a stasis effect: no movement, no AI, no contact damage.
 var _anim_name := ""
 
 
@@ -69,6 +70,7 @@ func reset() -> void:
 	stun_timer = 0.0
 	dead_time = 0.0
 	spawn_timer = 0.0
+	freeze_timer = 0.0
 	_anim_name = ""
 	shape.set_deferred("disabled", false)
 	_on_reset()
@@ -92,7 +94,19 @@ func hitbox_active() -> bool:
 
 
 func deals_contact_damage() -> bool:
-	return hitbox_active()
+	return hitbox_active() and not is_frozen()
+
+
+func is_frozen() -> bool:
+	return freeze_timer > 0.0
+
+
+## Holds the enemy in place for `duration`. It can still be hit.
+func freeze(duration: float) -> void:
+	if not hitbox_active():
+		return
+	freeze_timer = maxf(freeze_timer, duration)
+	velocity = Vector2.ZERO
 
 
 func restore_full_health() -> void:
@@ -125,6 +139,7 @@ func kill() -> bool:
 func _die() -> void:
 	alive = false
 	dead_time = 0.0
+	freeze_timer = 0.0
 	velocity = Vector2.ZERO
 	shape.set_deferred("disabled", true) # No more collision of any kind.
 
@@ -138,15 +153,24 @@ func step(delta: float) -> void:
 	elif spawn_timer > 0.0:
 		spawn_timer -= delta
 		facing = 1 if target == null or target.global_position.x >= global_position.x else -1
+	elif freeze_timer > 0.0:
+		freeze_timer -= delta # Frozen: the AI and physics simply do not run.
+		velocity = Vector2.ZERO
 	else:
 		_step_alive(delta)
 	flip.scale.x = facing
-	flip.modulate = Color(4, 4, 4) if alive and flash_timer > 0.0 else Color.WHITE # Hit flash tint.
+	if alive and flash_timer > 0.0:
+		flip.modulate = Color(4, 4, 4) # Hit flash tint.
+	elif alive and is_frozen():
+		flip.modulate = Color(0.55, 0.85, 1.6) # Frozen tint.
+	else:
+		flip.modulate = Color.WHITE
 	var next := _choose_animation()
 	if next != _anim_name and anim.has_animation(next):
 		_anim_name = next
 		anim.play(next)
-	anim.advance(delta)
+	if not is_frozen():
+		anim.advance(delta) # A frozen enemy holds its pose.
 	queue_redraw()
 
 

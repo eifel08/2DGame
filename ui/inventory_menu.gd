@@ -2,7 +2,8 @@ class_name InventoryMenu
 extends CanvasLayer
 ## Inventory window (I / Tab / Esc, gamepad Back) with two tabs:
 ##   Status    - shards (the only number), health and energy as bars
-##   Abilities - the 4 hotkey slots (top) and every unlocked ability (bottom)
+##   Abilities - the usable hotkey slots (top, as many as the slot capacity)
+##               and every unlocked ability (bottom)
 ##
 ## Keyboard only, no mouse needed:
 ##   Left / Right on the tab row      switch tab (also Q / E, PgUp / PgDn)
@@ -10,7 +11,7 @@ extends CanvasLayer
 ##   Arrow keys                       move between cards
 ##   Z / Enter / Space (confirm)
 ##     on an equipped ability (slot or grid)  unequip it
-##     on an unequipped ability (grid)        then choose slot 1-4; an occupied
+##     on an unequipped ability (grid)        then choose a slot; an occupied
 ##                                            slot is replaced
 ##   Backspace / Delete               cancel the slot choice, or clear the focused slot
 ## Loadout changes only work while standing at the saved checkpoint.
@@ -43,6 +44,7 @@ func setup(p_game: Node) -> void:
 	panel.visible = false
 	Events.loadout_changed.connect(func() -> void:
 		if is_open():
+			_rebuild_pool() # The known pool may have changed (debug overlay).
 			refresh())
 
 
@@ -121,7 +123,7 @@ func press_pool(ability: UltimateAbility) -> void:
 	pending_ability_id = ability.id
 	refresh()
 	var target: int = game.player_data.equipped.find("")
-	slot_cards[target if target >= 0 else 0].grab_focus()
+	slot_cards[target if target >= 0 and target < manager.slot_count() else 0].grab_focus()
 
 
 func _on_clear_pressed() -> void:
@@ -154,6 +156,7 @@ func refresh() -> void:
 	energy_bar.set_values(h.energy, max_energy, Config.vitals.max_energy, Color("#4fd1ff"))
 
 	for slot in slot_cards.size():
+		slot_cards[slot].visible = slot < manager.slot_count() # Only usable slots appear.
 		slot_cards[slot].show_ability(manager.get_slot(slot), max_energy, slot + 1)
 	# Every unlocked ability keeps a crisp icon; equipped ones show their key.
 	for card in pool_cards:
@@ -223,8 +226,8 @@ func _build() -> void:
 	panel.anchor_right = 0.5
 	panel.anchor_top = 0.5
 	panel.anchor_bottom = 0.5
-	panel.offset_left = -320.0
-	panel.offset_right = 320.0
+	panel.offset_left = -380.0 # Wide enough for eight cards in a row.
+	panel.offset_right = 380.0
 	panel.offset_top = -230.0
 	panel.offset_bottom = 230.0
 	var style := StyleBoxFlat.new()
@@ -301,7 +304,7 @@ func _build_abilities_tab() -> Control:
 	var slots := HBoxContainer.new()
 	slots.add_theme_constant_override("separation", 8)
 	box.add_child(slots)
-	for slot in PlayerData.SLOT_COUNT: # Left to right: keys 1, 2, 3, 4.
+	for slot in PlayerData.MAX_SLOTS: # Left to right: keys 1, 2, 3, ... (hidden past the capacity).
 		var card := AbilityCard.new()
 		var s := slot
 		card.pressed.connect(func() -> void: press_slot(s))
@@ -313,7 +316,7 @@ func _build_abilities_tab() -> Control:
 
 	box.add_child(_section("UNLOCKED"))
 	pool_grid = GridContainer.new()
-	pool_grid.columns = 6
+	pool_grid.columns = 8
 	pool_grid.add_theme_constant_override("h_separation", 8)
 	box.add_child(pool_grid)
 

@@ -7,7 +7,7 @@ extends RefCounted
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down",
 	&"jump", &"attack", &"dash", &"heal",
-	&"ult_1", &"ult_2", &"ult_3", &"ult_4",
+	&"ult_1", &"ult_2", &"ult_3", &"ult_4", &"ult_5", &"ult_6", &"ult_7", &"ult_8",
 	&"interact", &"inventory", &"pause", &"toggle_debug", &"debug_navigate", &"reset_room",
 ]
 

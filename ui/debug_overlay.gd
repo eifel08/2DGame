@@ -3,6 +3,8 @@ extends CanvasLayer
 ## Debug panel, toggled with F1 or ` (backquote).
 ## Fully data-driven: add a row to TOGGLES, SLIDERS or the actions list and it
 ## appears. Controls edit Config live, so changes apply on the next frame.
+## The Spells section lists every registered ability: tick which ones the
+## player knows, and set how many slots may be equipped (capacity).
 ## Controls never steal gameplay keys. For keyboard-only use press F2 while
 ## the panel is open: the game pauses, arrows move between controls,
 ## Enter/Space toggles or presses, Left/Right moves sliders. F2 again resumes.
@@ -57,6 +59,9 @@ var readout: Label
 var _bindings: Array[Dictionary] = [] ## {path, control, value_label}
 var _readout_timer := 0.0
 var _focusables: Array[Control] = []
+var _known_checks := {} ## ability id -> CheckBox ("player knows this spell")
+var _capacity_slider: HSlider
+var _capacity_label: Label
 var navigating := false ## Keyboard navigation mode (pauses the game).
 
 
@@ -171,6 +176,9 @@ func _build() -> void:
 			refresh())
 		buttons.add_child(btn)
 
+	# Spells: known pool, capacity, quick loadout tools
+	box.add_child(_build_spells())
+
 	# Ultimates: per-ability energy cost
 	box.add_child(_header("Ultimate Costs"))
 	for ability in game.ultimates.abilities.values():
@@ -190,7 +198,72 @@ func _build() -> void:
 	mono.font_names = PackedStringArray(["monospace", "Consolas", "Menlo"])
 	readout.add_theme_font_override("font", mono)
 	readout.add_theme_font_size_override("font_size", 10)
+	# Wrap long lines instead of widening the panel past the screen edge.
+	readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(readout)
+
+
+## Spell management: capacity slider, one "known" checkbox per registered
+## ability, and loadout shortcuts that ignore the checkpoint rule.
+func _build_spells() -> VBoxContainer:
+	var section := VBoxContainer.new()
+	section.add_theme_constant_override("separation", 3)
+	section.add_child(_header("Spells (known / capacity)"))
+
+	_capacity_slider = HSlider.new()
+	_capacity_slider.min_value = 1
+	_capacity_slider.max_value = PlayerData.MAX_SLOTS
+	_capacity_slider.step = 1
+	_capacity_slider.focus_mode = Control.FOCUS_NONE
+	_focusables.append(_capacity_slider)
+	_capacity_label = Label.new()
+	_capacity_slider.value_changed.connect(func(v: float) -> void:
+		game.ultimates.set_capacity(int(v))
+		_capacity_label.text = str(int(v)))
+	section.add_child(_row("Equip Slots", _capacity_slider, _capacity_label))
+
+	var grid := GridContainer.new()
+	grid.columns = 2
+	section.add_child(grid)
+	for ability: UltimateAbility in game.ultimates.abilities.values():
+		var check := CheckBox.new()
+		check.text = ability.display_name
+		check.tooltip_text = "%s · %s" % [ability.kind, ability.description]
+		check.add_theme_color_override("font_color", ability.color)
+		check.focus_mode = Control.FOCUS_NONE
+		_focusables.append(check)
+		var ability_id := ability.id
+		check.toggled.connect(func(on: bool) -> void: game.ultimates.set_known(ability_id, on))
+		grid.add_child(check)
+		_known_checks[ability_id] = check
+
+	var buttons := GridContainer.new()
+	buttons.columns = 2
+	section.add_child(buttons)
+	var tools := [
+		["Know All Spells", func() -> void:
+			for ability_id in game.ultimates.abilities:
+				game.ultimates.set_known(ability_id, true)],
+		["Forget All Spells", func() -> void:
+			for ability_id in game.ultimates.abilities:
+				game.ultimates.set_known(ability_id, false)],
+		["Auto-Equip Known", func() -> void: game.ultimates.auto_equip()],
+		["Clear Loadout", func() -> void:
+			for slot in PlayerData.MAX_SLOTS:
+				game.ultimates.unequip(slot, true)],
+	]
+	for t in tools:
+		var btn := Button.new()
+		btn.text = t[0]
+		btn.focus_mode = Control.FOCUS_NONE
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		_focusables.append(btn)
+		var action: Callable = t[1]
+		btn.pressed.connect(func() -> void:
+			action.call()
+			refresh())
+		buttons.add_child(btn)
+	return section
 
 
 ## Keyboard mode: controls become focusable and the game pauses.
@@ -255,6 +328,11 @@ func refresh() -> void:
 		else:
 			b.control.set_value_no_signal(float(v))
 			b.value_label.text = _format(float(v))
+	var data: PlayerData = game.player_data
+	_capacity_slider.set_value_no_signal(data.slot_capacity)
+	_capacity_label.text = str(data.slot_capacity)
+	for ability_id in _known_checks:
+		_known_checks[ability_id].set_pressed_no_signal(data.is_unlocked(ability_id))
 
 
 func _format(v: float) -> String:
@@ -274,7 +352,7 @@ func _process(delta: float) -> void:
 		.map(func(u: UltimateAbility) -> String: return u.display_name)
 	var alive: int = game.enemies.filter(func(e: Node) -> bool: return e.alive).size()
 	var slots := PackedStringArray()
-	for slot in PlayerData.SLOT_COUNT:
+	for slot in game.ultimates.slot_count():
 		var u: UltimateAbility = game.ultimates.get_slot(slot)
 		slots.append("%d:%s(%d)" % [slot + 1, u.display_name if u else "-", roundi(u.get_cost()) if u else 0])
 	var cp: Node = game.current_checkpoint
@@ -292,7 +370,8 @@ func _process(delta: float) -> void:
 		"energy       %.1f / %.0f" % [h.energy, h.get_max_energy()],
 		"i-frames     %.2f  invuln %s %s" % [maxf(0.0, h.iframe_timer), h.is_invulnerable(), h.invuln_flags.keys()],
 		"modifiers    %s" % (", ".join(PackedStringArray(p.modifiers.keys())) if not p.modifiers.is_empty() else "-"),
-		"slots        %s" % " ".join(slots),
+		"slots        %s  (capacity %d)" % [" ".join(slots), game.player_data.slot_capacity],
+		"known        %s" % ", ".join(PackedStringArray(game.player_data.unlocked)),
 		"running      %s" % (", ".join(PackedStringArray(running)) if not running.is_empty() else "-"),
 		"shards       %d" % game.player_data.currency,
 		"checkpoint   %s  at checkpoint %s" % [cp.name if cp else "-", p.at_checkpoint],

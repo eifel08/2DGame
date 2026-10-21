@@ -36,6 +36,9 @@ var is_channeling_heal := false
 var attack_dir := "" ## Written by CombatManager: "", "left", "right", "up", "down".
 var facing_locked := false ## Written by CombatManager during attacks.
 var modifiers := {} ## id -> {stat_name: multiplier}
+## id -> Callable(damage: float, attacker: Node) -> bool. Asked before a hit
+## lands; returning true negates it (e.g. a counter shield).
+var hit_guards := {}
 
 # Movement timers and resources.
 var coyote_timer := 0.0
@@ -96,6 +99,7 @@ func reset() -> void:
 	set_collision_mask_value(ONE_WAY_LAYER, true)
 	fsm.change("normal")
 	modifiers.clear()
+	hit_guards.clear()
 	health.reset()
 	animator.reset()
 
@@ -128,6 +132,14 @@ func add_modifier(id: String, mods: Dictionary) -> void:
 
 func remove_modifier(id: String) -> void:
 	modifiers.erase(id)
+
+
+func add_hit_guard(id: String, guard: Callable) -> void:
+	hit_guards[id] = guard
+
+
+func remove_hit_guard(id: String) -> void:
+	hit_guards.erase(id)
 
 
 func can_attack() -> bool:
@@ -258,11 +270,16 @@ func begin_ability_control(controller: Object) -> void:
 	fsm.change("ability", {"controller": controller})
 
 
-## Applies a hit unless invulnerable. `force` bypasses invulnerability
-## (debug "Take Damage" button). Returns true when the hit landed.
-func receive_hit(damage: float, source_x: float, knock_up := false, force := false) -> bool:
+## Applies a hit unless invulnerable or negated by a hit guard. `force`
+## bypasses both (debug "Take Damage" button). `attacker` is the enemy behind
+## the hit, when known. Returns true when the hit landed.
+func receive_hit(damage: float, source_x: float, knock_up := false, force := false, attacker: Node = null) -> bool:
 	if not force and health.is_invulnerable():
 		return false
+	if not force:
+		for guard: Callable in hit_guards.values():
+			if guard.call(damage, attacker):
+				return false
 	health.take_damage(damage)
 	var dir := 1 if global_position.x >= source_x else -1
 	Events.player_hurt.emit(self, damage)
