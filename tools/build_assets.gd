@@ -27,7 +27,7 @@ const ROOM_LAYOUT := [
 	"#..............................................................#",
 	"#..............................................................#",
 	"#..............................................................#",
-	"#..$..........................##...............................#",
+	"#..$..........................####.............................#",
 	"#=====..................#####.##.......................$.G.....#",
 	"#.....##......................##....................########...#",
 	"#.....##......................##..........................##...#",
@@ -142,6 +142,21 @@ const UPPER_LAYOUT := [
 ]
 
 ## Rooms: layout, output scene, doors (per letter) and optional arena.
+##
+## ROOM-DESIGN RULES (read GUIDELINES.md before editing any layout; the
+## generator checks A and B and reports violations as errors):
+##   Rule A - Downward transitions: wherever an exit leads DOWN into a room
+##            (that room's ceiling gap), solid ground must lie directly below
+##            the whole gap, within 4 tiles, so the player lands safely.
+##            (Testing Halls: the cap of the central wall spans the full gap.)
+##   Rule B - Upward transitions: wherever an exit leads UP into a room (that
+##            room's floor gap), at least one side of the gap needs standable
+##            floor. The player is placed up and to that side (random side if
+##            both are standable), never back over the gap.
+##   Rule C - Secret breakable walls in arenas stay breakable and their door
+##            stays open while the arena locks every other door ('Z' doors
+##            get `secret = true`; no gate is drawn over them).
+##
 ## Door letters: 'D' / 'H' side doorway (bottom cell of a 3-tall wall gap),
 ## 'O' ceiling or floor gap ("width" cells from the letter to the right),
 ## 'Z' side doorway hidden behind a breakable wall that fills the gap ('z'
@@ -375,6 +390,7 @@ func _initialize() -> void:
 		return
 	_build_tileset(texture)
 	for room_id in ROOMS:
+		_check_room_rules(room_id, ROOMS[room_id])
 		_build_room(room_id, ROOMS[room_id])
 	print("build_assets: done")
 	quit()
@@ -924,8 +940,10 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					door_def["trigger_size"] = Vector2(w, 24.0 if door_def.vertical == -1 else 40.0)
 					var origin := Vector2(x * TS + w / 2.0, y * TS if door_def.vertical == -1 else (y + 1) * TS)
 					_add_object(root, objects, counts, DOOR_SCENE, "Door", origin, door_def)
-				"Z":
-					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.doors[ch])
+				"Z": # Rule C: a secret door is never locked by the arena.
+					var secret_def: Dictionary = def.doors[ch].duplicate()
+					secret_def["secret"] = true
+					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, secret_def)
 					_add_object(root, objects, counts, BREAKABLE_SCENE, "BreakableWall", feet, {"secret_id": def.secret_id})
 				"R":
 					_add_object(root, objects, counts, RELIC_SCENE, "Relic", feet, def.relic)
@@ -949,6 +967,41 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 							am.set_meta("kind", ARENA_KINDS[ch])
 							_add(root, am, wave_nodes[i])
 	_save_scene(root, path)
+
+
+## Checks Rules A and B on a layout (see GUIDELINES.md). A violation is an
+## error, so a broken layout is noticed at build time, not in play.
+func _check_room_rules(room_id: String, def: Dictionary) -> void:
+	var layout: Array = def.layout
+	for y in layout.size():
+		var row: String = layout[y]
+		for x in row.length():
+			if row[x] != "O":
+				continue
+			var door: Dictionary = def.doors["O"]
+			var width: int = door.get("width", 1)
+			if door.vertical == -1: # Rule A: ground under every gap column, within 4 rows.
+				for gx in range(x, x + width):
+					var ground := false
+					for gy in range(y + 1, mini(y + 6, layout.size())):
+						if (layout[gy] as String)[gx] in ["#", "="]:
+							ground = true
+							break
+					if not ground:
+						push_error("Rule A violated in %s: no ground below ceiling gap column %d" % [room_id, gx])
+			else: # Rule B: standable floor beside the floor gap on at least one side.
+				var standable := false
+				for side_x in [x - 1, x + width]:
+					if side_x <= 0 or side_x >= row.length() - 1:
+						continue
+					var floor_ok := (layout[y - 1] as String)[side_x] == "#"
+					var top := y - 1
+					while top > 0 and (layout[top - 1] as String)[side_x] == "#":
+						top -= 1
+					var head_ok := top >= 2 and (layout[top - 1] as String)[side_x] != "#" and (layout[top - 2] as String)[side_x] != "#"
+					standable = standable or (floor_ok and head_ok)
+				if not standable:
+					push_error("Rule B violated in %s: no standable floor beside the floor gap at column %d" % [room_id, x])
 
 
 ## Exposed-edge mask for a solid cell: an edge is exposed when the neighbour

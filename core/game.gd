@@ -276,8 +276,17 @@ func load_room(id: String, arrival_door := "", offset := 0.0, velocity := Vector
 		if door.door_id == arrival_door:
 			arrival = door.arrival_for(offset)
 			arrival_velocity = door.arrival_velocity(velocity)
-			if door.vertical == 0:
-				player.facing = door.inward
+			match door.vertical:
+				0:
+					player.facing = door.inward
+				-1: # Arriving from above (a downward transition): Rule A.
+					arrival = _landing_arrival(door, arrival)
+				1: # Arriving from below (an upward transition): Rule B.
+					var eject := _ejection_arrival(door)
+					if not eject.is_empty():
+						arrival = eject.position
+						arrival_velocity = eject.velocity
+						player.facing = eject.side
 	player.global_position = arrival
 	player.velocity = arrival_velocity
 	player.is_jumping = false # No jump cut on the far side: the momentum carries over whole.
@@ -285,12 +294,92 @@ func load_room(id: String, arrival_door := "", offset := 0.0, velocity := Vector
 	camera.snap_to(player)
 
 
+# ---------- Room-design rules A / B (see GUIDELINES.md) ----------
+
+const TILE := 32.0
+const LANDING_DEPTH := 128.0 ## Rule A: ground must lie at most this far below a drop-in point.
+const EJECT_MARGIN := 24.0 ## Rule B: distance from the gap edge to the player's center.
+const EJECT_LIFT := 24.0 ## Rule B: the player appears this far above the floor ("offset up").
+const EJECT_HOP := Vector2(60.0, -280.0) ## Rule B: small hop away from the gap.
+
+
+## Rule A (downward transitions): the player must land on solid ground right
+## after entering. Keeps `arrival` if ground lies below it, otherwise moves
+## it along the gap to the nearest point that has ground below.
+func _landing_arrival(door: Door, arrival: Vector2) -> Vector2:
+	if _has_ground_below(arrival):
+		return arrival
+	var lo := door.gap_left() + Player.WIDTH / 2.0 + 2.0
+	var hi := door.gap_right() - Player.WIDTH / 2.0 - 2.0
+	for d in range(8, int(door.trigger_size.x) + 8, 8):
+		for side in [-1.0, 1.0]:
+			var x: float = clampf(arrival.x + side * d, lo, hi)
+			if _has_ground_below(Vector2(x, arrival.y)):
+				return Vector2(x, arrival.y)
+	push_warning("Rule A: no ground below the downward exit '%s' in %s" % [door.door_id, room_id])
+	return arrival
+
+
+## True when the player's whole width has ground within LANDING_DEPTH below.
+func _has_ground_below(feet: Vector2) -> bool:
+	for dx in [-Player.WIDTH / 2.0 + 1.0, Player.WIDTH / 2.0 - 1.0]:
+		var found := false
+		for dy in range(0, int(LANDING_DEPTH) + 1, 8):
+			if room.is_ground_at(feet + Vector2(dx, dy)):
+				found = true
+				break
+		if not found:
+			return false
+	return true
+
+
+## Rule B (upward transitions): the player appears up and to ONE side of
+## the floor gap, over standable floor, so they never drop straight back
+## into the transition zone. With floor on both sides the side is random.
+## Returns {position, velocity, side}, or {} if neither side can be stood on.
+func _ejection_arrival(door: Door) -> Dictionary:
+	var options := []
+	for side in [-1, 1]:
+		var x: float = (door.gap_left() - EJECT_MARGIN) if side < 0 else (door.gap_right() + EJECT_MARGIN)
+		var surface := _floor_surface(x, door.global_position.y - TILE / 2.0)
+		if surface < INF:
+			options.append({"side": side, "x": x, "surface": surface})
+	if options.is_empty():
+		push_warning("Rule B: no standable floor beside the upward exit '%s' in %s" % [door.door_id, room_id])
+		return {}
+	var pick: Dictionary = options[randi() % options.size()]
+	return {
+		"position": Vector2(pick.x, pick.surface - EJECT_LIFT),
+		"velocity": Vector2(pick.side * EJECT_HOP.x, EJECT_HOP.y),
+		"side": pick.side,
+	}
+
+
+## Top of the floor column at `x`, starting from a solid point at depth
+## `from_y` (inside the floor). INF when there is no floor under the whole
+## player width, or no head room above it.
+func _floor_surface(x: float, from_y: float) -> float:
+	var y := from_y
+	for dx in [-Player.WIDTH / 2.0, 0.0, Player.WIDTH / 2.0]:
+		if not room.is_solid_at(Vector2(x + dx, y)):
+			return INF
+	while room.is_solid_at(Vector2(x, y - TILE)):
+		y -= TILE
+	var surface := floorf(y / TILE) * TILE
+	for dy in [8.0, Player.HEIGHT]:
+		if room.is_solid_at(Vector2(x, surface - dy)):
+			return INF
+	return surface
+
+
+## Doors lock while an arena fight runs, EXCEPT secret doors behind a
+## breakable wall (Rule C): breaking the wall and leaving must always work.
 func _update_doors() -> void:
-	var locked := arena_director.is_active()
+	var arena_lock := arena_director.is_active()
 	var pr := player.get_rect()
 	for door in doors:
-		door.locked = locked
-		if not locked and door.get_trigger_rect().intersects(pr):
+		door.locked = arena_lock and not door.secret
+		if not door.locked and door.get_trigger_rect().intersects(pr):
 			begin_transition(door.target_room, door.target_door, door.offset_of(player.global_position))
 			return
 
@@ -514,6 +603,7 @@ func collect_relic(relic: Relic) -> void:
 
 
 ## A swing hit a breakable wall; the last hit opens the hidden passage.
+## Rule C: this never checks arena state; walls break during fights too.
 func hit_breakable(wall: BreakableWall, at: Vector2) -> void:
 	effects.play("wall_hit", at)
 	camera.add_trauma(0.15)

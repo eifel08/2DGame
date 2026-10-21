@@ -147,7 +147,9 @@ func _step_attack(delta: float) -> void:
 		if applied > 0.0:
 			connected = true
 
-	# Breakable walls (hidden passages) take hits from any swing.
+	# Breakable walls (hidden passages) take hits from any swing. Rule C
+	# (GUIDELINES.md): never gate this on arena state; secret exits must
+	# stay breakable during an arena fight.
 	for wall in game.breakables:
 		if wall.intact and not attack.hit_set.has(wall) and box.intersects(wall.get_rect()):
 			attack.hit_set[wall] = true

@@ -1,29 +1,29 @@
 [gd_scene load_steps=10 format=4]
 
-[ext_resource type="Script" path="res://world/room.gd" id="1_5uwqo"]
-[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_4qp4r"]
-[ext_resource type="Script" path="res://world/objects/arena_encounter.gd" id="3_b42l1"]
-[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="4_ewljm"]
-[ext_resource type="Script" path="res://world/objects/door.gd" id="5_3qbgr"]
-[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="6_sc6eh"]
-[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="7_glpv8"]
-[ext_resource type="PackedScene" path="res://world/objects/breakable_wall.tscn" id="8_brxqf"]
-[ext_resource type="Script" path="res://world/objects/breakable_wall.gd" id="9_db07m"]
+[ext_resource type="Script" path="res://world/room.gd" id="1_ukbwu"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_cw2jo"]
+[ext_resource type="Script" path="res://world/objects/arena_encounter.gd" id="3_tjixa"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="4_ofm3i"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="5_soj1f"]
+[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="6_51o1b"]
+[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="7_g5fpl"]
+[ext_resource type="PackedScene" path="res://world/objects/breakable_wall.tscn" id="8_vov3q"]
+[ext_resource type="Script" path="res://world/objects/breakable_wall.gd" id="9_er4ni"]
 
 [node name="ArenaRoom" type="Node2D"]
-script = ExtResource("1_5uwqo")
+script = ExtResource("1_ukbwu")
 room_id = "arena_room"
 
 [node name="Tiles" type="TileMapLayer" parent="."]
 tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAEAAAAAAAgAAAAAAAEAAAAAAAhAAAAAAAEAAAAAAAiAAAAAAAEAAAAAAAjAAAAAAAAAAAAAAAAAAEAAAACAAAAAAAjAAEAAAAIAAAAAAAAAAIAAAACAAAAAAAjAAIAAAAIAAAAAAAAAAMAAAACAAAAAAAjAAMAAAAIAAAAAAAAAAQAAAACAAAAAAAjAAQAAAAIAAAAAAAAAAUAAAACAAAAAAAjAAUAAAAIAAAAAAAAAAYAAAACAAAAAAAjAAYAAAAIAAAAAAAAAAcAAAACAAAAAAAjAAcAAAAIAAAAAAAAAAgAAAACAAAAAAAPAAgAAAAQAAAAAAAQAAgAAAAQAAAAAAARAAgAAAAQAAAAAAASAAgAAAAQAAAAAAATAAgAAAAQAAAAAAAUAAgAAAAQAAAAAAAVAAgAAAAQAAAAAAAjAAgAAAAIAAAAAAAAAAkAAAACAAAAAAAjAAkAAAAIAAAAAAAAAAoAAAACAAAAAAAjAAoAAAAIAAAAAAAAAAsAAAACAAAAAAAjAAsAAAAIAAAAAAAAAAwAAAAGAAAAAAAKAAwAAAAQAAAAAAALAAwAAAAQAAAAAAAMAAwAAAAQAAAAAAANAAwAAAAQAAAAAAAOAAwAAAAQAAAAAAAWAAwAAAAQAAAAAAAXAAwAAAAQAAAAAAAYAAwAAAAQAAAAAAAZAAwAAAAQAAAAAAAaAAwAAAAQAAAAAAAjAAwAAAAIAAAAAAAAABAAAAABAAAAAAABABAAAAABAAAAAAACABAAAAABAAAAAAADABAAAAABAAAAAAAEABAAAAABAAAAAAAFABAAAAABAAAAAAAGABAAAAABAAAAAAAHABAAAAABAAAAAAAIABAAAAABAAAAAAAJABAAAAABAAAAAAAKABAAAAABAAAAAAALABAAAAABAAAAAAAMABAAAAABAAAAAAANABAAAAABAAAAAAAOABAAAAABAAAAAAAPABAAAAABAAAAAAAQABAAAAABAAAAAAARABAAAAABAAAAAAASABAAAAABAAAAAAATABAAAAABAAAAAAAUABAAAAABAAAAAAAVABAAAAABAAAAAAAWABAAAAABAAAAAAAXABAAAAABAAAAAAAYABAAAAABAAAAAAAZABAAAAABAAAAAAAaABAAAAABAAAAAAAbABAAAAABAAAAAAAcABAAAAABAAAAAAAdABAAAAABAAAAAAAeABAAAAABAAAAAAAfABAAAAABAAAAAAAgABAAAAABAAAAAAAhABAAAAABAAAAAAAiABAAAAABAAAAAAAjABAAAAAAAAAAAAAAABEAAAAAAAAAAAABABEAAAAAAAAAAAACABEAAAAAAAAAAAADABEAAAAAAAAAAAAEABEAAAAAAAAAAAAFABEAAAAAAAAAAAAGABEAAAAAAAAAAAAHABEAAAAAAAAAAAAIABEAAAAAAAAAAAAJABEAAAAAAAAAAAAKABEAAAAAAAAAAAALABEAAAAAAAAAAAAMABEAAAAAAAAAAAANABEAAAAAAAAAAAAOABEAAAAAAAAAAAAPABEAAAAAAAAAAAAQABEAAAAAAAAAAAARABEAAAAAAAAAAAASABEAAAAAAAAAAAATABEAAAAAAAAAAAAUABEAAAAAAAAAAAAVABEAAAAAAAAAAAAWABEAAAAAAAAAAAAXABEAAAAAAAAAAAAYABEAAAAAAAAAAAAZABEAAAAAAAAAAAAaABEAAAAAAAAAAAAbABEAAAAAAAAAAAAcABEAAAAAAAAAAAAdABEAAAAAAAAAAAAeABEAAAAAAAAAAAAfABEAAAAAAAAAAAAgABEAAAAAAAAAAAAhABEAAAAAAAAAAAAiABEAAAAAAAAAAAAjABEAAAAAAAAAAAA=")
-tile_set = ExtResource("2_4qp4r")
+tile_set = ExtResource("2_cw2jo")
 
 [node name="EnemySpawns" type="Node2D" parent="."]
 
 [node name="Objects" type="Node2D" parent="."]
 
 [node name="Arena" type="Node2D" parent="Objects"]
-script = ExtResource("3_b42l1")
+script = ExtResource("3_tjixa")
 arena_id = "proving_grounds"
 trigger_rect = Rect2(288, 32, 768, 480)
 gate_rects = Array[Rect2]([Rect2(0, 416, 32, 32), Rect2(0, 448, 32, 32), Rect2(0, 480, 32, 32)])
@@ -68,38 +68,40 @@ metadata/kind = "strong"
 position = Vector2(944, 512)
 metadata/kind = "strong"
 
-[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("4_ewljm")]
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("4_ofm3i")]
 position = Vector2(16, 512)
-script = ExtResource("5_3qbgr")
+script = ExtResource("5_soj1f")
 door_id = "west"
 target_room = "boss_room"
 target_door = "east"
 inward = 1
 vertical = 0
 trigger_size = Vector2(24, 96)
+secret = false
 
-[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("6_sc6eh")]
+[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("6_51o1b")]
 z_index = 1
 position = Vector2(176, 512)
-script = ExtResource("7_glpv8")
+script = ExtResource("7_g5fpl")
 is_start = false
 prompt = "Save"
 interact_size = Vector2(56, 64)
 
-[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("4_ewljm")]
+[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("4_ofm3i")]
 position = Vector2(1136, 512)
-script = ExtResource("5_3qbgr")
+script = ExtResource("5_soj1f")
 door_id = "east"
 target_room = "secret_room"
 target_door = "west"
 inward = -1
 vertical = 0
 trigger_size = Vector2(24, 96)
+secret = true
 
-[node name="BreakableWall1" type="Node2D" parent="Objects" instance=ExtResource("8_brxqf")]
+[node name="BreakableWall1" type="Node2D" parent="Objects" instance=ExtResource("8_vov3q")]
 z_index = 1
 position = Vector2(1136, 512)
-script = ExtResource("9_db07m")
+script = ExtResource("9_er4ni")
 secret_id = "proving_grounds_wall"
 size = Vector2(32, 96)
 hits_required = 3

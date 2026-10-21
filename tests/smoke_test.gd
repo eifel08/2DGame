@@ -686,15 +686,24 @@ func _run() -> void:
 	Input.action_release(&"jump")
 	_check("jumping up through the ceiling gap enters the Upper Galleries", game.room_id == "upper_room" and game.transition.is_empty(), game.room_id)
 	var floor_gap: Door = _door("floor")
-	_check("you rise out of the floor gap, still moving up", p.velocity.y < 0.0 and floor_gap != null
-		and absf(p.global_position.x - floor_gap.global_position.x) < 64.0, [p.velocity, p.global_position])
-	Input.action_press(&"move_right")
+	var gap_floor_y: float = floor_gap.global_position.y - 64.0 # Top of the 2-tile floor.
+	var beside := p.global_position.x < floor_gap.gap_left() - Player.WIDTH / 2.0 or p.global_position.x > floor_gap.gap_right() + Player.WIDTH / 2.0
+	_check("Rule B: the upward exit puts you up and to one side of the gap", floor_gap != null and beside
+		and p.global_position.y < gap_floor_y, [p.global_position, floor_gap.gap_left(), floor_gap.gap_right()])
 	for i in 90:
 		await _frames(1)
 		if p.grounded:
 			break
-	Input.action_release(&"move_right")
-	_check("steering aside lands on the upper floor", p.grounded and game.room_id == "upper_room", [p.global_position, game.room_id])
+	_check("Rule B: with no input you land on the floor beside the gap, not back in it",
+		p.grounded and game.room_id == "upper_room" and absf(p.global_position.y - gap_floor_y) < 1.0, [p.global_position, game.room_id])
+	# Both sides of this gap are standable, so the side is random: both must occur.
+	var sides_seen := {}
+	for i in 24:
+		game.load_room("upper_room", "floor", 0.0, Vector2(0, -500))
+		sides_seen[signf(p.global_position.x - floor_gap.global_position.x)] = true
+		floor_gap = _door("floor")
+	_check("Rule B: with floor on both sides, either side can be chosen", sides_seen.has(-1.0) and sides_seen.has(1.0), sides_seen)
+	await _frames(60)
 	var kinds := {}
 	for e in game.enemies:
 		kinds[e.tier if not (e is DummyEnemy and e.flying) else "flyer"] = true
@@ -712,6 +721,18 @@ func _run() -> void:
 		if p.grounded:
 			break
 	_check("the fall lands on the ledge under the gap", p.grounded and absf(p.global_position.y - wall_top.y) < 2.0, p.global_position)
+	# Rule A: wherever along the ceiling gap you drop in, you land on solid ground.
+	var rule_a := true
+	var landed_at := []
+	for along in [-60.0, -30.0, 0.0, 30.0, 60.0]:
+		game.load_room("test_room", "ceiling", along, Vector2(0, 100))
+		for i in 60:
+			await _frames(1)
+			if p.grounded:
+				break
+		landed_at.append(p.global_position)
+		rule_a = rule_a and p.grounded and absf(p.global_position.y - wall_top.y) < 2.0 and game.room_id == "test_room"
+	_check("Rule A: every point of the downward exit has ground right below it", rule_a, landed_at)
 	await _reset()
 
 	# --- Enemy persistence and respawn hierarchy ---
@@ -973,6 +994,48 @@ func _run() -> void:
 	await _frames(30)
 	_check("a cleared arena room stays cleared", grounds.state == "cleared" and game.enemies.is_empty(), [grounds.state, game.enemies.size()])
 	await _frames(60)
+
+	# --- Rule C: the secret wall works while the arena locks every other door ---
+	game.new_game()
+	Config.upgrades.god_mode = true
+	game.load_room("arena_room", "west")
+	await _frames(30)
+	p.global_position = Vector2(20 * 32, 512)
+	for i in 60:
+		await _frames(1)
+		if game.arena_director.is_active():
+			break
+	var secret_door: Door = _door("east")
+	_check("Rule C: during the arena, normal doors lock but the secret door does not",
+		game.arena_director.is_active() and _door("west").locked and secret_door.secret and not secret_door.locked)
+	var arena_wall: BreakableWall = game.breakables[0]
+	p.global_position = Vector2(arena_wall.get_rect().position.x - 24.0, 512)
+	p.facing = 1
+	await _frames(3)
+	for i in 3:
+		Input.action_press(&"attack")
+		await _frames(3)
+		Input.action_release(&"attack")
+		await _frames(30)
+		p.global_position = Vector2(arena_wall.get_rect().position.x - 24.0, 512)
+		p.facing = 1
+	_check("Rule C: the secret wall breaks during an active arena", not arena_wall.intact and game.arena_director.is_active())
+	Input.action_press(&"move_right")
+	for i in 60:
+		await _frames(1)
+		if game.room_id == "secret_room":
+			break
+	Input.action_release(&"move_right")
+	_check("Rule C: the secret exit can be used to leave mid-fight", game.room_id == "secret_room", game.room_id)
+	game.load_room("arena_room", "east")
+	await _frames(3)
+	_check("leaving mid-fight leaves the arena uncleared, ready to retry",
+		not game.world.is_arena_cleared("proving_grounds") and not game.arena_director.is_active() and not game.breakables[0].intact)
+	# Back to the state the next block expects: arena cleared, wall intact.
+	game.new_game()
+	game.world.clear_arena("proving_grounds")
+	game.load_room("arena_room", "west")
+	await _frames(5)
 
 	# --- Hidden passage: breakable wall to the Hidden Shrine ---
 	var wall: BreakableWall = game.breakables[0]

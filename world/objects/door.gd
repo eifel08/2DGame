@@ -7,6 +7,15 @@ extends Node2D
 ## the opening itself is the only sign of an exit. While `locked` (an arena
 ## is active) it does nothing. No autoloads here (the generator instantiates it).
 ##
+## Room-design rules (full text: GUIDELINES.md in the project root):
+##   Rule A - a DOWNWARD exit must have solid ground right below its arrival
+##            point, so the player lands safely (Game._landing_arrival).
+##   Rule B - an UPWARD exit puts the player up and to ONE side of the floor
+##            gap, onto standable floor (random side if both are standable),
+##            never back over the gap (Game._ejection_arrival).
+##   Rule C - a door behind a breakable wall (`secret`) is never locked by an
+##            arena; the wall can be broken and used mid-fight.
+##
 ## Node origin:
 ##   side doors (vertical = 0)   - floor of the doorway, at the cell center
 ##   ceiling door (vertical = -1) - top edge of the room, center of the gap
@@ -18,9 +27,10 @@ extends Node2D
 @export var inward := -1 ## Side doors: direction into this room (+1 right, -1 left).
 @export_range(-1, 1) var vertical := 0 ## 0 side, -1 opening in the ceiling, 1 opening in the floor.
 @export var trigger_size := Vector2(24, 96)
+@export var secret := false ## Behind a breakable wall: an arena never locks it (Rule C).
 
 const SIDE_ARRIVAL := 40.0 ## Just past the trigger, inside the room.
-const RISE_SPEED := 900.0 ## Minimum upward speed when arriving through a floor gap.
+const RISE_SPEED := 900.0 ## Fallback only: rise speed when no side of a floor gap is standable.
 
 var locked := false
 
@@ -46,7 +56,8 @@ func arrival_for(offset: float) -> Vector2:
 	match vertical:
 		-1: # Dropping in from above: just below the ceiling gap.
 			return global_position + Vector2(_clamp_along(offset), trigger_size.y + 42.0)
-		1: # Rising in from below: inside the floor gap, under the trigger line.
+		1: # Rising in from below. Game applies Rule B (to one side, on the floor);
+			# this point inside the gap is only the fallback.
 			return global_position + Vector2(_clamp_along(offset), -trigger_size.y - 2.0)
 	return global_position + Vector2(inward * SIDE_ARRIVAL, clampf(offset, -trigger_size.y + 40.0, 0.0))
 
@@ -64,6 +75,15 @@ func arrival_velocity(velocity: Vector2) -> Vector2:
 	if vertical == 1:
 		return Vector2(velocity.x, minf(velocity.y, -RISE_SPEED))
 	return velocity
+
+
+## Horizontal extent of a ceiling / floor gap.
+func gap_left() -> float:
+	return global_position.x - trigger_size.x / 2.0
+
+
+func gap_right() -> float:
+	return global_position.x + trigger_size.x / 2.0
 
 
 func _clamp_along(offset: float) -> float:
