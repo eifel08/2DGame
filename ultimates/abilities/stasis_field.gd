@@ -1,9 +1,11 @@
 class_name StasisField
 extends UltimateAbility
-## CONTROL FIELD: an instant pulse that freezes every enemy and hostile
-## projectile within `radius` for `duration`. Frozen enemies stop moving and
-## thinking, deal no contact damage, and can still be hit. Frozen
-## projectiles hang in the air, harmless, then fly on.
+## EMERGENCY ESCAPE: a near-instant, short-range pulse that freezes every
+## enemy and hostile projectile within `radius` (small) for `duration`
+## (short). It is a last-second reaction to slip out of danger, not area
+## control. Frozen enemies stop moving and thinking, deal no contact damage,
+## and can still be hit. Frozen projectiles hang in the air, harmless, then
+## fly on.
 
 var t := 0.0
 var origin := Vector2.ZERO
@@ -14,10 +16,10 @@ var frozen_projectiles := 0
 func _init() -> void:
 	id = "stasis_field"
 	display_name = "Stasis Field"
-	kind = "Control Field"
+	kind = "Emergency Escape"
 	color = Color("#74c0fc")
 	icon = "stasis"
-	description = "A cold pulse that freezes nearby enemies and their projectiles in place for a short time."
+	description = "A split-second cold pulse that freezes enemies and projectiles right next to you. Use it to escape at the last moment."
 
 
 func _on_activate(ctx: UltimateContext) -> void:

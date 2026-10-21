@@ -4,6 +4,7 @@ extends Node2D
 ##   - player melee: input, directional hitboxes, pogo, recoil
 ##   - a generic damage API used by ultimates and projectiles
 ##   - enemy contact damage and hazard damage to the player
+##     (the three damage sources and their i-frame rules: combat/damage.gd)
 ## Outcomes are reported only through Events (hit_landed, pogo_bounced, ...).
 ## Also draws the placeholder slash and the debug hitboxes / animation labels.
 
@@ -223,10 +224,11 @@ func _resolve_contact_damage() -> void:
 	var pr := p.get_rect()
 	for enemy in get_enemies():
 		if enemy.deals_contact_damage() and pr.intersects(enemy.get_rect()):
-			if p.receive_hit(Config.combat.contact_damage * enemy.contact_damage_mul, enemy.get_center().x, false, false, enemy):
+			if p.receive_hit(Config.combat.contact_damage * enemy.contact_damage_mul, enemy.get_center().x, false, false, enemy, Damage.Source.ENEMY):
 				return
 
 
+## Environmental hazards ignore i-frames (Damage.Source.HAZARD).
 func _resolve_hazards() -> void:
 	var p := get_player()
 	var r := p.get_rect().grow_individual(-2.0, -4.0, -2.0, 0.0)

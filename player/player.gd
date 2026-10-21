@@ -36,8 +36,9 @@ var is_channeling_heal := false
 var attack_dir := "" ## Written by CombatManager: "", "left", "right", "up", "down".
 var facing_locked := false ## Written by CombatManager during attacks.
 var modifiers := {} ## id -> {stat_name: multiplier}
-## id -> Callable(damage: float, attacker: Node) -> bool. Asked before a hit
-## lands; returning true negates it (e.g. a counter shield).
+## id -> Callable(damage: float, attacker: Node, source: Damage.Source) -> bool.
+## Asked before an enemy or projectile hit lands; returning true negates it
+## (e.g. a counter shield). Hazards never ask the guards.
 var hit_guards := {}
 
 # Movement timers and resources.
@@ -270,15 +271,17 @@ func begin_ability_control(controller: Object) -> void:
 	fsm.change("ability", {"controller": controller})
 
 
-## Applies a hit unless invulnerable or negated by a hit guard. `force`
-## bypasses both (debug "Take Damage" button). `attacker` is the enemy behind
-## the hit, when known. Returns true when the hit landed.
-func receive_hit(damage: float, source_x: float, knock_up := false, force := false, attacker: Node = null) -> bool:
-	if not force and health.is_invulnerable():
+## Applies an enemy or projectile hit (Damage.Source) unless invulnerable or
+## negated by a hit guard. `force` bypasses both (debug "Take Damage" button).
+## `attacker` is the enemy behind the hit, when known. Returns true when the
+## hit landed. Hazards use hazard_respawn() instead.
+func receive_hit(damage: float, source_x: float, knock_up := false, force := false, attacker: Node = null,
+		source := Damage.Source.ENEMY) -> bool:
+	if not force and health.blocks(source):
 		return false
 	if not force:
 		for guard: Callable in hit_guards.values():
-			if guard.call(damage, attacker):
+			if guard.call(damage, attacker, source):
 				return false
 	health.take_damage(damage)
 	var dir := 1 if global_position.x >= source_x else -1
@@ -311,16 +314,18 @@ func enter_trance() -> void:
 	fsm.change("trance")
 
 
-## Touching a hazard: take damage (unless invulnerable) and teleport back to
-## the last safe ground (or the checkpoint, see Config.combat). If the damage
-## is lethal there is no teleport: the death respawns the player at the
-## active checkpoint instead. Teleporting even when invulnerable (dash, god
-## mode, i-frames) guarantees the player can never get stuck in a hazard.
+## Touching an environmental hazard (Damage.Source.HAZARD): take damage and
+## teleport back to the last safe ground (or the checkpoint, see
+## Config.combat). I-frames and invulnerability (recent hits, dash, casts,
+## Meteor Slam) do NOT protect here; only the debug God Mode does. If the
+## damage is lethal there is no teleport: the death respawns the player at
+## the active checkpoint instead. The teleport always happens, so the player
+## can never get stuck in a hazard or take damage from it twice in a row.
 func hazard_respawn(damage: float) -> void:
 	if is_dying():
 		return # Already collapsing; the death respawn takes over.
 	var from := global_position
-	var took_damage := not health.is_invulnerable()
+	var took_damage := not health.blocks(Damage.Source.HAZARD)
 	if took_damage:
 		health.take_damage(damage)
 		if health.health <= 0.0:

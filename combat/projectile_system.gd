@@ -97,7 +97,7 @@ func step(delta: float) -> void:
 			var player: Player = combat.get_player()
 			if Geom.circle_overlaps_rect(pr.pos, pr.radius, player.get_rect()):
 				var shooter: Node = pr.owner if is_instance_valid(pr.owner) else null
-				player.receive_hit(pr.damage, pr.pos.x - signf(pr.vel.x), false, false, shooter)
+				player.receive_hit(pr.damage, pr.pos.x - signf(pr.vel.x), false, false, shooter, Damage.Source.PROJECTILE)
 				pr.dead = true
 			continue
 		for e in combat.get_enemies():

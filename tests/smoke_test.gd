@@ -292,7 +292,7 @@ func _run() -> void:
 	_check("player is not stuck in the hazard", not game.room.find_hazard(p.get_rect()).has_area() and p.global_position.x < pit_left, p.global_position)
 	_check("hazard hit grants i-frames", p.health.has_iframes() or p.health.health < hp_full)
 
-	# --- Hazard while invulnerable: still teleports, no damage ---
+	# --- Debug God Mode: hazards still teleport, but deal no damage ---
 	await _reset()
 	Config.upgrades.god_mode = true
 	p.global_position = Vector2(pit_left - 100.0, p.global_position.y)
@@ -300,9 +300,12 @@ func _run() -> void:
 	var hp_god := p.health.health
 	p.global_position = Vector2(pit_left + 40.0, 22.0 * 32.0 - 2.0) # Drop straight into the spikes.
 	await _frames(20)
-	_check("invulnerable hazard touch teleports out", p.global_position.x < pit_left, p.global_position)
-	_check("invulnerable hazard touch deals no damage", is_equal_approx(p.health.health, hp_god), p.health.health)
+	_check("God Mode hazard touch still teleports out", p.global_position.x < pit_left, p.global_position)
+	_check("God Mode (debug) blocks hazard damage", is_equal_approx(p.health.health, hp_god), p.health.health)
 	Config.upgrades.god_mode = false
+
+	# --- Three damage sources: hazards ignore i-frames, enemies and projectiles do not ---
+	await _test_damage_sources(pit_left)
 
 	# --- Pogo off spikes does not trigger the hazard ---
 	await _reset()
@@ -1320,60 +1323,95 @@ func _test_new_spells() -> void:
 	_check("eight spells are registered and known from the start",
 		game.ultimates.abilities.size() == 8 and data.unlocked.size() == 8, data.unlocked)
 
-	# Repulse Aegis: consumes all energy, negates the next hit, strikes back x1.5.
+	# Repulse Aegis: a parry. Consumes all energy, a tiny window, enemy contact only.
 	await _reset()
 	var aegis: RepulseAegis = game.ultimates.get_ability("repulse_aegis")
+	var window: float = Config.ultimates.repulse_aegis.window
+	_check("aegis is a tight parry (no wind-up, a short window)",
+		is_zero_approx(Config.ultimates.repulse_aegis.cast_time) and window <= 0.25, window)
 	p.health.set_energy(10.0)
 	await _cast_slot0("repulse_aegis")
 	_check("aegis refused below its threshold", is_equal_approx(p.health.energy, 10.0) and not aegis.is_running, p.health.energy)
+	var striker: DummyEnemy = game.spawn_enemy_kind("strong", p.global_position + Vector2(200, 0))
+	striker.patrol = false
+	await _frames(3)
 	p.health.set_energy(80.0)
 	await _cast_slot0("repulse_aegis")
 	_check("aegis consumes all energy", is_zero_approx(p.health.energy) and is_equal_approx(aegis.consumed, 80.0), [p.health.energy, aegis.consumed])
-	await _frames(15)
-	_check("aegis shield is up", aegis.is_running and p.hit_guards.has(RepulseAegis.GUARD_ID))
-	var striker: Enemy = game.spawn_enemy_kind("strong", p.global_position + Vector2(200, 0))
-	await _frames(3)
+	await _frames(1)
+	_check("aegis window opens at once (within a few frames)", aegis.is_running and p.hit_guards.has(RepulseAegis.GUARD_ID))
 	var striker_hp := striker.health
-	p.health.iframe_timer = 0.0
-	p.global_position = striker.global_position
+	p.global_position = striker.global_position # Contact right inside the window.
 	await _frames(2)
-	_check("aegis negates contact damage", is_equal_approx(p.health.health, p.health.get_max_health()), p.health.health)
+	_check("a well-timed aegis negates contact damage", is_equal_approx(p.health.health, p.health.get_max_health()) and aegis.countered, p.health.health)
 	_check("aegis strikes back with one and a half times the energy",
 		is_equal_approx(aegis.last_reflected, 120.0) and is_equal_approx(striker_hp - striker.health, minf(120.0, striker_hp)),
 		[aegis.last_reflected, striker_hp, striker.health])
 	_check("aegis is spent after one counter", not aegis.is_running and p.hit_guards.is_empty())
+
+	# Too early: the window closes before contact, the energy is gone, the hit lands.
+	await _reset()
+	var late: DummyEnemy = game.spawn_enemy_kind("strong", p.global_position + Vector2(200, 0))
+	late.patrol = false
+	await _frames(3)
+	p.health.set_energy(80.0)
+	await _cast_slot0("repulse_aegis")
+	await _frames(int(ceil(window * 60.0)) + 4)
+	_check("the aegis window closes quickly", not aegis.is_running and not aegis.countered and is_zero_approx(p.health.energy), aegis.remaining)
+	p.global_position = late.global_position
+	await _frames(2)
+	_check("a mistimed aegis does not protect", p.health.health < p.health.get_max_health(), p.health.health)
+
+	# Very short range: an enemy a hair from the body triggers it, one a step away does not.
+	await _reset()
+	var near: DummyEnemy = game.spawn_enemy_kind("strong", p.global_position + Vector2(200, 0))
+	near.patrol = false
+	await _frames(3)
+	var touch_x: float = near.global_position.x - near.size.x / 2.0 - Player.WIDTH / 2.0
+	p.global_position = Vector2(touch_x - 30.0, near.global_position.y)
+	p.health.set_energy(50.0)
+	await _cast_slot0("repulse_aegis")
+	await _frames(int(ceil(window * 60.0)) + 4)
+	_check("aegis does not reach an enemy a step away", not aegis.countered and is_equal_approx(near.health, near.max_health), near.health)
+	p.global_position = Vector2(touch_x - 3.0, near.global_position.y)
+	p.health.set_energy(50.0)
+	await _cast_slot0("repulse_aegis")
+	await _frames(2)
+	_check("aegis counters an enemy at the player's skin", aegis.countered and near.health < near.max_health, near.health)
+
+	# No projectile repel: a projectile hurts as usual during the window.
 	await _reset()
 	p.health.set_energy(40.0)
 	await _cast_slot0("repulse_aegis")
-	await _frames(15)
-	p.health.iframe_timer = 0.0
-	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(30, 0), "velocity": Vector2(-200, 0), "hostile": true, "damage": 20.0})
-	await _frames(15)
-	_check("aegis negates a projectile hit", is_equal_approx(p.health.health, p.health.get_max_health()) and not aegis.is_running, p.health.health)
+	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(14, 0), "velocity": Vector2(-200, 0), "hostile": true, "damage": 20.0})
+	await _frames(3)
+	_check("aegis does not block projectiles",
+		is_equal_approx(p.health.health, p.health.get_max_health() - 20.0) and not aegis.countered, [p.health.health, aegis.countered])
 
-	# Stasis Field: enemies and hostile projectiles in range freeze in place.
+	# Stasis Field: a short-range, short emergency freeze.
 	await _reset()
 	var stasis: StasisField = game.ultimates.get_ability("stasis_field")
+	var sf: Dictionary = Config.ultimates.stasis_field
+	_check("stasis is tuned as a quick emergency tool", sf.radius <= 100.0 and sf.duration <= 1.0 and sf.cast_time <= 0.1, sf)
 	var frozen: DummyEnemy = _first_enemy(false)
-	p.global_position = frozen.global_position + Vector2(-90, 0)
+	p.global_position = frozen.global_position + Vector2(-60, 0)
 	p.health.set_energy(100.0)
-	var far: Enemy = game.spawn_enemy_kind("weak", p.global_position + Vector2(-420, 0))
-	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(0, -80), "velocity": Vector2(0, -20), "hostile": true, "life": 9.0})
+	var far: Enemy = game.spawn_enemy_kind("weak", p.global_position + Vector2(-200, 0))
+	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(0, -60), "velocity": Vector2(0, -20), "hostile": true, "life": 9.0})
 	await _cast_slot0("stasis_field")
-	await _frames(20)
-	_check("stasis spends its cost", is_equal_approx(p.health.energy, 100.0 - Config.ultimates.stasis_field.cost), p.health.energy)
+	await _frames(3)
+	_check("stasis spends its cost", is_equal_approx(p.health.energy, 100.0 - sf.cost), p.health.energy)
 	var frozen_at := frozen.global_position
 	var shot: Dictionary = game.combat.projectiles.list[0] if not game.combat.projectiles.list.is_empty() else {}
 	var shot_at: Vector2 = shot.get("pos", Vector2.ZERO)
-	await _frames(30)
-	_check("stasis freezes enemies in range", frozen.is_frozen() and frozen.global_position == frozen_at and stasis.frozen_enemies >= 1,
+	await _frames(20)
+	_check("stasis freezes enemies right next to the player", frozen.is_frozen() and frozen.global_position == frozen_at and stasis.frozen_enemies >= 1,
 		[frozen.freeze_timer, frozen_at, frozen.global_position])
 	_check("frozen enemies deal no contact damage", not frozen.deals_contact_damage())
 	_check("stasis freezes projectiles in range", stasis.frozen_projectiles == 1 and shot.get("pos") == shot_at, [stasis.frozen_projectiles, shot_at, shot.get("pos")])
-	_check("stasis leaves enemies out of range alone", not far.is_frozen(), far.global_position)
-	game.ultimates.cancel_all()
-	await _frames(int(Config.ultimates.stasis_field.duration * 60.0))
-	_check("stasis wears off", not frozen.is_frozen(), frozen.freeze_timer)
+	_check("stasis is short-range: an enemy a few steps away is not frozen", not far.is_frozen(), far.global_position)
+	await _frames(int(sf.duration * 60.0))
+	_check("stasis wears off quickly", not frozen.is_frozen() and not stasis.is_running, frozen.freeze_timer)
 
 	# Radiant Lance: a forward beam that damages; aiming up fires it vertically.
 	await _reset()
@@ -1487,6 +1525,84 @@ func _test_spell_management() -> void:
 	game.ultimates.set_capacity(PlayerData.DEFAULT_CAPACITY)
 	data.equipped = loadout
 	Events.loadout_changed.emit()
+	await _reset()
+
+
+## Damage.Source rules: ENEMY and PROJECTILE respect i-frames; HAZARD never does.
+func _test_damage_sources(pit_left: float) -> void:
+	var p: Player = game.player
+	var hazard_dmg: float = Config.combat.hazard_damage
+	var spike_drop := Vector2(pit_left + 40.0, 22.0 * 32.0 - 2.0)
+
+	await _reset()
+	p.health.iframe_timer = 2.0
+	_check("i-frames block enemies and projectiles but not hazards",
+		p.health.blocks(Damage.Source.ENEMY) and p.health.blocks(Damage.Source.PROJECTILE) and not p.health.blocks(Damage.Source.HAZARD))
+
+	# Recent-hit i-frames: spikes still hurt.
+	p.global_position = Vector2(pit_left - 100.0, p.global_position.y)
+	await _frames(10)
+	var hp := p.health.health
+	p.health.iframe_timer = 2.0
+	p.global_position = spike_drop
+	await _frames(20)
+	_check("spikes hurt through i-frames from a recent hit",
+		is_equal_approx(p.health.health, hp - hazard_dmg) and p.global_position.x < pit_left, [p.health.health, p.global_position])
+
+	# Every invulnerability flag (dash, cast, ability) is ignored by hazards too.
+	await _reset()
+	p.global_position = Vector2(pit_left - 100.0, p.global_position.y)
+	await _frames(10)
+	hp = p.health.health
+	p.health.set_invulnerable("dash", true)
+	p.global_position = spike_drop
+	await _frames(20)
+	p.health.set_invulnerable("dash", false)
+	_check("spikes hurt through dash invulnerability", is_equal_approx(p.health.health, hp - hazard_dmg), p.health.health)
+
+	# Meteor Slam into the spikes: its dive i-frames do not save the player.
+	await _reset()
+	var slam: MeteorSlam = game.ultimates.get_ability("meteor_slam")
+	p.global_position = Vector2(pit_left - 100.0, p.global_position.y)
+	await _frames(10)
+	hp = p.health.health
+	var slams := slam.slam_count
+	p.global_position = spike_drop + Vector2(0, -110)
+	p.health.set_energy(100.0)
+	await _cast_slot0("meteor_slam")
+	var dived := false
+	for i in 40:
+		if p.state_name() == "ability":
+			dived = p.health.is_invulnerable()
+		if p.health.health < hp:
+			break
+		await _frames(1)
+	await _frames(5)
+	_check("meteor slam i-frames do not block spikes",
+		dived and is_equal_approx(p.health.health, hp - hazard_dmg) and p.global_position.x < pit_left and slam.slam_count == slams,
+		[dived, p.health.health, p.global_position, slam.slam_count])
+
+	# I-frames still protect against enemies...
+	await _reset()
+	var dummy: DummyEnemy = _first_enemy(false)
+	dummy.patrol = false
+	await _frames(3)
+	hp = p.health.health
+	p.health.iframe_timer = 2.0
+	p.global_position = dummy.global_position
+	await _frames(3)
+	_check("i-frames still block enemy contact", is_equal_approx(p.health.health, hp), p.health.health)
+	# ...and projectiles (from enemies, or fired by a hazard).
+	await _reset()
+	hp = p.health.health
+	p.health.iframe_timer = 2.0
+	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(14, 0), "velocity": Vector2(-200, 0), "hostile": true, "damage": 20.0})
+	await _frames(4)
+	_check("i-frames still block projectiles", is_equal_approx(p.health.health, hp) and game.combat.projectiles.list.is_empty(), p.health.health)
+	p.health.iframe_timer = 0.0
+	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(14, 0), "velocity": Vector2(-200, 0), "hostile": true, "damage": 20.0})
+	await _frames(4)
+	_check("without i-frames a projectile hurts", is_equal_approx(p.health.health, hp - 20.0), p.health.health)
 	await _reset()
 
 

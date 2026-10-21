@@ -81,8 +81,8 @@ The pogo is forgiving: the downward swing has a wide hitbox (78 × 80 px, `Confi
   | Spirit Volley | Projectiles | 50 | Fan of homing bolts. |
   | Ascendant Form | Buff | 100 | More damage, speed and reach for a while. |
   | Comet Dash | Mobility strike | 25 | Aimable invulnerable charge, then a blast. |
-  | **Repulse Aegis** | Counter shield | 20 minimum, **consumes all energy** | For up to 6 s, the next enemy hit (contact or projectile) is negated. The attacker takes **150 %** of the energy consumed. One counter per cast. |
-  | **Stasis Field** | Control | 40 | Instant pulse: every enemy and hostile projectile within 210 px freezes in place for 2.5 s. Frozen enemies cannot move or hurt you but can still be hit. Frozen projectiles hang harmless, then fly on. |
+  | **Repulse Aegis** | Counter (parry) | 20 minimum, **consumes all energy** | No wind-up. Opens a **0.2 s** counter window. If an enemy touches you inside it (or comes within 6 px of your body), its contact damage is negated and it takes **150 %** of the energy consumed. **Enemy contact only:** projectiles are not blocked and hurt as usual. Cast too early and the energy is wasted. |
+  | **Stasis Field** | Emergency escape | 40 | Near-instant (0.05 s) pulse: enemies and hostile projectiles within **90 px** freeze in place for **0.8 s**. A last-second escape, not area control. Frozen enemies cannot move or hurt you but can still be hit. Frozen projectiles hang harmless, then fly on. |
   | **Radiant Lance** | Beam | 60 | A long piercing beam forward, or straight up while holding Up. It stops at walls and hits each enemy once. |
   | **Meteor Slam** | Dive strike | 30 | Invulnerable straight-down plunge that hits enemies on the way, then a wide ground shockwave and short landing i-frames. On the ground it slams in place. |
 - **Color-coded energy bar, no numbers.** Each equipped slot puts a mark on the bar at the energy it needs. Under the bar, the hotkey strip shows the four slots from left to right, each with its icon and its **actual key** (1–4 by default; a key rebound in Settings shows its new name). A mark or slot is bright when there is enough energy.
@@ -91,7 +91,7 @@ The pogo is forgiving: the downward swing has a wide hitbox (78 × 80 px, `Confi
 - **No exact stats for the player.** Abilities, tooltips and lore never show energy numbers. Each ability shows a small gauge filled to its requirement instead. Exact values appear only in the debug stats view.
 
 ### Checkpoints, safe ground and death
-- **Spikes:** damage, then you reappear on the **last safe ground** you stood on, a few steps back. This happens even while invulnerable (but then without damage), so a damage loop is impossible.
+- **Spikes:** damage, then you reappear on the **last safe ground** you stood on, a few steps back. **I-frames never protect against hazards** (see *Damage sources* below). Because you are always moved out, a damage loop is impossible.
 - **Death:** only when health reaches zero (from enemies or spikes) do you respawn at the checkpoint where you **last saved**.
   - A short collapse animation plays first (red flash, death sound). Then the screen fades.
   - Respawning works like a save: weak and strong enemies return. Energy starts at **0**.
@@ -161,6 +161,19 @@ Each wave starts once the previous one is defeated. After the last wave the gate
 - The camera, including screen shake, never shows anything outside the room.
 - Every opening in a room's outer wall (sides, ceiling, floor) is an exit. The automated test checks all of this.
 - With *Hitboxes & Stats* on, the debug view also outlines solid tiles, door triggers and arena areas.
+
+### Damage sources and i-frames
+Damage to the player comes from exactly three sources (`combat/damage.gd`, `Damage.Source`). Each has its own rule, decided in one place: `HealthEnergy.blocks(source)`.
+
+| Source | Examples | I-frames / invulnerability protect? |
+| --- | --- | --- |
+| `ENEMY` | Touching a creature (dummies, the boss's charge) | **Yes** |
+| `PROJECTILE` | Anything fired, by an enemy or by a hazard (boss shards, shockwaves, a future turret) | **Yes** |
+| `HAZARD` | Touching the environment (spikes; later lava, acid) | **Never**: not post-hit i-frames, dash, casts or the Meteor Slam dive. Only the debug *God Mode* protects. |
+
+- A projectile fired by a hazard is still a `PROJECTILE`. Only direct contact with the hazard bypasses i-frames.
+- Enemy and projectile hits go through `Player.receive_hit(..., source)`; hazards go through `Player.hazard_respawn()`.
+- Hit guards (such as Repulse Aegis) receive the source and only ever see enemy and projectile hits.
 
 ### Hazards
 Spikes damage the player (see above). **Enemies that touch spikes die instantly**, and **shards that touch spikes disappear**.
@@ -245,8 +258,9 @@ The HUD is clean by default: health and energy bars, threshold marks, the hotkey
 | Checkpoint tablet | The only tablet stands just before the first flame. Saving at any flame shows no text and starts the trance. |
 | Dialogue | Walk to the robed NPC right of the start, press E. |
 | Debug, keyboard only | F1, then F2: arrows, Enter, Left/Right on sliders. F2 again resumes. |
-| Repulse Aegis | F1 → *Max Energy*. Put the Aegis on a key (F1 → *Auto-Equip Known* with capacity 8, or the inventory at a flame). Cast it: the energy bar empties and a gold hexagon appears. Walk into a dummy: you take no damage and the dummy takes 150 damage (100 energy × 1.5), enough to destroy it. Stats show with *Hitboxes & Stats*. |
-| Stasis Field | Stand near a moving dummy, cast it: a blue ring opens, the dummy stops and turns blue. It does not hurt you while frozen. In the Boss Room, cast it when shards fly at you: they freeze in the air. |
+| Repulse Aegis | F1 → *Max Energy*. Put the Aegis on a key (F1 → *Auto-Equip Known* with capacity 8, or the inventory at a flame). Walk toward a dummy and cast it **just before** you touch it: a gold hexagon flashes and shrinks, you take no damage, and the dummy takes 150 damage (100 energy × 1.5). Cast it early: the hexagon vanishes, the energy is gone, and the touch hurts. In the Boss Room, a shard still hurts during the window. |
+| Stasis Field | Let a dummy walk right up to you, then cast: a small blue ring snaps open, the dummy stops and turns blue for under a second. An enemy a few steps away is not affected. In the Boss Room, cast it as a shard is about to hit you: it hangs in the air. |
+| Hazards ignore i-frames | F1 → *Take Damage*, then at once walk into the spike pit: you still lose health. Cast Meteor Slam above a spike pit: the dive does not protect you. A dummy touching you during i-frames still does nothing. |
 | Radiant Lance | Face a dummy and cast: a pink beam hits it. Hold Up while casting: the beam fires straight up. |
 | Meteor Slam | Jump above a dummy and cast: you plunge down (invulnerable), land with a green shockwave and the dummy is hit. |
 | Known spells | F1 → *Spells*: untick a spell. It leaves the inventory pool and its slot. Tick it again to relearn it. |
@@ -269,7 +283,8 @@ player/
   player_animator.gd     animation state machine (rules → animation name)
   player_rig.tscn        placeholder skeleton; swap art here
 stats/health_energy.gd   health, shared energy, healing, i-frames, growth bonuses
-combat/                  melee, pogo, damage API, contact/hazard damage, projectiles
+combat/                  melee, pogo, damage API, contact/hazard damage, projectiles;
+  damage.gd              the three damage sources (enemy, projectile, hazard) and their i-frame rules
 ultimates/               ability base class, slot manager (keys 1-8, capacity), the 8 abilities
 enemies/
   enemy.gd               shared enemy base (tiers, health, contact damage)
@@ -291,7 +306,7 @@ core/arena_director.gd   arena waves: start, next wave, clear, abort
 effects/fx/               one scene per visual effect (placeholders), FxPlayer
 audio/sfx.tscn, sfx/     the Sfx autoload: one AudioStreamPlayer per sound + .wav placeholders
 GUIDELINES.md            binding design rules A-D (transitions, secret walls, no celebrations)
-tests/smoke_test.tscn    automated headless test (267 checks)
+tests/smoke_test.tscn    automated headless test (280 checks)
 ```
 
 ## Extending
@@ -299,7 +314,7 @@ tests/smoke_test.tscn    automated headless test (267 checks)
 - **New ultimate:** extend `UltimateAbility` in `ultimates/abilities/`, add a config block to `Config.ultimates`, and register it in `ultimate_registry.gd`. Every registered ability starts known; `UltimateManager.set_known(id, false)` removes one. It then appears in the inventory pool, in the debug overlay's *Spells* list and cost sliders, and can be slotted at a checkpoint. Give it an icon by adding a `match` case in `ui/ability_icon.gd`.
   - Optional hooks, no engine changes needed:
     - `pay_cost(health)`: a special energy rule (Repulse Aegis consumes the whole meter).
-    - `Player.add_hit_guard(id, callable)`: intercept incoming hits (counters, shields).
+    - `Player.add_hit_guard(id, callable)`: intercept incoming enemy and projectile hits (counters, shields). The callable gets `(damage, attacker, source)`; check `source` (`Damage.Source`).
     - `Player.begin_ability_control(self)`: take over movement (Comet Dash, Meteor Slam). Set `invulnerable` for i-frames.
     - `Enemy.freeze(duration)` and `ProjectileSystem.freeze_in_circle(...)`: crowd control.
 - **New lore or NPC:** create a `DialogueData` resource and assign it to an instance of `world/objects/lore_stone.tscn` or `npc.tscn` under `TestRoom/Objects`.
@@ -316,4 +331,4 @@ tests/smoke_test.tscn    automated headless test (267 checks)
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It plays the game through real input actions and checks 267 behaviors. New in this version: the four new spells (Repulse Aegis consumes all energy, negates a contact or projectile hit and strikes back ×1.5; Stasis Field freezes enemies and projectiles in range, harmless while frozen, and wears off; Radiant Lance fires forward or up and damages; Meteor Slam dives with i-frames, lands, grants landing i-frames and damages), the slot capacity (fewer slots, more slots up to 8, keys past the limit do nothing, saved per slot) and the debug overlay's spell controls (known checkboxes, capacity slider). Before that: no celebrations anywhere (no victory/secret/relic sounds or celebration effects exist; an arena clear only plays the gate clunk). Before that: the room-design rules from GUIDELINES.md (A: landing ground at every point of a downward exit; B: upward exits place you beside the gap, either side at random; C: the secret wall breaks and its exit opens during an active arena). Before that: seamless exits (no fade, sound or marker; speed kept), the ceiling gap to the Upper Galleries and back, its standard enemies, the secret wall sitting in the outer wall and blocking until broken, and a quiet boss defeat (no fanfare, effect or freeze). Earlier: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.
+It plays the game through real input actions and checks 280 behaviors. New in this version: the three damage sources (spikes hurt through post-hit i-frames, dash invulnerability and the Meteor Slam dive; i-frames still block enemy contact and projectiles; God Mode still blocks hazards), the Repulse Aegis parry (no wind-up, a short window, a mistimed cast does not protect, only an enemy at the player's skin triggers it, projectiles are never blocked) and the Stasis Field as a short-range, short emergency freeze. Before that: the four new spells (Repulse Aegis consumes all energy, negates a contact or projectile hit and strikes back ×1.5; Stasis Field freezes enemies and projectiles in range, harmless while frozen, and wears off; Radiant Lance fires forward or up and damages; Meteor Slam dives with i-frames, lands, grants landing i-frames and damages), the slot capacity (fewer slots, more slots up to 8, keys past the limit do nothing, saved per slot) and the debug overlay's spell controls (known checkboxes, capacity slider). Before that: no celebrations anywhere (no victory/secret/relic sounds or celebration effects exist; an arena clear only plays the gate clunk). Before that: the room-design rules from GUIDELINES.md (A: landing ground at every point of a downward exit; B: upward exits place you beside the gap, either side at random; C: the secret wall breaks and its exit opens during an active arena). Before that: seamless exits (no fade, sound or marker; speed kept), the ceiling gap to the Upper Galleries and back, its standard enemies, the secret wall sitting in the outer wall and blocking until broken, and a quiet boss defeat (no fanfare, effect or freeze). Earlier: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.

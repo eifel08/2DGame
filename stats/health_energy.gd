@@ -51,6 +51,15 @@ func is_invulnerable() -> bool:
 	return iframe_timer > 0.0 or not invuln_flags.is_empty() or Config.upgrades.god_mode
 
 
+## True when damage from `source` (Damage.Source) is prevented right now.
+## Enemies and projectiles respect i-frames and invulnerability; hazards
+## (spikes, lava, acid) ignore them all. Only the debug God Mode stops those.
+func blocks(source: Damage.Source) -> bool:
+	if source == Damage.Source.HAZARD:
+		return Config.upgrades.god_mode
+	return is_invulnerable()
+
+
 func set_invulnerable(key: String, on: bool) -> void:
 	if on:
 		invuln_flags[key] = true
