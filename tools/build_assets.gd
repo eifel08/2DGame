@@ -319,16 +319,9 @@ const FX := {
 	"boss_phase": [{"ring": 140.0, "color": "#b06cff", "width": 8.0, "life": 0.6}],
 	"boss_dissolve": [{"amount": 40, "color": "#b06cff", "speed": 80.0, "angle": -90.0, "spread": 35.0, "gravity": -260.0,
 		"life": 0.7, "size": 4.0, "box": [30.0, 36.0], "continuous": 1.5}],
-	"arena_clear": [{"ring": 260.0, "color": "#ffd36b", "width": 8.0, "life": 0.8},
-		{"ring": 160.0, "color": "#ffffff", "width": 5.0, "life": 0.6},
-		{"amount": 18, "color": "#ffd36b", "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0, "at": [-160.0, -120.0]},
-		{"amount": 18, "color": "#8dffb0", "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0, "at": [0.0, -140.0]},
-		{"amount": 18, "color": "#7cf3ff", "speed": 260.0, "gravity": 380.0, "life": 1.0, "size": 4.0, "at": [160.0, -120.0]}],
 	"wall_hit": [{"amount": 8, "color": "#56649a", "speed": 220.0, "size": 4.0, "life": 0.4}],
-	"wall_break": [{"amount": 40, "color": "#3a4370", "speed": 320.0, "size": 6.0, "life": 0.7},
-		{"ring": 90.0, "color": "#7cf3ff", "width": 5.0, "life": 0.6}],
-	"relic_pickup": [{"ring": 70.0, "color": "#ff5e7a", "width": 6.0, "life": 0.6},
-		{"amount": 30, "color": "#ff9aae", "speed": 220.0, "gravity": -100.0, "life": 0.8, "size": 4.0}],
+	"wall_break": [{"amount": 40, "color": "#3a4370", "speed": 320.0, "size": 6.0, "life": 0.7}], # Debris only (no flash).
+	"relic_pickup": [{"amount": 8, "color": "#ff9aae", "speed": 90.0, "gravity": 0.0, "life": 0.3, "size": 3.0}], # A small puff (no flare).
 	"nova_burst": [{"amount": 40, "color": "#ffffff", "speed": 520.0, "size": 5.0, "gravity": 0.0, "life": 0.45}],
 	"volley_muzzle": [{"amount": 3, "color": "#ffffff", "speed": 120.0, "gravity": 0.0, "life": 0.2, "size": 3.0}],
 	"ascendant_ring": [{"ring": 120.0, "color": "#ffffff", "width": 8.0, "life": 0.5}],
@@ -337,6 +330,7 @@ const FX := {
 		{"amount": 22, "color": "#ffffff", "speed": 360.0, "gravity": 200.0, "life": 0.35, "size": 4.0}],
 }
 
+## No celebration sounds (GUIDELINES.md, Rule D): no fanfares or jingles.
 ## Placeholder sounds, written as .wav files to audio/sfx/<name>.wav and
 ## wired into audio/sfx.tscn (one AudioStreamPlayer per sound). Replace a
 ## sound by overwriting its .wav (same name) or by setting the node's Stream.
@@ -349,10 +343,9 @@ const SOUNDS := {
 	"save": [[523, 523, 0.1, "sine", 0.35, 0.0], [784, 784, 0.22, "sine", 0.35, 0.0]],
 	"spawn": [[180, 520, 0.3, "sine", 0.3, 0.2]],
 	"break": [[180, 60, 0.35, "square", 0.45, 0.8]],
-	"secret": [[659, 659, 0.08, "sine", 0.35, 0.0], [831, 831, 0.08, "sine", 0.35, 0.0], [988, 988, 0.08, "sine", 0.35, 0.0], [1319, 1319, 0.3, "sine", 0.35, 0.0]],
-	"relic": [[440, 440, 0.12, "sine", 0.35, 0.0], [880, 880, 0.4, "sine", 0.35, 0.0]],
+	"pickup": [[520, 640, 0.08, "sine", 0.25, 0.0]],
+	"gate": [[90, 60, 0.22, "square", 0.3, 0.6]], # Mechanical clunk (arena gates).
 	"boss_roar": [[170, 42, 1.5, "saw", 0.6, 0.55]],
-	"victory": [[523, 523, 0.12, "square", 0.28, 0.0], [659, 659, 0.12, "square", 0.28, 0.0], [784, 784, 0.12, "square", 0.28, 0.0], [1047, 1047, 0.5, "square", 0.28, 0.0]],
 	"ui_move": [[880, 880, 0.03, "sine", 0.12, 0.0]],
 	"ui_confirm": [[660, 990, 0.07, "sine", 0.22, 0.0]],
 }

@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://autoload/sfx.gd" id="script"]
 [ext_resource type="AudioStream" path="res://audio/sfx/hit.wav" id="s1"]
@@ -8,12 +8,11 @@
 [ext_resource type="AudioStream" path="res://audio/sfx/save.wav" id="s5"]
 [ext_resource type="AudioStream" path="res://audio/sfx/spawn.wav" id="s6"]
 [ext_resource type="AudioStream" path="res://audio/sfx/break.wav" id="s7"]
-[ext_resource type="AudioStream" path="res://audio/sfx/secret.wav" id="s8"]
-[ext_resource type="AudioStream" path="res://audio/sfx/relic.wav" id="s9"]
+[ext_resource type="AudioStream" path="res://audio/sfx/pickup.wav" id="s8"]
+[ext_resource type="AudioStream" path="res://audio/sfx/gate.wav" id="s9"]
 [ext_resource type="AudioStream" path="res://audio/sfx/boss_roar.wav" id="s10"]
-[ext_resource type="AudioStream" path="res://audio/sfx/victory.wav" id="s11"]
-[ext_resource type="AudioStream" path="res://audio/sfx/ui_move.wav" id="s12"]
-[ext_resource type="AudioStream" path="res://audio/sfx/ui_confirm.wav" id="s13"]
+[ext_resource type="AudioStream" path="res://audio/sfx/ui_move.wav" id="s11"]
+[ext_resource type="AudioStream" path="res://audio/sfx/ui_confirm.wav" id="s12"]
 
 [node name="Sfx" type="Node"]
 script = ExtResource("script")
@@ -53,12 +52,12 @@ stream = ExtResource("s7")
 max_polyphony = 4
 bus = &"SFX"
 
-[node name="secret" type="AudioStreamPlayer" parent="."]
+[node name="pickup" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("s8")
 max_polyphony = 4
 bus = &"SFX"
 
-[node name="relic" type="AudioStreamPlayer" parent="."]
+[node name="gate" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("s9")
 max_polyphony = 4
 bus = &"SFX"
@@ -68,17 +67,12 @@ stream = ExtResource("s10")
 max_polyphony = 4
 bus = &"SFX"
 
-[node name="victory" type="AudioStreamPlayer" parent="."]
+[node name="ui_move" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("s11")
 max_polyphony = 4
 bus = &"SFX"
 
-[node name="ui_move" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("s12")
-max_polyphony = 4
-bus = &"SFX"
-
 [node name="ui_confirm" type="AudioStreamPlayer" parent="."]
-stream = ExtResource("s13")
+stream = ExtResource("s12")
 max_polyphony = 4
 bus = &"SFX"

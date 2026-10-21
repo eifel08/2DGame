@@ -974,7 +974,8 @@ func _run() -> void:
 	game.load_room("arena_room", "west")
 	await _frames(30)
 	var grounds: ArenaDirector = game.arena_director
-	var victories := Sfx.count("victory")
+	var gate_sounds := Sfx.count("gate")
+	var fx_before: Dictionary = game.effects.play_counts.duplicate()
 	p.global_position = Vector2(20 * 32, 512)
 	for i in 900:
 		await _frames(1)
@@ -985,8 +986,12 @@ func _run() -> void:
 				e.kill()
 				Events.enemy_killed.emit(e)
 	_check("the Proving Grounds arena runs and clears", grounds.state == "cleared" and game.world.is_arena_cleared("proving_grounds"), grounds.state)
-	_check("clearing an arena plays a victory sound and effect (no text)",
-		Sfx.count("victory") > victories and game.effects.count("arena_clear") > 0)
+	var new_fx := []
+	for fx_name in game.effects.play_counts:
+		if game.effects.play_counts[fx_name] > fx_before.get(fx_name, 0) and not fx_name in ["enemy_death", "spawn_portal", "coin_pickup", "hit_spark"]:
+			new_fx.append(fx_name)
+	_check("clearing an arena is silent apart from the gates: no fanfare, effect or text",
+		Sfx.count("gate") > gate_sounds and Sfx.count("victory") == 0 and new_fx.is_empty(), new_fx)
 	game.load_room("boss_room", "east")
 	game.load_room("arena_room", "west")
 	await _frames(3)
@@ -1160,7 +1165,7 @@ func _run() -> void:
 
 	# --- Placeholder architecture: sounds and effects are swappable nodes ---
 	var sounds_ok := true
-	for sound in ["hit", "pogo", "hurt", "death", "save", "spawn", "break", "secret", "relic", "boss_roar", "victory", "ui_move", "ui_confirm"]:
+	for sound in ["hit", "pogo", "hurt", "death", "save", "spawn", "break", "pickup", "gate", "boss_roar", "ui_move", "ui_confirm"]:
 		var node := Sfx.get_node_or_null(sound) as AudioStreamPlayer
 		sounds_ok = sounds_ok and node != null and node.stream != null and node.bus == &"SFX"
 	_check("every sound is its own AudioStreamPlayer node with a stream", sounds_ok)
@@ -1179,6 +1184,24 @@ func _run() -> void:
 	_check("enemy visuals are rig + AnimationPlayer clips (spawn, dead, roar, dissolve)", anims_ok)
 	var pap := p.get_node("AnimationPlayer") as AnimationPlayer
 	_check("the player has trance and dying clips", pap.has_animation("trance") and pap.has_animation("dying"))
+
+	# --- No celebrations anywhere (GUIDELINES.md, Rule D) ---
+	var celebration_assets := []
+	for sound in ["victory", "fanfare", "secret", "relic", "jingle"]:
+		if Sfx.get_node_or_null(sound) != null:
+			celebration_assets.append("sound " + sound)
+	for fx_name in ["arena_clear", "boss_death", "victory"]:
+		if ResourceLoader.exists("res://effects/fx/%s.tscn" % fx_name):
+			celebration_assets.append("effect " + fx_name)
+	for flare in ["wall_break", "relic_pickup"]:
+		var scene_root: Node = load("res://effects/fx/%s.tscn" % flare).instantiate()
+		for child in scene_root.get_children():
+			if child is RingPlaceholder:
+				celebration_assets.append("flash ring in " + flare)
+		scene_root.free()
+	_check("no celebration sounds, effects or flashes exist (bosses, arenas, secrets, relics)", celebration_assets.is_empty(), celebration_assets)
+	_check("the HUD has no pop-up text system", not "banner_text" in game.hud and not game.hud.has_method("show_banner"))
+	_check("the secret and relic sounds play nothing celebratory", Sfx.count("victory") == 0 and Sfx.count("secret") == 0 and Sfx.count("relic") == 0)
 
 	# --- HUD shows the bound hotkeys on the ability slots ---
 	_check("HUD slots show keys 1-4 by default", game.hud.hotkey_label(0) == "1" and game.hud.hotkey_label(3) == "4",

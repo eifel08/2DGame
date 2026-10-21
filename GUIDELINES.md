@@ -1,7 +1,7 @@
-# Room-Design Guidelines
+# Design Guidelines
 
-These rules are binding for every room, layout and transition in this project.
-Read them before you add or change a room, a doorway or a secret wall.
+These rules are binding for every room, layout, transition and piece of feedback in this project.
+Read them before you add or change a room, a doorway, a secret wall or any win/discovery feedback.
 They apply to developers and to AI assistants alike.
 
 The same rules are repeated in the code, at the places that enforce them:
@@ -11,6 +11,7 @@ The same rules are repeated in the code, at the places that enforce them:
 | A | `core/game.gd` → `_landing_arrival()` | `tools/build_assets.gd` → `_check_room_rules()`, smoke test "Rule A" |
 | B | `core/game.gd` → `_ejection_arrival()` | `tools/build_assets.gd` → `_check_room_rules()`, smoke test "Rule B" |
 | C | `core/game.gd` → `_update_doors()`, `hit_breakable()`; `combat/combat_manager.gd` (breakable hits) | smoke test "Rule C" |
+| D | `effects/feedback.gd` (boss, arena, secret, relic handlers); `tools/build_assets.gd` (`FX`, `SOUNDS`) | smoke test "no celebration …" |
 
 `world/objects/door.gd` and the room section of `tools/build_assets.gd` carry a short summary of all three rules.
 
@@ -53,6 +54,22 @@ The same rules are repeated in the code, at the places that enforce them:
 - Arena gates are never drawn over a secret wall, so the arena does not give the secret away.
 - Leaving through a secret exit mid-fight aborts the attempt. The arena is not cleared and starts again on the next visit. The broken wall stays broken (saved in `WorldState.secrets`).
 
+## Rule D — No celebrations, anywhere
+
+**Defeating a boss, clearing an arena, breaking a secret wall or taking a relic never triggers a celebration.** No victory music, fanfare or jingle. No text pop-up or banner. No victory effects, flashes, flares or rings. No freeze.
+
+Feedback stays strictly environmental, and play continues at once:
+
+| Event | Allowed feedback |
+| --- | --- |
+| Boss defeated | Its own roar, a shudder, the dissolve clip and particles. A light camera shake. |
+| Arena cleared | The gates open with a mechanical clunk (`gate`). No more enemies come. |
+| Secret wall broken | A crash (`break`), falling debris (`wall_break`, particles only), a light shake. |
+| Relic taken | A soft pickup sound (`pickup`) and a small puff (`relic_pickup`). The relic is gone. |
+
+- Do not add sounds such as `victory`, `fanfare`, `secret` or `jingle`, nor effects such as `arena_clear` or `boss_death`. The smoke test fails if they exist.
+- The HUD has no banner or pop-up text system. Do not add one for these events.
+
 ---
 
 ## Checklist for a new room or exit
@@ -62,5 +79,6 @@ The same rules are repeated in the code, at the places that enforce them:
 3. Exit going **up** into this room (floor gap): standable floor on at least one side of the gap (**Rule B**).
 4. Secret exit: `Z` / `z` in the outer wall, never a normal door; keep it usable during arenas (**Rule C**).
 5. No visual markers on exits: an exit is just a missing piece of wall.
-6. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
-7. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.
+6. No celebration when anything in the room is won or found (**Rule D**).
+7. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
+8. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.

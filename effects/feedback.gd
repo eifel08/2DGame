@@ -10,7 +10,6 @@ var effects: Effects
 var hitstop_timer := 0.0
 var _trail_timer := 0.0
 var _heal_sparkle := false
-var _boss_fell := false ## The current arena's last foe was a boss.
 
 
 func setup(p_camera: CameraRig, p_effects: Effects) -> void:
@@ -32,7 +31,7 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.boss_phase_changed.connect(_on_boss_phase_changed)
 	Events.boss_defeated.connect(_on_boss_defeated)
 	Events.arena_started.connect(func(_id: String) -> void:
-		_boss_fell = false
+		Sfx.play("gate") # Gates slam shut.
 		camera.add_trauma(0.35))
 	Events.arena_cleared.connect(_on_arena_cleared)
 	Events.enemy_spawning.connect(_on_enemy_spawning)
@@ -155,34 +154,29 @@ func _on_boss_phase_changed(boss: Node, _phase: int) -> void:
 	effects.play("boss_phase", boss.get_center())
 
 
-## A boss falls quietly: its roar and dissolve are the whole send-off. No
-## freeze, no celebration effect and no fanfare (also not for the arena it
-## ends), so play simply goes on.
+## NO CELEBRATIONS (GUIDELINES.md, Rule D): bosses, arenas, secrets and
+## relics never get fanfares, jingles, flashes, flares or text. Feedback is
+## environmental only: the boss roars and dissolves, arena gates move with a
+## mechanical clunk, a broken wall crumbles, a picked-up relic is just gone.
 func _on_boss_defeated(_boss: Node) -> void:
 	camera.add_trauma(0.3)
-	_boss_fell = true
 
 
-## Arena victory: fanfare, flash rings and sparks around the camera. Skipped
-## when the arena ended with a boss (see _on_boss_defeated).
+## Arena cleared: the gates open with a mechanical sound. Nothing else.
 func _on_arena_cleared(_arena_id: String) -> void:
-	if _boss_fell:
-		_boss_fell = false
-		return
-	Sfx.play("victory")
-	camera.add_trauma(0.35)
-	effects.play("arena_clear", camera.global_position)
+	Sfx.play("gate")
 
 
+## A secret wall breaks: stone crumbles (debris + a crash). No jingle or flash.
 func _on_secret_found(_secret_id: String, pos: Vector2) -> void:
 	Sfx.play("break")
-	Sfx.play("secret")
-	camera.add_trauma(0.4)
+	camera.add_trauma(0.25)
 	effects.play("wall_break", pos)
 
 
+## A relic is taken: a soft pickup sound and a small puff. No jingle or flare.
 func _on_relic_collected(_relic_id: String, pos: Vector2) -> void:
-	Sfx.play("relic")
+	Sfx.play("pickup")
 	effects.play("relic_pickup", pos + Vector2(0, -22))
 
 
