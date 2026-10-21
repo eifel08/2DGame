@@ -1230,7 +1230,7 @@ func _run() -> void:
 	var pap := p.get_node("AnimationPlayer") as AnimationPlayer
 	_check("the player has trance and dying clips", pap.has_animation("trance") and pap.has_animation("dying"))
 
-	# --- No celebrations anywhere (GUIDELINES.md, Rule D) ---
+	# --- No celebrations anywhere (GUIDELINES.md, Rule F) ---
 	var celebration_assets := []
 	for sound in ["victory", "fanfare", "secret", "relic", "jingle"]:
 		if Sfx.get_node_or_null(sound) != null:
@@ -1669,6 +1669,18 @@ func _test_secret_walls() -> void:
 			"HiddenPocketWall", "SecretDoorway", "camera", "semi-transparent", "back and forth"]:
 		documented = documented and doc.contains(needle)
 	_check("GUIDELINES.md documents both secret wall types", documented)
+	_check("GUIDELINES.md has Rule D (solid boundaries) and Rule E (open secret exits)",
+		doc.contains("## Rule D — Boundaries require solid walls") and doc.contains("## Rule E — Secret room exits look open")
+		and doc.contains("## Rule F — No celebrations"))
+	# Rule D: every hidden pocket is closed by solid wall on all other sides.
+	var open_pockets := []
+	for rid in ["test_room", "upper_room"]:
+		game.load_room(rid)
+		for wall in game.hidden_pockets:
+			if not _pocket_closed(wall):
+				open_pockets.append([rid, wall.secret_id])
+	_check("Rule D: every hidden pocket is closed by solid wall", open_pockets.is_empty(), open_pockets)
+	await _reset()
 
 
 ## Type 1 in the Upper Galleries: the alcove under the east block.
@@ -1727,7 +1739,7 @@ func _test_hidden_pocket() -> void:
 	_check("passing through finds the pocket and saves it",
 		wall.discovered and game.world.is_secret_open("galleries_alcove") and found == ["galleries_alcove"], [wall.discovered, found])
 	_check("a found pocket is permanently un-hidden (wall and cover gone)", not wall.is_covered() and not visual.visible)
-	_check("finding a pocket plays no effect (Rule D)", game.effects.play_counts == fx_before, game.effects.play_counts)
+	_check("finding a pocket plays no effect (Rule F)", game.effects.play_counts == fx_before, game.effects.play_counts)
 	await _hold(&"move_left", 45)
 	_check("a found pocket wall is passable both ways", p.global_position.x < left_edge - Player.WIDTH / 2.0, p.global_position)
 
@@ -1804,6 +1816,16 @@ func _test_west_pocket_camera() -> void:
 	var full: Rect2 = game.room.get_full_bounds().grow(1.0)
 	_check("the camera scrolls left to show the pocket, never past the tiles",
 		cam.view_rect().position.x < 0.0 and full.encloses(cam.view_rect()), cam.view_rect())
+	# Rule D: the pocket's far end is a solid wall, and the player can see it.
+	Input.action_press(&"move_left")
+	await _frames(60)
+	Input.action_release(&"move_left")
+	await _frames(40)
+	var far_wall := Vector2(wall.pocket_rect.position.x - 16.0, floor_y - 16.0)
+	_check("Rule D: a solid wall closes the far end of the west pocket",
+		game.room.is_solid_at(far_wall) and p.get_rect().position.x >= wall.pocket_rect.position.x - 0.5, [p.global_position, wall.pocket_rect])
+	_check("Rule D: that boundary wall is on screen, never a screen edge over void",
+		cam.view_rect().position.x <= wall.pocket_rect.position.x - 32.0 + 0.5, [cam.view_rect(), wall.pocket_rect])
 
 	# The reveal is permanent: after leaving and coming back, the camera may still go there.
 	game.load_room("upper_room")
@@ -1823,8 +1845,7 @@ func _test_secret_doorway() -> void:
 	if doorway == null:
 		return
 	var entry := doorway.get_node("EntryVisual") as CanvasItem
-	var exit := doorway.get_node("ExitVisual") as CanvasItem
-	_check("entry side: semi-transparent", entry.visible and not exit.visible and is_equal_approx(entry.modulate.a, 0.5), entry.modulate)
+	_check("entry side: semi-transparent", entry.visible and doorway.shown_visual() == entry and is_equal_approx(entry.modulate.a, 0.5), entry.modulate)
 	_check("a secret doorway has no collision and no tile",
 		not game.room.is_solid_at(doorway.get_rect().get_center()) and doorway.find_children("*", "CollisionObject2D").is_empty())
 	var secrets_before: int = game.world.secrets.size()
@@ -1834,15 +1855,10 @@ func _test_secret_doorway() -> void:
 		if game.room_id != "hidden_vault":
 			break
 		var back: SecretDoorway = game.secret_doorways[0]
-		var exit_visual := back.get_node("ExitVisual") as CanvasItem
-		var tiles: TileMapLayer = game.room.tiles
-		var wall_cell := tiles.local_to_map(tiles.to_local(back.get_rect().position + Vector2(16, -16)))
-		var sprite := exit_visual.get_child(0) as Sprite2D if exit_visual.get_child_count() > 0 else null
-		_check("exit side (trip %d): looks exactly like the wall next to it" % (trip + 1),
-			not back.is_entry() and exit_visual.visible and is_equal_approx(exit_visual.modulate.a, 1.0)
-			and not (back.get_node("EntryVisual") as CanvasItem).visible and sprite != null
-			and int(sprite.region_rect.position.x / 32.0) == tiles.get_cell_atlas_coords(wall_cell).x,
-			[exit_visual.modulate, sprite.region_rect if sprite else null, tiles.get_cell_atlas_coords(wall_cell)])
+		_check("Rule E (trip %d): the exit looks like a standard open doorway, nothing drawn" % (trip + 1),
+			not back.is_entry() and back.shown_visual() == null and not back.has_node("ExitVisual")
+			and _gap_is_open(back.get_rect()) and _doorway_drawn_items(back) == 0,
+			[back.side, _doorway_drawn_items(back)])
 		p.global_position = back.global_position + Vector2(-90.0, 0.0)
 		p.velocity = Vector2.ZERO
 		await _frames(8)
@@ -1862,6 +1878,39 @@ func _test_secret_doorway() -> void:
 		and is_equal_approx((doorway.get_node("EntryVisual") as CanvasItem).modulate.a, 0.5))
 	_check("a secret doorway is not saved as a found secret", game.world.secrets.size() == secrets_before, game.world.secrets)
 	await _reset()
+
+
+## True when every cell of a doorway gap is open: no tile at all, not solid.
+func _gap_is_open(rect: Rect2) -> bool:
+	var tiles: TileMapLayer = game.room.tiles
+	for y in range(int(rect.position.y) + 16, int(rect.end.y), 32):
+		var at := Vector2(rect.get_center().x, y)
+		if game.room.is_solid_at(at) or tiles.get_cell_source_id(tiles.local_to_map(tiles.to_local(at))) != -1:
+			return false
+	return true
+
+
+## Visible drawable nodes under a secret doorway (0 = it draws nothing).
+func _doorway_drawn_items(doorway: SecretDoorway) -> int:
+	var count := 0
+	for item in doorway.find_children("*", "CanvasItem", true, false):
+		if (item as CanvasItem).is_visible_in_tree() and (item is Sprite2D or item is Polygon2D or item is Control or item is Line2D):
+			count += 1
+	return count
+
+
+## Rule D for pockets: every cell around a hidden pocket is solid wall,
+## except the hidden pocket wall itself.
+func _pocket_closed(wall: HiddenPocketWall) -> bool:
+	var ring := wall.pocket_rect.grow(32.0)
+	for y in range(int(ring.position.y) + 16, int(ring.end.y), 32):
+		for x in range(int(ring.position.x) + 16, int(ring.end.x), 32):
+			var at := Vector2(x, y)
+			if wall.pocket_rect.has_point(at) or wall.get_rect().has_point(at):
+				continue
+			if not game.room.is_solid_at(at):
+				return false
+	return true
 
 
 func _walk_galleries_to_vault(doorway: SecretDoorway) -> void:

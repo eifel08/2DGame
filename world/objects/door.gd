@@ -16,8 +16,12 @@ extends Node2D
 ##            gap (Game._ejection_arrival, EjectState).
 ##   Rule C - a door behind a breakable wall (`secret`) is never locked by an
 ##            arena; the wall can be broken and used mid-fight.
+##   Rule D - every room and hidden pocket is closed by solid wall wherever
+##            there is no transition: no open void at any edge.
+##   Rule E - the way back out of a secret room looks like a standard open
+##            doorway, never blocked or solid from the inside.
 ## A Type 2 secret doorway (SecretDoorway, GUIDELINES.md "Secret walls") is an
-## ordinary side door like this one; only its disguise is drawn over the gap.
+## ordinary side door like this one; only its entry-side disguise is drawn.
 ##
 ## Node origin:
 ##   side doors (vertical = 0)   - floor of the doorway, at the cell center

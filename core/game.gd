@@ -408,7 +408,7 @@ func _update_doors() -> void:
 ## Secret walls (GUIDELINES.md). Type 1 hidden pockets: one-way until walked
 ## through, then found for good (saved like a broken wall) and the camera may
 ## show the pocket. Type 2 secret doorways are ordinary doors underneath;
-## they only get the chance to animate. Finding a pocket is silent (Rule D).
+## they only get the chance to animate. Finding a pocket is silent (Rule F).
 func _update_secret_walls() -> void:
 	var pr := player.get_rect()
 	for wall in hidden_pockets:

@@ -186,6 +186,12 @@ const VAULT_LAYOUT := [
 ##   Rule C - Secret breakable walls in arenas stay breakable and their door
 ##            stays open while the arena locks every other door ('Z' doors
 ##            get `secret = true`; no gate is drawn over them).
+##   Rule D - Boundaries require solid walls: every cell on a layout's outer
+##            edge is wall ('#') or part of a transition; a hidden pocket must
+##            be closed by wall and may not reach the layout edge. Checked by
+##            _check_room_rules() and _pocket_rect() (errors at build time).
+##   Rule E - Secret room exits look open: an "exit" secret doorway draws no
+##            disguise, so the way back looks like a standard opening.
 ##
 ## Door letters: 'D' / 'H' side doorway (bottom cell of a 3-tall wall gap),
 ## 'O' ceiling or floor gap ("width" cells from the letter to the right),
@@ -197,7 +203,8 @@ const VAULT_LAYOUT := [
 ##     entry side. The pocket behind it is found by flood fill and covered.
 ## 'X' Type 2 secret doorway: a side door (bottom cell, like 'D') disguised by
 ##     a SecretDoorway; 'x' marks the upper cells of its gap. The door's
-##     "secret_doorway" key is "entry" (semi-transparent) or "exit" (looks solid).
+##     "secret_doorway" key is "entry" (semi-transparent disguise) or "exit"
+##     (no disguise: an ordinary open doorway, Rule E).
 ## "origin_x" (optional, negative): the layout starts that many columns left
 ## of x = 0; the room's normal area (camera limits) starts at x = 0.
 ## '*' a shard inside a hidden pocket (named PocketCoinN, so adding a pocket
@@ -385,7 +392,7 @@ const FX := {
 		{"amount": 22, "color": "#ffffff", "speed": 360.0, "gravity": 200.0, "life": 0.35, "size": 4.0}],
 }
 
-## No celebration sounds (GUIDELINES.md, Rule D): no fanfares or jingles.
+## No celebration sounds (GUIDELINES.md, Rule F): no fanfares or jingles.
 ## Placeholder sounds, written as .wav files to audio/sfx/<name>.wav and
 ## wired into audio/sfx.tscn (one AudioStreamPlayer per sound). Replace a
 ## sound by overwriting its .wav (same name) or by setting the node's Stream.
@@ -1049,6 +1056,18 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 ## error, so a broken layout is noticed at build time, not in play.
 func _check_room_rules(room_id: String, def: Dictionary) -> void:
 	var layout: Array = def.layout
+	# Rule D: the outer edge is wall, or part of a transition (doors, gaps,
+	# secret doorways, breakable-wall doorways). Never open void.
+	for y in layout.size():
+		var row: String = layout[y]
+		for x in row.length():
+			var edge := y == 0 or y == layout.size() - 1 or x == 0 or x == row.length() - 1
+			if not edge:
+				continue
+			if not (row[x] in ["#", "O", ".", "D", "H", "Z", "z", "X", "x"]):
+				push_error("Rule D violated in %s: '%s' on the outer edge at (%d, %d)" % [room_id, row[x], x, y])
+			elif row[x] == "." and not _is_doorway_cell(layout, def, x, y):
+				push_error("Rule D violated in %s: open edge cell at (%d, %d) is not part of a transition" % [room_id, x, y])
 	for y in layout.size():
 		var row: String = layout[y]
 		for x in row.length():
@@ -1078,6 +1097,22 @@ func _check_room_rules(room_id: String, def: Dictionary) -> void:
 					standable = standable or (floor_ok and head_ok)
 				if not standable:
 					push_error("Rule B violated in %s: no standable floor beside the floor gap at column %d" % [room_id, x])
+
+
+## Rule D helper: an open '.' cell on the outer edge is allowed only inside
+## a transition gap - above a side door letter (3-tall gap) or beside a
+## ceiling / floor gap letter 'O' (its "width" cells).
+func _is_doorway_cell(layout: Array, def: Dictionary, x: int, y: int) -> bool:
+	for dy in [1, 2]:
+		if y + dy < layout.size() and (layout[y + dy] as String)[x] in ["D", "H", "Z", "X"]:
+			return true
+	var row: String = layout[y]
+	var doors: Dictionary = def.get("doors", {})
+	var o: Dictionary = doors.get("O", {})
+	for dx in range(1, int(o.get("width", 1))):
+		if x - dx >= 0 and row[x - dx] == "O":
+			return true
+	return false
 
 
 ## Exposed-edge mask for a solid cell: an edge is exposed when the neighbour
@@ -1128,6 +1163,8 @@ func _pocket_rect(layout: Array, wx: int, top: int, bottom: int, pass_dir: int, 
 				queue.append(n)
 	if seen.size() >= 400:
 		push_error("Hidden pocket at column %d is not closed: it leaks into the room" % wx)
+	elif lo.x <= 0 or lo.y <= 0 or hi.y >= layout.size() - 1 or hi.x >= (layout[hi.y] as String).length() - 1:
+		push_error("Rule D violated: the hidden pocket at column %d reaches the layout edge (open void)" % wx)
 	if seen.is_empty():
 		return Rect2()
 	return Rect2((lo.x + ox) * TS, lo.y * TS, (hi.x - lo.x + 1) * TS, (hi.y - lo.y + 1) * TS)

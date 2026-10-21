@@ -10,11 +10,14 @@ extends SecretWall
 ##     covered by the `Cover` node, so nothing inside can be seen;
 ##   - a pocket outside the room's normal area stays outside the camera
 ##     limits (Game._refresh_camera_bounds).
+## Rule D: the pocket is closed by solid wall on every side but the hidden
+## wall (the generator refuses an open pocket), and once found the camera
+## shows that boundary wall too (camera_rect).
 ## Walking all the way through FINDS it, once and for good: the wall and the
 ## cover are gone (passable both ways), the camera may show the pocket, and
 ## the find is saved (WorldState.secrets, key `secret_id`). It never hides
 ## again after a room change, a death or loading the save. Finding it is
-## silent (Rule D).
+## silent (Rule F).
 ##
 ## Enemies never pass it: they collide on their own physics layer.
 ## Projectiles and room queries ignore it (it is not a tile).
@@ -66,8 +69,12 @@ func _make_body(layer: int) -> StaticBody2D:
 
 
 ## The area the camera may show once found: the pocket and the opening.
+## Includes one tile of the pocket's boundary wall on every side (Rule D):
+## the player must SEE the solid wall that closes the pocket, never a screen
+## edge that looks like open void.
 func camera_rect() -> Rect2:
-	return pocket_rect.merge(get_rect()) if pocket_rect.has_area() else get_rect()
+	var area := pocket_rect.merge(get_rect()) if pocket_rect.has_area() else get_rect()
+	return area.grow(TILE)
 
 
 ## Called every step BEFORE the player moves. Makes the wall solid or

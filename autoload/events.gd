@@ -88,7 +88,7 @@ signal enemy_spawning(enemy: Node)
 @warning_ignore("unused_signal")
 signal secret_found(secret_id: String, position: Vector2)
 @warning_ignore("unused_signal")
-signal hidden_pocket_found(secret_id: String) ## A Type 1 hidden pocket was walked into (no feedback: Rule D).
+signal hidden_pocket_found(secret_id: String) ## A Type 1 hidden pocket was walked into (no feedback: Rule F).
 @warning_ignore("unused_signal")
 signal relic_collected(relic_id: String, position: Vector2)
 

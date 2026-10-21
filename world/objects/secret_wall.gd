@@ -8,7 +8,9 @@ extends Node2D
 ##            good (saved). Everything inside the pocket is covered until then.
 ##   Type 2 - SecretDoorway:    a disguised room transition to ANOTHER room.
 ##            Never consumed; usable back and forth. Semi-transparent from the
-##            entry side, an ordinary-looking wall from the exit side.
+##            entry side; from the exit side an ordinary open doorway (Rule E).
+## Rule D applies to both: every pocket and room is closed by solid wall
+## wherever there is no transition.
 ##
 ## Each type has its own scene and its own visual nodes, so final art and
 ## animations plug in per type. This base only knows the size and how to

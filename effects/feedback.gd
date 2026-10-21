@@ -154,7 +154,7 @@ func _on_boss_phase_changed(boss: Node, _phase: int) -> void:
 	effects.play("boss_phase", boss.get_center())
 
 
-## NO CELEBRATIONS (GUIDELINES.md, Rule D): bosses, arenas, secrets and
+## NO CELEBRATIONS (GUIDELINES.md, Rule F): bosses, arenas, secrets and
 ## relics never get fanfares, jingles, flashes, flares or text. Feedback is
 ## environmental only: the boss roars and dissolves, arena gates move with a
 ## mechanical clunk, a broken wall crumbles, a picked-up relic is just gone.
