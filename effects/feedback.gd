@@ -25,6 +25,9 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.grapple_bounced.connect(func(pos: Vector2) -> void:
 		Sfx.play("pogo")
 		effects.play("pogo_spark", pos))
+	# Breakable platforms and pegs: a dry crumble, no flash (Rule F).
+	Events.platform_crumbled.connect(func(_pos: Vector2) -> void: Sfx.play("break", 1.4))
+	Events.peg_crumbled.connect(func(_pos: Vector2) -> void: Sfx.play("break", 1.8))
 	Events.player_hurt.connect(_on_player_hurt)
 	Events.player_hazard_respawn.connect(_on_hazard_respawn)
 	Events.player_jumped.connect(_on_player_jumped)

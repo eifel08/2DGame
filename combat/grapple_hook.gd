@@ -53,6 +53,10 @@ extends Node2D
 ##            rays (areas only). A swing throw swings on the peg; any other
 ##            throw pulls to it and then holds (phase "hold"). Pegs have no
 ##            body collision: the player passes through them.
+##   movers   moving pegs and Platform objects (one-way layer) carry the
+##            anchor: Game._update_movers calls follow_anchor() before the
+##            player moves, so a pull, hold or swing rides along. A crumbled
+##            breakable peg or platform makes the hook let go.
 ##   ignored  the hidden-wall layers (5, 6).
 ##
 ## Outcomes are reported through Events (grapple_fired, grapple_latched,
@@ -84,6 +88,8 @@ var anchor_one_way := false ## The anchor is on a one-way platform.
 var platform_top := 0.0 ## Top of that platform (feet height after the pull).
 var target_enemy: Enemy ## The hooked enemy during an enemy pull, else null.
 var target_peg: GrapplePeg ## The hooked peg (pull, hold or swing), else null.
+var anchor_platform: Platform ## The hooked Platform object, else null.
+var _platform_offset := Vector2.ZERO ## Anchor relative to that platform.
 var _enemy_offset := Vector2.ZERO ## Anchor relative to the hooked enemy.
 var cooldown := 0.0
 var buffer := 0.0
@@ -104,6 +110,7 @@ func reset() -> void:
 	phase = "idle"
 	target_enemy = null
 	target_peg = null
+	anchor_platform = null
 	cooldown = 0.0
 	buffer = 0.0
 	travelled = 0.0
@@ -200,6 +207,7 @@ func fire(p: Player) -> void:
 	travelled = 0.0
 	target_enemy = null
 	target_peg = null
+	anchor_platform = null
 	anchor_one_way = false
 	buffer = 0.0
 	phase = "fly"
@@ -266,15 +274,15 @@ func _step_fly(delta: float, p: Player) -> void:
 		_hook_peg(peg.peg, p)
 	else:
 		tip = terrain.point # The surface point (a side ray may have caught it).
-		_hook_terrain(p)
+		_hook_terrain(p, terrain.collider)
 
 
 ## The nearest terrain hit of three parallel rays: the path itself and one
-## ray `r` to each side. Returns {distance (along the path), point}.
+## ray `r` to each side. Returns {distance (along the path), point, collider}.
 ## A side ray that starts inside solid (the player hugging a wall) is skipped,
 ## so it never latches on the wall the player stands against.
 func _cast_terrain(from: Vector2, dist: float, r: float, p: Player) -> Dictionary:
-	var best := {"distance": INF, "point": from}
+	var best := {"distance": INF, "point": from, "collider": null}
 	var space := get_world_2d().direct_space_state
 	var side := dir.orthogonal() * r
 	for offset in [Vector2.ZERO, side, -side]:
@@ -288,7 +296,7 @@ func _cast_terrain(from: Vector2, dist: float, r: float, p: Player) -> Dictionar
 			continue
 		var d: float = (hit.position - start).dot(dir)
 		if d < best.distance:
-			best = {"distance": d, "point": hit.position}
+			best = {"distance": d, "point": hit.position, "collider": hit.collider}
 	return best
 
 
@@ -318,7 +326,7 @@ func _deflect() -> void:
 	release()
 
 
-func _hook_terrain(p: Player) -> void:
+func _hook_terrain(p: Player, collider: Object = null) -> void:
 	anchor = tip
 	if not anchor_is_safe(anchor):
 		_deflect()
@@ -332,6 +340,11 @@ func _hook_terrain(p: Player) -> void:
 	anchor_one_way = room.is_one_way_at(inside)
 	if anchor_one_way:
 		platform_top = room.cell_rect_at(inside).position.y
+	if collider is Platform: # A platform object: one-way, and it may move.
+		anchor_platform = collider
+		_platform_offset = anchor - anchor_platform.global_position
+		anchor_one_way = true
+		platform_top = anchor_platform.top_y()
 	_latch(false)
 
 
@@ -357,7 +370,26 @@ func _hook_peg(peg: GrapplePeg, p: Player) -> void:
 	target_peg = peg
 	anchor = peg.global_position
 	tip = anchor
+	peg.on_hooked() # A breakable peg starts to crumble.
 	_latch(false)
+
+
+## Keeps a latched anchor on its moving peg or platform (Game._update_movers,
+## right after they moved). A crumbled one makes the hook let go.
+func follow_anchor() -> void:
+	if not is_latched():
+		return
+	if target_peg:
+		if not target_peg.active:
+			release()
+			return
+		anchor = target_peg.global_position
+	elif anchor_platform:
+		if not anchor_platform.solid:
+			release()
+			return
+		anchor = anchor_platform.global_position + _platform_offset
+		platform_top = anchor_platform.top_y()
 
 
 ## Called by GrappleState when a pull reaches a peg: the hook stays attached.
@@ -397,6 +429,7 @@ func release() -> void:
 	phase = "retract"
 	target_enemy = null
 	target_peg = null
+	anchor_platform = null
 	_play("retract")
 	Events.grapple_released.emit(tip)
 

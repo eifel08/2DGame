@@ -58,6 +58,9 @@ var is_jumping := false ## True while the jump can still be cut short.
 
 func _ready() -> void:
 	set_physics_process(false)
+	# Moving Platform objects carry the player explicitly (Game._update_movers),
+	# so move_and_slide must not add their velocity a second time.
+	platform_floor_layers = 0
 	fsm.add("normal", NormalState.new(self))
 	fsm.add("dash", DashState.new(self))
 	fsm.add("heal", HealState.new(self))

@@ -19,7 +19,7 @@ extends PlayerState
 ##          Letting go keeps the swing's momentum.
 ##   peg hold  a pull that reached a grapple peg (GrapplePeg): the hook stays
 ##          attached and the player hangs still under the peg (no gravity,
-##          zero velocity). Left / Right only turn the player. Any other
+##          zero velocity; a moving peg carries the player along). Left / Right only turn the player. Any other
 ##          action pressed lets go at once and still does its job: Jump jumps
 ##          (with the double jump back), Dash dashes, Attack / Spell fire
 ##          from normal movement, Grapple only lets go. A swing throw at a
@@ -65,7 +65,7 @@ func enter(params: Dictionary) -> void:
 
 func step(delta: float) -> void:
 	if hook.is_holding():
-		_step_peg_hold()
+		_step_peg_hold(delta)
 	elif hook.is_pulling():
 		if not latched:
 			_begin_pull()
@@ -234,8 +234,14 @@ func _release_swing(reason: String) -> void:
 
 # ---------- Peg hold (hook latched on a peg after a pull) ----------
 
-func _step_peg_hold() -> void:
-	p.velocity = Vector2.ZERO # Hangs still: no gravity, no drift.
+func _step_peg_hold(delta: float) -> void:
+	# Hangs still under the peg: no gravity, no drift. A moving peg carries
+	# the player along (with collisions).
+	var to := hook.hang_point() - p.get_center()
+	if to.length() > 0.01:
+		p.velocity = to / delta
+		p.move(delta)
+	p.velocity = Vector2.ZERO
 	var ix := p.input.axis_x()
 	if ix != 0:
 		p.facing = ix

@@ -164,8 +164,9 @@ func _step_attack(delta: float) -> void:
 			if dir_x != 0.0:
 				p.velocity.x = -dir_x * c.recoil_velocity
 
-	# Down-attacks also bounce off hazards (spikes).
-	var on_hazard := dir == "down" and get_room().find_hazard(box).has_area()
+	# Down-attacks also bounce off spikes. Never off lava: a pogo over lava
+	# falls in (hazard damage + safe-ground respawn, _resolve_hazards).
+	var on_hazard := dir == "down" and get_room().find_hazard(box, false).has_area()
 
 	if dir == "down" and (connected or on_hazard) and not attack.pogoed:
 		attack.pogoed = true

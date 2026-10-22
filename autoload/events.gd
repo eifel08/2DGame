@@ -107,3 +107,5 @@ signal relic_collected(relic_id: String, position: Vector2)
 # Animation (frame events from method tracks, e.g. "footstep", "swing")
 @warning_ignore("unused_signal")
 signal anim_event(owner: Node, event_name: String)
+signal platform_crumbled(position: Vector2) ## A breakable platform gave way (it comes back later).
+signal peg_crumbled(position: Vector2) ## A breakable grapple peg gave way (it comes back later).

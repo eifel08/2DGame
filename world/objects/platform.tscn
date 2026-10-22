@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://world/objects/platform.gd" id="1_plat"]
+
+[node name="Platform" type="AnimatableBody2D"]
+z_index = 1
+collision_layer = 4
+collision_mask = 0
+sync_to_physics = false
+script = ExtResource("1_plat")
+kind = "standard"
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="Visual"]
+color = Color(0.36, 0.42, 0.62, 1)
+polygon = PackedVector2Array(-48, 0, 48, 0, 48, 12, -48, 12)
+
+[node name="Top" type="Polygon2D" parent="Visual"]
+color = Color(0.62, 0.7, 0.92, 1)
+polygon = PackedVector2Array(-48, 0, 48, 0, 48, 3, -48, 3)

@@ -20,6 +20,7 @@ const ROOM_SCENES := {
 	"secret_room": preload("res://world/secret_room.tscn"),
 	"upper_room": preload("res://world/upper_room.tscn"),
 	"hidden_vault": preload("res://world/hidden_vault.tscn"),
+	"lava_room": preload("res://world/lava_room.tscn"),
 }
 const START_ROOM := "test_room"
 const ENEMY_SCENES := {
@@ -68,6 +69,8 @@ var breakables: Array[BreakableWall] = []
 var hidden_pockets: Array[HiddenPocketWall] = [] ## Type 1 secret walls in this room.
 var secret_doorways: Array[SecretDoorway] = [] ## Type 2 secret walls in this room.
 var relics: Array[Relic] = []
+var platforms: Array[Platform] = [] ## Platform objects (standard, moving, breakable) in this room.
+var grapple_pegs: Array[GrapplePeg] = []
 var playtime := 0.0
 ## Set false before adding to the tree to skip the opening trance (tests).
 var start_in_trance := true
@@ -163,6 +166,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_update_secret_walls() # Before the player moves: sets each pocket wall solid or passable.
+	_update_movers(delta) # Before the player moves: platforms carry riders, ropes follow.
 	player.step(delta)
 	for enemy in enemies:
 		enemy.step(delta)
@@ -233,6 +237,8 @@ func _load_room_scene(id: String) -> void:
 	hidden_pockets.clear()
 	secret_doorways.clear()
 	relics.clear()
+	platforms.clear()
+	grapple_pegs.clear()
 	current_checkpoint = null
 	focused_interactable = null
 	combat.reset()
@@ -267,6 +273,10 @@ func _load_room_scene(id: String) -> void:
 				node.reveal() # Found before: never hidden again.
 		if node is SecretDoorway:
 			secret_doorways.append(node)
+		if node is Platform:
+			platforms.append(node)
+		if node is GrapplePeg:
+			grapple_pegs.append(node)
 		if node is Relic:
 			relics.append(node)
 			if world.has_relic(node.relic_id):
@@ -410,6 +420,20 @@ func _update_doors() -> void:
 ## through, then found for good (saved like a broken wall) and the camera may
 ## show the pocket. Type 2 secret doorways are ordinary doors underneath;
 ## they only get the chance to animate. Finding a pocket is silent (Rule F).
+## Moving / breakable platforms and pegs. A player standing on a platform
+## moves with it; a latched hook follows its peg or platform (and lets go of
+## a crumbled one).
+func _update_movers(delta: float) -> void:
+	for platform in platforms:
+		var riding := platform.supports(player)
+		platform.step(delta, player)
+		if riding and platform.last_delta != Vector2.ZERO:
+			player.global_position += platform.last_delta
+	for peg in grapple_pegs:
+		peg.step(delta)
+	combat.grapple.follow_anchor()
+
+
 func _update_secret_walls() -> void:
 	var pr := player.get_rect()
 	for wall in hidden_pockets:

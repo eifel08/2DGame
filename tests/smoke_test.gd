@@ -9,6 +9,17 @@ var failures: Array[String] = []
 var passed := 0
 
 
+const PLATFORM_SCENE_PATHS := {
+	"standard": "res://world/objects/platform.tscn",
+	"moving": "res://world/objects/platform_moving.tscn",
+	"breakable": "res://world/objects/platform_breakable.tscn",
+}
+const PEG_SCENE_PATHS := {
+	"standard": "res://world/objects/grapple_peg.tscn",
+	"moving": "res://world/objects/grapple_peg_moving.tscn",
+	"breakable": "res://world/objects/grapple_peg_breakable.tscn",
+}
+
 func _ready() -> void:
 	_run()
 
@@ -253,6 +264,9 @@ func _run() -> void:
 
 	# --- Grapple pegs: hook-only layer, static hold, swing ---
 	await _test_grapple_pegs()
+
+	# --- Ember Crossing: lava, moving / breakable platforms and pegs, a full run ---
+	await _test_lava_room()
 
 	# --- Key bindings: no WASD defaults, no duplicates, swap on conflict, Grapple on S ---
 	await _test_keybindings()
@@ -2923,6 +2937,324 @@ func _test_grapple_pegs() -> void:
 	Events.grapple_swing_ended.disconnect(on_ended)
 	game.combat.reset()
 	await _reset()
+
+
+## Waits up to `frames` steps for `cond`; returns whether it came true.
+func _until(cond: Callable, frames: int) -> bool:
+	for i in frames:
+		if cond.call():
+			return true
+		await _frames(1)
+	return cond.call()
+
+
+func _objects_of(kind: Variant, variant := "") -> Array:
+	var list := []
+	for node in game.room.get_objects():
+		if is_instance_of(node, kind) and (variant == "" or node.kind == variant):
+			list.append(node)
+	return list
+
+
+## A real jump toward `target` (a Platform): full jump, Right held until the
+## player is over the target, then a landing check. Returns true when the
+## player stands on it.
+func _jump_onto(target: Platform, double := false) -> bool:
+	var p: Player = game.player
+	Input.action_press(&"jump")
+	Input.action_press(&"move_right")
+	await _frames(2)
+	var jumped_again := false
+	for i in 90:
+		if p.global_position.x >= target.global_position.x - 8.0:
+			Input.action_release(&"move_right")
+		if double and not jumped_again and p.velocity.y > 0.0:
+			Input.action_release(&"jump")
+			await _frames(1)
+			Input.action_press(&"jump")
+			jumped_again = true
+		if i > 4 and target.supports(p):
+			break
+		await _frames(1)
+	Input.action_release(&"jump")
+	Input.action_release(&"move_right")
+	return target.supports(p)
+
+
+## A plain throw (no direction) right; returns true once the hook holds a peg.
+func _throw_to_hold() -> bool:
+	var hook: GrappleHook = game.combat.grapple
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	return await _until(func() -> bool: return hook.is_holding(), 60)
+
+
+func _test_lava_room() -> void:
+	var p: Player = game.player
+	var hook: GrappleHook = game.combat.grapple
+	var god: bool = Config.upgrades.god_mode
+	Config.upgrades.god_mode = false
+	game.combat.reset()
+	game.load_room("lava_room", "west")
+	await _frames(3)
+	var room: Room = game.room
+	var bounds: Rect2 = room.get_bounds()
+
+	# Layout: lava over the whole floor between the two doorway ledges.
+	var lavas: Array = _objects_of(Lava)
+	var lava_rect := Rect2()
+	for lava in lavas:
+		lava_rect = lava.get_rect() if not lava_rect.has_area() else lava_rect.merge(lava.get_rect())
+	var floor_y := lava_rect.end.y
+	_check("lava room: lava covers the floor except the entrance and exit ledges",
+		lavas.size() >= 1 and is_equal_approx(lava_rect.position.x, 5 * 32.0) and is_equal_approx(lava_rect.end.x, 59 * 32.0)
+		and room.is_solid_at(Vector2(100, floor_y - 16)) and room.is_solid_at(Vector2(1950, floor_y - 16)), [lava_rect])
+	var on_floor := true
+	for lava in lavas:
+		for x in range(int(lava.global_position.x) + 16, int(lava.global_position.x + lava.size.x), 32):
+			on_floor = on_floor and room.is_solid_at(Vector2(x, lava.global_position.y + lava.size.y + 16))
+	_check("lava room: lava lies only on solid floor (floor-only hazard)", on_floor)
+	_check("lava room: a high, open ceiling over the course", bounds.size.y >= 18 * 32 and not room.is_solid_at(Vector2(1000, 3 * 32)), bounds)
+	var doors: Array = room.get_doors()
+	_check("lava room: entrance west (Upper Galleries), exit east (Hidden Vault)",
+		doors.size() == 2 and _door("west") != null and _door("west").target_room == "upper_room"
+		and _door("east") != null and _door("east").target_room == "hidden_vault", doors.size())
+	var kinds := {}
+	for node in _objects_of(Platform):
+		kinds["platform " + node.kind] = kinds.get("platform " + node.kind, 0) + 1
+	for node in _objects_of(GrapplePeg):
+		kinds["peg " + node.kind] = kinds.get("peg " + node.kind, 0) + 1
+	_check("lava room: the course uses every platform and peg kind",
+		kinds.get("platform standard", 0) >= 1 and kinds.get("platform moving", 0) >= 1 and kinds.get("platform breakable", 0) >= 1
+		and kinds.get("peg standard", 0) >= 1 and kinds.get("peg moving", 0) >= 1 and kinds.get("peg breakable", 0) >= 1, kinds)
+
+	# Visual distinction: each kind has its own colors (and markings).
+	var plat_colors := {}
+	for kind in ["standard", "moving", "breakable"]:
+		var node: Platform = load(PLATFORM_SCENE_PATHS[kind]).instantiate()
+		plat_colors[kind] = (node.get_node("Visual/Body") as Polygon2D).color
+		node.free()
+	var peg_colors := {}
+	for kind in ["standard", "moving", "breakable"]:
+		var node: GrapplePeg = load(PEG_SCENE_PATHS[kind]).instantiate()
+		var tex := (node.get_node("Visual") as Sprite2D).texture as GradientTexture2D
+		peg_colors[kind] = tex.gradient.get_color(1)
+		node.free()
+	_check("visuals: standard, moving and breakable platforms and pegs look different",
+		plat_colors.values().size() == 3 and plat_colors.standard != plat_colors.moving and plat_colors.moving != plat_colors.breakable and plat_colors.standard != plat_colors.breakable
+		and peg_colors.standard != peg_colors.moving and peg_colors.moving != peg_colors.breakable and peg_colors.standard != peg_colors.breakable,
+		[plat_colors, peg_colors])
+
+	# Lava: touching it hurts and sends the player back to safe ground.
+	var respawns := []
+	var pogos := []
+	var on_respawn := func(_pl: Node, from: Vector2, to: Vector2) -> void: respawns.append([from, to])
+	var on_pogo := func(pos: Vector2, _h: bool) -> void: pogos.append(pos)
+	Events.player_hazard_respawn.connect(on_respawn)
+	Events.pogo_bounced.connect(on_pogo)
+	p.health.full_heal()
+	var hp := p.health.health
+	p.global_position = Vector2(700, floor_y - 60)
+	p.velocity = Vector2.ZERO
+	await _until(func() -> bool: return not respawns.is_empty(), 60)
+	_check("lava: touching it deals hazard damage and returns the player to safe ground",
+		respawns.size() == 1 and p.health.health < hp and respawns[0][1].x < 5 * 32.0, [respawns, p.health.health])
+	await _frames(10)
+
+	# No pogo: a down-attack over lava never bounces; the player falls in.
+	respawns.clear()
+	p.global_position = Vector2(900, floor_y - 90)
+	p.velocity = Vector2(0, 200)
+	await _frames(1)
+	Input.action_press(&"move_down")
+	Input.action_press(&"attack")
+	await _frames(2)
+	Input.action_release(&"attack")
+	await _until(func() -> bool: return not respawns.is_empty(), 60)
+	Input.action_release(&"move_down")
+	_check("lava: a pogo over lava never bounces; it falls in and takes the hazard respawn",
+		pogos.is_empty() and respawns.size() == 1, [pogos, respawns])
+	_check("lava: the pogo check skips lava (it only sees spikes)",
+		room.find_hazard(lava_rect, false) == Rect2() and room.find_hazard(lava_rect).has_area())
+	Events.player_hazard_respawn.disconnect(on_respawn)
+	Events.pogo_bounced.disconnect(on_pogo)
+	await _frames(10)
+
+	# A full run with real input, left to right, no teleports.
+	game.load_room("lava_room", "west")
+	await _frames(5)
+	room = game.room
+	var standard: Array = _objects_of(Platform, "standard")
+	standard.sort_custom(func(a, b) -> bool: return a.global_position.x < b.global_position.x)
+	var plat_a: Platform = standard[0]
+	var plat_c: Platform = standard[1]
+	var movers: Array = _objects_of(Platform, "moving")
+	movers.sort_custom(func(a, b) -> bool: return a.global_position.x < b.global_position.x)
+	var plat_b: Platform = movers[0]
+	var plat_e: Platform = movers[1]
+	var plat_d: Platform = _objects_of(Platform, "breakable")[0]
+	var peg1: GrapplePeg = _objects_of(GrapplePeg, "standard")[0]
+	var peg2: GrapplePeg = _objects_of(GrapplePeg, "moving")[0]
+	var peg3: GrapplePeg = _objects_of(GrapplePeg, "breakable")[0]
+	var fell := [0]
+	var on_fall := func(_pl: Node, _f: Vector2, _t: Vector2) -> void: fell[0] += 1
+	Events.player_hazard_respawn.connect(on_fall)
+	var steps := {}
+	# 1. West ledge -> standard platform A.
+	Input.action_press(&"move_right")
+	await _until(func() -> bool: return p.global_position.x >= 5 * 32.0 - 16.0, 120)
+	Input.action_release(&"move_right")
+	steps["1 ledge -> A"] = await _jump_onto(plat_a)
+	# 2. A -> moving platform B (wait until it is near), then ride it.
+	Input.action_press(&"move_right")
+	await _until(func() -> bool: return p.global_position.x >= plat_a.get_rect().end.x - 14.0, 60)
+	Input.action_release(&"move_right")
+	await _until(func() -> bool: return plat_b.get_rect().position.x <= 400.0, 300)
+	steps["2 A -> moving B"] = await _jump_onto(plat_b)
+	var ride_from := p.global_position.x - plat_b.global_position.x
+	var rode := await _until(func() -> bool: return plat_b.global_position.x >= plat_b.mover.start.x + 120.0, 300)
+	steps["2b rides B"] = rode and plat_b.supports(p) and absf(p.global_position.x - plat_b.global_position.x - ride_from) < 2.0
+	# 3. Throw at peg P1 from B: hold.
+	steps["3 B -> hold P1"] = await _throw_to_hold() and hook.target_peg == peg1
+	await _frames(5)
+	# 4. Jump from the hold to standard platform C.
+	steps["4 P1 -> C"] = await _jump_onto(plat_c)
+	# 5. Throw at moving peg P2 when it is low: hold, ride it up.
+	Input.action_press(&"move_right")
+	await _until(func() -> bool: return p.global_position.x >= plat_c.get_rect().end.x - 14.0, 60)
+	Input.action_release(&"move_right")
+	await _frames(4)
+	await _until(func() -> bool: return absf(peg2.global_position.y - hook.rope_origin(p).y) < 6.0, 300)
+	steps["5 C -> hold moving P2"] = await _throw_to_hold() and hook.target_peg == peg2
+	var tether := 0.0
+	var high := await _until(func() -> bool:
+		tether = maxf(tether, p.get_center().distance_to(hook.hang_point()))
+		return peg2.global_position.y <= peg2.mover.start.y - 120.0, 300)
+	steps["5b the hold rides P2 up"] = high and hook.is_holding() and tether < 2.0
+	# 6. Jump from P2 to breakable platform D (double jump).
+	steps["6 P2 -> breakable D"] = await _jump_onto(plat_d, true)
+	# 7. Throw at breakable peg P3 from D before D crumbles.
+	Input.action_press(&"move_right")
+	await _until(func() -> bool: return p.global_position.x >= plat_d.get_rect().end.x - 14.0, 30)
+	Input.action_release(&"move_right")
+	steps["7 D -> hold breakable P3"] = await _throw_to_hold() and hook.target_peg == peg3
+	# 8. Jump right before P3 crumbles: E or the east ledge.
+	Input.action_press(&"jump")
+	Input.action_press(&"move_right")
+	var landed := await _until(func() -> bool: return p.grounded and p.global_position.x > plat_e.mover.start.x - plat_e.size.x / 2.0, 120)
+	Input.action_release(&"jump")
+	await _until(func() -> bool: return p.global_position.x >= 61 * 32.0, 240)
+	Input.action_release(&"move_right")
+	steps["8 P3 -> E / east ledge -> relic"] = landed and game.world.has_relic("ember_heart")
+	steps["no fall into the lava on the way"] = fell[0] == 0
+	Events.player_hazard_respawn.disconnect(on_fall)
+	var run_ok := true
+	for k in steps:
+		run_ok = run_ok and steps[k]
+	_check("lava room: a full run across with real input (both platform and peg kinds, no lava)", run_ok, steps)
+
+	# Breakable platform: crumbles after its delay, drops the player, comes back.
+	game.load_room("lava_room", "west")
+	await _frames(3)
+	plat_d = _objects_of(Platform, "breakable")[0]
+	p.global_position = Vector2(plat_d.global_position.x, plat_d.top_y() - 1.0)
+	p.velocity = Vector2.ZERO
+	await _until(func() -> bool: return plat_d.supports(p), 20)
+	var t0 := Time.get_ticks_msec()
+	var stood := plat_d.supports(p)
+	var held_until := 0
+	for i in 200:
+		if not plat_d.solid:
+			break
+		held_until = i
+		await _frames(1)
+	await _frames(3)
+	_check("breakable platform: stays for its delay, then crumbles and drops the player",
+		stood and not plat_d.solid and not plat_d.visible and absf(held_until / 60.0 - plat_d.crumble_delay) < 0.1 and not plat_d.supports(p),
+		[stood, held_until, plat_d.solid])
+	game.combat.reset()
+	p.global_position = Vector2(80, floor_y - 40)
+	p.velocity = Vector2.ZERO
+	var back := await _until(func() -> bool: return plat_d.solid, int((plat_d.respawn_time + 0.5) * 60))
+	_check("breakable platform: comes back after its respawn time", back and plat_d.visible)
+
+	# Breakable peg: the hook lets go when it crumbles; it comes back.
+	peg3 = _objects_of(GrapplePeg, "breakable")[0]
+	plat_d = _objects_of(Platform, "breakable")[0]
+	await _reset_in_room(Vector2(plat_d.get_rect().end.x - 12.0, plat_d.top_y() - 1.0))
+	var peg_held := await _throw_to_hold()
+	var let_go := await _until(func() -> bool: return not hook.is_latched(), int((peg3.crumble_delay + 0.3) * 60))
+	_check("breakable peg: crumbles after its delay and the hook lets go (the player drops)",
+		peg_held and let_go and not peg3.active and peg3.collision_layer == 0 and p.state_name() != "grapple", [peg_held, let_go, peg3.active, p.state_name()])
+	var peg_back := await _until(func() -> bool: return peg3.active, int((peg3.respawn_time + 0.5) * 60))
+	_check("breakable peg: comes back after its respawn time", peg_back and peg3.visible and peg3.collision_layer == GrapplePeg.MASK)
+
+	# Swing tether on a moving peg: the rope anchor follows the peg.
+	peg2 = _objects_of(GrapplePeg, "moving")[0]
+	await _reset_in_room(Vector2(1100, 400))
+	var start := peg2.global_position + Vector2(-70, 70) - GrappleHook.HAND_OFFSET # Clear of the lava.
+	p.global_position += start - p.get_center()
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	Input.action_press(&"move_down")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_down")
+	var swung := await _until(func() -> bool: return hook.is_swinging(), 30)
+	var follows := true
+	for i in 15:
+		if not hook.is_swinging():
+			break
+		follows = follows and hook.anchor.distance_to(peg2.global_position) < 0.01
+		await _frames(1)
+	_check("moving peg: a swing's rope anchor follows the moving peg", swung and follows and hook.on_peg(), [swung, follows, hook.phase])
+	game.combat.reset()
+
+	# Hook on a moving platform (from below, Up): the anchor rides along.
+	var plat_b2: Platform = _objects_of(Platform, "moving")[0]
+	for b2 in _objects_of(Platform, "moving"):
+		if b2.global_position.x < plat_b2.global_position.x:
+			plat_b2 = b2
+	await _reset_in_room(Vector2(plat_b2.global_position.x, plat_b2.top_y() + 90.0))
+	var under := plat_b2.global_position.x
+	p.global_position.x = under
+	Input.action_press(&"move_up")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_up")
+	var latched_b := await _until(func() -> bool: return hook.is_latched(), 20)
+	var offset := hook.anchor - plat_b2.global_position
+	var rides := true
+	for i in 6:
+		if not hook.is_latched():
+			break
+		await _frames(1)
+		rides = rides and (hook.anchor - plat_b2.global_position).distance_to(offset) < 0.01
+	_check("moving platform: a hook on it keeps its anchor on the platform as it moves",
+		latched_b and rides and hook.anchor_platform == plat_b2, [latched_b, rides, hook.phase])
+	game.combat.reset()
+
+	Config.upgrades.god_mode = god
+	if game.world.has_relic("ember_heart"): # Undo the reward for the tests that follow.
+		game.world.relics.erase("ember_heart")
+		p.health.max_energy_bonus -= 20.0
+	await _reset()
+
+
+## Puts the player at `feet` in the current room, still, facing right.
+func _reset_in_room(feet: Vector2) -> void:
+	var p: Player = game.player
+	game.combat.reset()
+	p.fsm.change("normal")
+	p.global_position = feet
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	await _frames(3)
+	p.global_position = feet
+	p.velocity = Vector2.ZERO
 
 ## Sends a real keyboard event (physical key), like a key press on hardware.
 func _key_event(key: Key, pressed: bool) -> void:

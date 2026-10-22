@@ -23,6 +23,10 @@ const TS := 32
 ## 'S' start checkpoint (+ player spawn)  'C' checkpoint  '$' shard (currency)
 ## 'N' guide NPC  'W' / 'K' / 'U' lore tablets  'T' checkpoint info tablet (see LORE)
 ## '+' grapple peg (GrapplePeg, centered in its cell; only the hook touches it)
+## 'm' moving grapple peg  'b' breakable grapple peg (see the room's "movers")
+## '_' platform  '~' moving platform  '%' breakable platform (Platform objects:
+##     one node per horizontal run, one-way like '=')
+## 'L' lava (Lava, one node per run): floor only, it must sit on a solid cell
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. Wall spikes ('<', right part of the room,
 ## rows 10-12) and ceiling spikes ('V', under the block in row 13) are there to
@@ -133,6 +137,7 @@ const SECRET_LAYOUT := [
 ## ceiling gap ('O' = floor gap here, 4 cells wide). Standard enemies only.
 ## West wall: a secret doorway (Type 2, 'X'/'x') to the Hidden Vault.
 ## East: a hidden pocket (Type 1, 'I') under the block, with shards and a dummy.
+## East wall, on top of the block: the doorway to the Ember Crossing ('H').
 const UPPER_LAYOUT := [
 	"########################################",
 	"#......................................#",
@@ -142,9 +147,9 @@ const UPPER_LAYOUT := [
 	"#..........$...........$.........$.....#",
 	"#.........=====......=====......=====..#",
 	"#......................................#",
-	"#......................................#",
-	"#.....................F................#",
-	"#..................................$...#",
+	"#.......................................",
+	"#.....................F.................",
+	"#..................................$...H",
 	"#..............======...........########",
 	"#...............................########",
 	"x...............................I......#",
@@ -157,6 +162,7 @@ const UPPER_LAYOUT := [
 ## Hidden Vault: a secret room behind the Upper Galleries' west wall (at
 ## least one screen in size, like every room, so the camera stays inside).
 ## Its east doorway is the exit side of the secret doorway: it looks like wall.
+## Its west doorway ('D') is the goal exit of the Ember Crossing.
 const VAULT_LAYOUT := [
 	"################################",
 	"#..............................#",
@@ -171,11 +177,44 @@ const VAULT_LAYOUT := [
 	"#.........$..........$.........#",
 	"#.......=====......=====.......#",
 	"#..............................#",
-	"#..............................x",
-	"#..............................x",
-	"#....$......$.....$......$.....X",
+	"...............................x",
+	"...............................x",
+	"D....$......$.....$......$.....X",
 	"################################",
 	"################################",
+]
+
+## Ember Crossing: a lava gauntlet between the Upper Galleries (west) and the
+## Hidden Vault (east). The whole floor is lava ('L') except the two ledges at
+## the doorways. High ceiling. The way across, left to right:
+##   A standard platform -> B moving platform (ride it right) -> throw at peg P1
+##   (hold) -> jump to standard platform C -> throw at moving peg P2 when it is
+##   low (hold, it lifts you) -> jump to breakable platform D (it crumbles 1 s
+##   after you land) -> throw at breakable peg P3 (it crumbles 1 s after the
+##   hook latches) -> jump right: moving platform E or the east ledge.
+## Goal: the east ledge holds a relic and shards; its doorway leads on to the
+## Hidden Vault. A checkpoint sits on the west ledge.
+const LAVA_LAYOUT := [
+	"################################################################",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#..................................................b...........#",
+	"#........................................%%%%..................#",
+	"#..............................................................#",
+	"#..............................................................#",
+	"#.......................+.............m..............~~~.......#",
+	"............~~~.............____................................",
+	".......___......................................................",
+	"D.C.........................................................$R$H",
+	"#####LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL#####",
+	"################################################################",
 ]
 
 ## Rooms: layout, output scene, doors (per letter) and optional arena.
@@ -219,6 +258,7 @@ const VAULT_LAYOUT := [
 ##     never renames the room's other shards, which saves refer to by name).
 ## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(breakable wall)-> Hidden Shrine
 ##             Test Room <-(ceiling gap)-> Upper Galleries <-(secret doorway)-> Hidden Vault
+##             Upper Galleries <-> Ember Crossing (lava) <-> Hidden Vault
 const ROOMS := {
 	"test_room": {
 		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn", "origin_x": -7,
@@ -256,13 +296,32 @@ const ROOMS := {
 		"doors": {
 			"O": {"door_id": "floor", "target_room": "test_room", "target_door": "ceiling", "vertical": 1, "width": 4},
 			"X": {"door_id": "west", "target_room": "hidden_vault", "target_door": "east", "inward": 1, "secret_doorway": "entry"},
+			"H": {"door_id": "east", "target_room": "lava_room", "target_door": "west", "inward": -1},
 		},
 		# Type 1: the alcove under the east block, entered from the left.
 		"hidden_pocket": {"secret_id": "galleries_alcove", "pass_dir": 1},
 	},
 	"hidden_vault": {
 		"name": "HiddenVault", "layout": VAULT_LAYOUT, "path": "res://world/hidden_vault.tscn",
-		"doors": {"X": {"door_id": "east", "target_room": "upper_room", "target_door": "west", "inward": -1, "secret_doorway": "exit"}},
+		"doors": {
+			"X": {"door_id": "east", "target_room": "upper_room", "target_door": "west", "inward": -1, "secret_doorway": "exit"},
+			"D": {"door_id": "west", "target_room": "lava_room", "target_door": "east", "inward": 1},
+		},
+	},
+	"lava_room": {
+		"name": "LavaRoom", "layout": LAVA_LAYOUT, "path": "res://world/lava_room.tscn",
+		"doors": {
+			"D": {"door_id": "west", "target_room": "upper_room", "target_door": "east", "inward": 1},
+			"H": {"door_id": "east", "target_room": "hidden_vault", "target_door": "west", "inward": -1},
+		},
+		"relic": {"relic_id": "ember_heart", "stat": "max_energy", "amount": 20.0},
+		# Moving platforms ('~') and pegs ('m'), keyed by "col,row" of their
+		# first cell: travel (offset of the far end), period (s), phase (0..1).
+		"movers": {
+			"12,15": {"travel": Vector2(128, 0), "period": 4.0},
+			"38,14": {"travel": Vector2(0, -128), "period": 4.0},
+			"53,14": {"travel": Vector2(96, 0), "period": 3.0, "phase": 0.5},
+		},
 	},
 }
 const ARENA_KINDS := {"w": "weak", "u": "weak", "v": "flyer", "s": "strong", "B": "boss"}
@@ -286,6 +345,17 @@ const RELIC_SCENE := "res://world/objects/relic.tscn"
 const HIDDEN_POCKET_SCENE := "res://world/objects/hidden_pocket_wall.tscn"
 const SECRET_DOORWAY_SCENE := "res://world/objects/secret_doorway.tscn"
 const GRAPPLE_PEG_SCENE := "res://world/objects/grapple_peg.tscn"
+const PEG_SCENES := {
+	"+": GRAPPLE_PEG_SCENE,
+	"m": "res://world/objects/grapple_peg_moving.tscn",
+	"b": "res://world/objects/grapple_peg_breakable.tscn",
+}
+const PLATFORM_SCENES := {
+	"_": "res://world/objects/platform.tscn",
+	"~": "res://world/objects/platform_moving.tscn",
+	"%": "res://world/objects/platform_breakable.tscn",
+}
+const LAVA_SCENE := "res://world/objects/lava.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -1012,8 +1082,27 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, COIN_SCENE, "Coin", feet, {})
 				"*": # A shard inside a hidden pocket: own names, so other shards keep theirs.
 					_add_object(root, objects, counts, COIN_SCENE, "PocketCoin", feet, {})
-				"+":
-					_add_object(root, objects, counts, GRAPPLE_PEG_SCENE, "GrapplePeg", feet - Vector2(0, TS / 2.0), {})
+				"+", "m", "b":
+					var peg_props: Dictionary = def.get("movers", {}).get("%d,%d" % [x, y], {}) if ch == "m" else {}
+					_add_object(root, objects, counts, PEG_SCENES[ch], "GrapplePeg", feet - Vector2(0, TS / 2.0), peg_props)
+				"_", "~", "%": # One Platform per horizontal run; origin at its top-center.
+					if x > 0 and row[x - 1] == ch:
+						continue
+					var run := 1
+					while x + run < row.length() and row[x + run] == ch:
+						run += 1
+					var plat_props: Dictionary = def.get("movers", {}).get("%d,%d" % [x, y], {}).duplicate() if ch == "~" else {}
+					plat_props["size"] = Vector2(run * TS, 12)
+					_add_object(root, objects, counts, PLATFORM_SCENES[ch], "Platform",
+						Vector2((x + ox) * TS + run * TS / 2.0, y * TS), plat_props)
+				"L": # One Lava node per horizontal run; origin at its top-left.
+					if x > 0 and row[x - 1] == "L":
+						continue
+					var lava_run := 1
+					while x + lava_run < row.length() and row[x + lava_run] == "L":
+						lava_run += 1
+					_add_object(root, objects, counts, LAVA_SCENE, "Lava", Vector2((x + ox) * TS, y * TS),
+						{"size": Vector2(lava_run * TS, TS)})
 				"N":
 					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
 				"W", "K", "U", "T", "Q":
@@ -1077,6 +1166,12 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 ## error, so a broken layout is noticed at build time, not in play.
 func _check_room_rules(room_id: String, def: Dictionary) -> void:
 	var layout: Array = def.layout
+	# Lava is a floor hazard only: every 'L' cell sits on solid wall.
+	for y in layout.size():
+		var row: String = layout[y]
+		for x in row.length():
+			if row[x] == "L" and (y + 1 >= layout.size() or (layout[y + 1] as String)[x] != "#"):
+				push_error("Lava rule violated in %s: 'L' at (%d, %d) is not on a solid floor" % [room_id, x, y])
 	# Rule D: the outer edge is wall, or part of a transition (doors, gaps,
 	# secret doorways, breakable-wall doorways). Never open void.
 	for y in layout.size():

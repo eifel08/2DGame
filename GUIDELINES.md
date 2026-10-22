@@ -141,6 +141,15 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 
 ---
 
+## Lava — floor only, never pogoed
+
+- Lava (`L` in a layout, `world/objects/lava.gd`) is a **floor** hazard. Every lava cell sits on solid wall (`#`). `tools/build_assets.gd` reports `Lava rule violated …` otherwise. Never put lava on walls or ceilings; use spikes there.
+- Lava can **never** be pogoed. `CombatManager` checks the down-attack against spikes only (`Room.find_hazard(rect, false)`). Do not change that.
+- Leave a ledge of solid floor at every doorway of a lava room, at least 4 tiles deep. Ground within 1.5 tiles of lava is not safe ground, so the respawn needs room.
+- Current instance: **Ember Crossing** (lava floor between the west and east doorway ledges).
+
+---
+
 ## Checklist for a new room or exit
 
 1. Side exit: a 3-tile gap in the side wall, door letter in its bottom cell (`D` / `H`). Arrival keeps height and speed.
@@ -151,6 +160,7 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 6. Every outer edge is solid wall unless it is part of a transition; every hidden pocket is closed by wall (**Rule D**).
 7. A way back out of a secret room looks like an ordinary open doorway (**Rule E**).
 8. No celebration when anything in the room is won or found (**Rule F**).
-9. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
-10. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
-11. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.
+9. Lava? Floor only, ledges at the doorways (see "Lava" above).
+10. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
+11. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
+12. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.

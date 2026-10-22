@@ -111,14 +111,20 @@ func hazard_rect_for_cell(cell: Vector2i) -> Rect2:
 
 
 ## Returns the first hazard rect overlapping `rect`, or an empty Rect2.
-func find_hazard(rect: Rect2) -> Rect2:
-	var hits := hazards_in(rect)
+## `include_lava` false: spikes only (the pogo check: lava is never pogoed).
+func find_hazard(rect: Rect2, include_lava := true) -> Rect2:
+	var hits := hazards_in(rect, include_lava)
 	return hits[0] if not hits.is_empty() else Rect2()
 
 
-## Every hazard rect overlapping `rect`.
-func hazards_in(rect: Rect2) -> Array[Rect2]:
+## Every hazard rect overlapping `rect`: spike tiles, and Lava nodes unless
+## `include_lava` is false.
+func hazards_in(rect: Rect2, include_lava := true) -> Array[Rect2]:
 	var result: Array[Rect2] = []
+	if include_lava:
+		for node in get_objects():
+			if node is Lava and node.get_rect().intersects(rect):
+				result.append(node.get_rect())
 	var first := tiles.local_to_map(tiles.to_local(rect.position))
 	var last := tiles.local_to_map(tiles.to_local(rect.end))
 	for y in range(first.y, last.y + 1):

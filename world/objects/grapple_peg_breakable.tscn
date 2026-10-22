@@ -1,0 +1,42 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://world/objects/grapple_peg.gd" id="1_peg"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_peg"]
+radius = 8.0
+
+[sub_resource type="Gradient" id="Gradient_peg"]
+offsets = PackedFloat32Array(0, 0.55, 0.7, 1)
+colors = PackedColorArray(1, 0.75, 0.65, 1, 0.85, 0.25, 0.2, 1, 0.35, 0.08, 0.06, 1, 0.35, 0.08, 0.06, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_peg"]
+gradient = SubResource("Gradient_peg")
+width = 20
+height = 20
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[node name="GrapplePegBreakable" type="Area2D"]
+z_index = 1
+collision_layer = 64
+collision_mask = 0
+monitoring = false
+script = ExtResource("1_peg")
+kind = "breakable"
+
+[node name="Shape" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_peg")
+
+[node name="Visual" type="Sprite2D" parent="."]
+texture = SubResource("GradientTexture2D_peg")
+
+[node name="Cracks" type="Line2D" parent="Visual"]
+points = PackedVector2Array(-6, -6, -1, -1, -3, 4, 3, 7)
+width = 1.5
+default_color = Color(0.15, 0.03, 0.02, 0.95)
+
+[node name="Cracks2" type="Line2D" parent="Visual"]
+points = PackedVector2Array(-1, -1, 5, -4)
+width = 1.2
+default_color = Color(0.15, 0.03, 0.02, 0.95)
