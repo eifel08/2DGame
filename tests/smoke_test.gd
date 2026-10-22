@@ -1495,7 +1495,7 @@ func _test_new_spells() -> void:
 	await _frames(int(sf.duration * 60.0))
 	_check("stasis wears off quickly", not frozen.is_frozen() and not stasis.is_running, frozen.freeze_timer)
 
-	# Radiant Lance: a forward beam that damages; aiming up fires it vertically.
+	# Radiant Lance: a forward beam that damages; Up / Down never aim it.
 	await _reset()
 	var lance: RadiantLance = game.ultimates.get_ability("radiant_lance")
 	var beam_target: DummyEnemy = _first_enemy(false)
@@ -1510,12 +1510,37 @@ func _test_new_spells() -> void:
 	_check("lance fires forward and damages", lance.dir == Vector2.RIGHT and beam_target.health < beam_target.max_health, [lance.dir, beam_target.health])
 	await _frames(30)
 	p.health.set_energy(100.0)
-	Input.action_press(&"move_up")
-	await _cast_spell("radiant_lance", PlayerData.SLOT_UP)
-	await _frames(16)
-	var rect := lance.beam_rect()
-	Input.action_release(&"move_up")
-	_check("lance aims straight up while holding up", lance.dir == Vector2.UP and rect.size.y > rect.size.x, [lance.dir, rect])
+	for aim in [&"move_up", &"move_down"]:
+		Input.action_press(aim)
+		await _cast_spell("radiant_lance", PlayerData.SLOT_UP if aim == &"move_up" else PlayerData.SLOT_DOWN)
+		await _frames(16)
+		var rect := lance.beam_rect()
+		Input.action_release(aim)
+		_check("lance stays horizontal toward facing while holding %s" % aim, lance.dir == Vector2.RIGHT and rect.size.x > rect.size.y, [lance.dir, rect])
+		await _frames(30)
+		p.health.set_energy(100.0)
+
+	# Comet Dash: always a horizontal charge toward facing, even with Up or Down held.
+	var comet: CometDash = game.ultimates.get_ability("comet_dash")
+	for aim in [&"move_up", &"move_down"]:
+		await _reset()
+		p.global_position = Vector2(150, 420)
+		p.velocity = Vector2.ZERO
+		p.facing = -1
+		p.health.set_energy(100.0)
+		await _frames(1)
+		Input.action_press(aim)
+		await _cast_spell("comet_dash", PlayerData.SLOT_UP if aim == &"move_up" else PlayerData.SLOT_DOWN)
+		var charged := 0
+		var max_vy := 0.0
+		for i in 30:
+			if p.state_name() == "ability":
+				charged += 1
+				max_vy = maxf(max_vy, absf(p.velocity.y))
+			await _frames(1)
+		Input.action_release(aim)
+		_check("comet dash stays horizontal toward facing while holding %s" % aim,
+			comet.dir == Vector2.LEFT and p.facing == -1 and charged > 0 and max_vy < 1.0, [comet.dir, p.facing, charged, max_vy])
 
 	# Meteor Slam: invulnerable dive, then a ground shockwave and landing i-frames.
 	await _reset()

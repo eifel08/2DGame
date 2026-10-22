@@ -1,7 +1,8 @@
 class_name CometDash
 extends UltimateAbility
-## MOBILITY-COMBAT HYBRID: an 8-directional invulnerable charge that damages
-## everything on its path and ends with a small explosion. It takes over the
+## MOBILITY-COMBAT HYBRID: a horizontal invulnerable charge toward the
+## player's facing (Up / Down are ignored) that damages everything on its
+## path and ends with a small explosion. It takes over the
 ## player's movement through Player.begin_ability_control(self).
 
 var invulnerable := true ## Read by the player's ability state.
@@ -18,17 +19,12 @@ func _init() -> void:
 	kind = "Mobility Strike"
 	color = Color("#ff7a59")
 	icon = "comet"
-	description = "Aimable invulnerable charge that pierces enemies, then detonates."
+	description = "Invulnerable horizontal charge that pierces enemies, then detonates."
 
 
 func _on_activate(ctx: UltimateContext) -> void:
 	_ctx = ctx
-	var aim := Vector2(ctx.input.axis_x(), ctx.input.axis_y())
-	if aim == Vector2.ZERO:
-		aim = Vector2(ctx.player.facing, 0)
-	dir = aim.normalized()
-	if aim.x != 0.0:
-		ctx.player.facing = int(signf(aim.x))
+	dir = Vector2(ctx.player.facing, 0) # Always horizontal, toward facing.
 	hit_set = {}
 	cancelled = false
 	ctx.player.begin_ability_control(self)
@@ -47,10 +43,7 @@ func control_step(delta: float, player: Player) -> bool:
 		"damage": cfg("damage"), "knockback": 380.0, "dir_y": -0.3, "source": id, "strength": 0.7,
 	}, hit_set)
 	time_left -= delta
-	var blocked := player.is_on_wall() \
-		or (dir.y < 0.0 and player.is_on_ceiling()) \
-		or (dir.y > 0.0 and player.is_on_floor())
-	return time_left <= 0.0 or blocked
+	return time_left <= 0.0 or player.is_on_wall()
 
 
 func control_finish(player: Player) -> void:
@@ -58,7 +51,7 @@ func control_finish(player: Player) -> void:
 		return
 	_detonate(player)
 	# Exit with controllable momentum instead of full ability speed.
-	player.velocity = Vector2(dir.x * Config.movement.max_run_speed, -320.0 if dir.y < 0.0 else 0.0)
+	player.velocity = Vector2(dir.x * Config.movement.max_run_speed, 0.0)
 	end(_ctx)
 
 
