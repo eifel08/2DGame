@@ -72,7 +72,7 @@ class Combat:
 
 ## Grappling hook (combat/grapple_hook.gd, player/states/grapple_state.gd).
 class Grapple:
-	var max_range := 384.0 ## How far the hook flies before it comes back.
+	var max_range := 256.0 ## How far the hook flies before it comes back (8 tiles: short and precise).
 	var hook_speed := 1500.0 ## Flight speed of the hook tip.
 	var retract_speed := 2400.0 ## Speed of the tip coming back after a miss or a pull.
 	var hook_radius := 5.0 ## Size of the tip when it checks for enemies.
@@ -80,11 +80,14 @@ class Grapple:
 	var pull_accel := 5200.0 ## Ease-in toward pull_speed, so the pull starts smoothly.
 	var pull_max_time := 0.9 ## Safety net: a pull never lasts longer.
 	var arrive_distance := 4.0 ## Closer than this to the stop point ends the pull.
-	var exit_speed_mul := 0.35 ## Share of the pull speed kept after a pull to terrain.
+	var exit_speed_mul := 0.35 ## Share of the pull speed kept after a pull to a wall or ceiling.
 	## Gap kept between the player and an enemy's contact hitbox at the end of
 	## a pull, so a hooked enemy is never touched (no contact damage).
 	var enemy_safe_margin := 18.0
 	var enemy_knockback_mul := 0.5 ## Knockback on a hooked enemy, relative to melee.
+	## Rebound at the end of an enemy pull, like a pogo: up, and a little away.
+	var enemy_bounce_velocity := 560.0
+	var enemy_bounce_recoil := 120.0
 	var cooldown := 0.3 ## After the hook is back, before it can fire again.
 	var buffer_time := 0.1 ## A press slightly before the hook is ready still fires.
 

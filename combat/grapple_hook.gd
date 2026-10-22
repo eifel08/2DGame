@@ -9,36 +9,44 @@ extends Node2D
 ##   Down                RESERVED for a future modifier: Aim.DOWN exists, but
 ##                       no input selects it yet; holding Down fires the default.
 ##
-## Phases:
+## Phases (the player is in the "grapple" state, player/states/grapple_state.gd,
+## from the throw until the hook lets go):
 ##   idle     nothing out; `cooldown` runs
-##   fly      the tip travels up to Config.grapple.max_range
-##   pull     the hook holds; the player is in the "grapple" state
-##            (player/states/grapple_state.gd), which moves them
+##   fly      the tip travels up to Config.grapple.max_range. The player
+##            hangs still in the air meanwhile (no gravity), so they do not
+##            drop and snag on walls before the pull
+##   pull     the hook holds; the state pulls the player to stop_point()
 ##   retract  the tip flies back to the player, then idle
 ##
 ## What the hook can hit (physics layers, see project.godot):
-##   terrain  TERRAIN_MASK = layer 1 "world": solid tiles, breakable walls,
-##            closed arena gates. The hook latches and pulls the player to it.
-##            An undiscovered hidden pocket wall counts as terrain too, so the
-##            hook never reaches into a covered pocket (GUIDELINES.md, Type 1).
+##   terrain  TERRAIN_MASK = layers 1 "world" (solid tiles, breakable walls,
+##            closed arena gates) and 3 "one_way" (platforms). It latches and
+##            pulls the player there. On a one-way platform the pull ends
+##            standing ON the platform. An undiscovered hidden pocket wall
+##            counts as terrain too, so the hook never reaches into a covered
+##            pocket (GUIDELINES.md, Type 1).
 ##   enemies  layer 4 is NOT in the mask. Like every attack, enemies are hit
 ##            through CombatManager's enemy list (hitbox_active()). A hooked
 ##            enemy takes the standard attack damage, then the player is
-##            pulled toward it and stops Config.grapple.enemy_safe_margin
-##            short of its contact hitbox.
-##   ignored  one-way platforms (layer 3) and the hidden-wall layers (5, 6):
-##            the hook passes them. Hazards (spikes) have no collision; an
-##            anchor touching a hazard is refused (anchor_is_safe), so the
-##            hook never pulls the player into spikes.
+##            pulled toward it, stops Config.grapple.enemy_safe_margin short
+##            of its contact hitbox and rebounds upward, like a pogo.
+##   hazards  spikes on floors, walls and ceilings (tiles with the "hazard"
+##            flag; they have no collision). The flight path is checked
+##            against their areas: the hook is deflected and comes back. It
+##            never latches on or next to a hazard (anchor_is_safe).
+##   ignored  the hidden-wall layers (5, 6).
 ##
 ## Outcomes are reported through Events (grapple_fired, grapple_latched,
-## grapple_released, hit_landed); Feedback plays the sounds and effects.
+## grapple_deflected, grapple_released, grapple_bounced, hit_landed);
+## Feedback plays the sounds and effects.
 ## Art: replace Rope (Line2D) and Tip/Visual; the AnimationPlayer clips are
 ## "fly", "latch" and "retract".
 
 enum Aim { DIAGONAL, HORIZONTAL, UP, DOWN }
 
-const TERRAIN_MASK := 1 ## Physics layer "world".
+const WORLD_LAYER := 1
+const ONE_WAY_LAYER := 3
+const TERRAIN_MASK := (1 << (WORLD_LAYER - 1)) | (1 << (ONE_WAY_LAYER - 1))
 const HAND_OFFSET := Vector2(0.0, -4.0) ## Rope start, from the player's center.
 
 @onready var rope: Line2D = $Rope
@@ -51,6 +59,8 @@ var tip := Vector2.ZERO ## Hook position (global).
 var dir := Vector2.RIGHT ## Flight direction.
 var travelled := 0.0
 var anchor := Vector2.ZERO ## Where the hook holds (global).
+var anchor_one_way := false ## The anchor is on a one-way platform.
+var platform_top := 0.0 ## Top of that platform (feet height after the pull).
 var target_enemy: Enemy ## The hooked enemy during an enemy pull, else null.
 var _enemy_offset := Vector2.ZERO ## Anchor relative to the hooked enemy.
 var cooldown := 0.0
@@ -65,19 +75,22 @@ func setup(p_combat: CombatManager) -> void:
 
 ## Room loads, respawns and resets: the hook is gone at once.
 func reset() -> void:
-	var was_pulling := phase == "pull"
 	phase = "idle"
 	target_enemy = null
 	cooldown = 0.0
 	buffer = 0.0
 	travelled = 0.0
-	if was_pulling and combat and combat.get_player().fsm.is_in("grapple"):
+	if combat and combat.get_player().fsm.is_in("grapple"):
 		combat.get_player().fsm.change("normal")
 	_update_visual()
 
 
 func is_idle() -> bool:
 	return phase == "idle"
+
+
+func is_flying() -> bool:
+	return phase == "fly"
 
 
 func is_pulling() -> bool:
@@ -144,10 +157,12 @@ func fire(p: Player) -> void:
 	tip = rope_origin(p)
 	travelled = 0.0
 	target_enemy = null
+	anchor_one_way = false
 	buffer = 0.0
 	phase = "fly"
 	_play("fly")
 	Events.grapple_fired.emit(tip, dir)
+	p.fsm.change("grapple", {"hook": self}) # Hangs in the air while the hook flies.
 
 
 func rope_origin(p: Player) -> Vector2:
@@ -158,8 +173,9 @@ func _step_fly(delta: float, p: Player) -> void:
 	var g = Config.grapple
 	var dist: float = minf(g.hook_speed * delta, g.max_range - travelled)
 	var from := tip
+	var r: float = g.hook_radius
 
-	# Terrain: physics ray on the world layer only.
+	# Terrain: physics ray on the world and one-way layers only.
 	var terrain_d := INF
 	var query := PhysicsRayQueryParameters2D.create(from, from + dir * dist, TERRAIN_MASK, [p.get_rid()])
 	query.hit_from_inside = true
@@ -170,10 +186,15 @@ func _step_fly(delta: float, p: Player) -> void:
 		if not wall.discovered:
 			terrain_d = minf(terrain_d, Geom.box_cast_distance(from, Vector2.ZERO, dir, wall.get_rect()))
 
+	# Hazards: their areas, along the path.
+	var hazard_d := INF
+	var path := Rect2(from, Vector2.ZERO).expand(from + dir * dist).grow(r)
+	for h in combat.get_room().hazards_in(path):
+		hazard_d = minf(hazard_d, Geom.box_cast_distance(from, Vector2(r, r), dir, h))
+
 	# Enemies: the first living hitbox along the path.
 	var enemy: Enemy = null
 	var enemy_d := INF
-	var r: float = g.hook_radius
 	for e in combat.get_enemies():
 		if not e.hitbox_active():
 			continue
@@ -182,30 +203,48 @@ func _step_fly(delta: float, p: Player) -> void:
 			enemy_d = d
 			enemy = e
 
-	if enemy and enemy_d <= terrain_d:
-		tip = from + dir * enemy_d
-		_hook_enemy(enemy, p)
-	elif terrain_d <= dist:
-		tip = from + dir * terrain_d
-		_hook_terrain(p)
-	else:
+	var first := minf(minf(terrain_d, hazard_d), enemy_d)
+	if first > dist:
 		tip = from + dir * dist
 		travelled += dist
 		if travelled >= g.max_range - 0.01:
 			release()
+		return
+	tip = from + dir * first
+	if hazard_d <= first:
+		_deflect()
+	elif enemy and enemy_d <= first:
+		_hook_enemy(enemy, p)
+	else:
+		_hook_terrain(p)
+
+
+## The hook touched a hazard: no latch, it bounces off and comes back.
+func _deflect() -> void:
+	Events.grapple_deflected.emit(tip)
+	release()
 
 
 func _hook_terrain(p: Player) -> void:
 	anchor = tip
-	if not anchor_is_safe(anchor) or not p.fsm.is_in("normal"):
+	if not anchor_is_safe(anchor):
+		_deflect()
+		return
+	if not p.fsm.is_in("grapple"):
 		release()
 		return
-	_start_pull(p, false)
+	# A point just past the hit, inside the collider, tells what was hit.
+	var inside := anchor + dir * 2.0
+	var room := combat.get_room()
+	anchor_one_way = room.is_one_way_at(inside)
+	if anchor_one_way:
+		platform_top = room.cell_rect_at(inside).position.y
+	_start_pull(false)
 
 
 ## Standard attack damage (with the player's damage modifiers), then a pull
-## that stops short of the enemy's contact hitbox. A killed enemy, or one the
-## player already stands next to, means no pull.
+## that stops short of the enemy's contact hitbox and ends in a rebound.
+## A killed enemy means no pull.
 func _hook_enemy(enemy: Enemy, p: Player) -> void:
 	var c = Config.combat
 	anchor = tip
@@ -217,22 +256,18 @@ func _hook_enemy(enemy: Enemy, p: Player) -> void:
 		"strength": 0.8,
 		"position": anchor,
 	})
-	if not enemy.hitbox_active() or not p.fsm.is_in("normal"):
+	if not enemy.hitbox_active() or not p.fsm.is_in("grapple"):
 		release()
 		return
 	target_enemy = enemy
 	_enemy_offset = anchor - enemy.global_position
-	if stop_point(p).distance_to(p.get_center()) <= Config.grapple.arrive_distance:
-		release() # Already at the safe distance.
-		return
-	_start_pull(p, true)
+	_start_pull(true)
 
 
-func _start_pull(p: Player, on_enemy: bool) -> void:
+func _start_pull(on_enemy_hit: bool) -> void:
 	phase = "pull"
 	_play("latch")
-	Events.grapple_latched.emit(anchor, on_enemy)
-	p.fsm.change("grapple", {"hook": self})
+	Events.grapple_latched.emit(anchor, on_enemy_hit)
 
 
 ## Lets go: the tip flies back to the player.
@@ -245,9 +280,9 @@ func release() -> void:
 	Events.grapple_released.emit(tip)
 
 
-## Called by GrappleState.exit(): however the pull ended, the hook comes back.
-func on_pull_ended() -> void:
-	if phase == "pull":
+## Called by GrappleState.exit(): however the state ended, the hook comes back.
+func on_state_ended() -> void:
+	if phase == "fly" or phase == "pull":
 		release()
 
 
@@ -265,12 +300,16 @@ func _step_retract(delta: float, p: Player) -> void:
 
 # ---------- Pull targets (read by GrappleState) ----------
 
-## Where the player's CENTER should stop: the point at which the player's
-## box first touches the anchor (terrain), or the enemy's contact hitbox
-## grown by the safety margin (enemy). Returns the current center when the
-## target is gone or already reached.
+## Where the player's CENTER should stop:
+##   wall / ceiling   where the player's box first touches the anchor
+##   one-way platform standing on the platform, above the anchor
+##   enemy            where the box touches the enemy's contact hitbox grown
+##                    by the safety margin
+## Returns the current center when the target is gone or already reached.
 func stop_point(p: Player) -> Vector2:
 	var c := p.get_center()
+	if anchor_one_way and target_enemy == null:
+		return Vector2(anchor.x, platform_top - Player.HEIGHT / 2.0 - 0.5)
 	var half := Vector2(Player.WIDTH, Player.HEIGHT) / 2.0
 	var rect: Rect2
 	var aim_at := anchor

@@ -19,6 +19,12 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.pogo_bounced.connect(_on_pogo)
 	Events.grapple_fired.connect(func(_origin: Vector2, _dir: Vector2) -> void: Sfx.play("grapple_fire"))
 	Events.grapple_latched.connect(_on_grapple_latched)
+	Events.grapple_deflected.connect(func(pos: Vector2) -> void:
+		Sfx.play("grapple_latch", 1.6)
+		effects.play("pogo_spike", pos))
+	Events.grapple_bounced.connect(func(pos: Vector2) -> void:
+		Sfx.play("pogo")
+		effects.play("pogo_spark", pos))
 	Events.player_hurt.connect(_on_player_hurt)
 	Events.player_hazard_respawn.connect(_on_hazard_respawn)
 	Events.player_jumped.connect(_on_player_jumped)

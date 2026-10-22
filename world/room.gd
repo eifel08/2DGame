@@ -92,15 +92,33 @@ func is_safe_ground(rect: Rect2) -> bool:
 	return not find_hazard(probe).has_area()
 
 
-## Spikes only occupy the lower part of their tile.
+## Spikes only occupy the part of their tile that points into open space.
+## The cell's transform flags (set by tools/build_assets.gd) give the side:
+##   none                  floor spikes, pointing up    (lower 60%)
+##   FLIP_V                ceiling spikes, pointing down (upper 60%)
+##   TRANSPOSE             wall spikes, pointing left  (right 60%, wall on the right)
+##   TRANSPOSE | FLIP_H    wall spikes, pointing right (left 60%, wall on the left)
 func hazard_rect_for_cell(cell: Vector2i) -> Rect2:
 	var ts := Vector2(tiles.tile_set.tile_size)
 	var origin := tiles.to_global(Vector2(cell) * ts)
+	var alt := tiles.get_cell_alternative_tile(cell)
+	if alt & TileSetAtlasSource.TRANSFORM_TRANSPOSE:
+		var x := origin.x if alt & TileSetAtlasSource.TRANSFORM_FLIP_H else origin.x + ts.x * 0.4
+		return Rect2(x, origin.y + 3.0, ts.x * 0.6, ts.y - 6.0)
+	if alt & TileSetAtlasSource.TRANSFORM_FLIP_V:
+		return Rect2(origin.x + 3.0, origin.y, ts.x - 6.0, ts.y * 0.6)
 	return Rect2(origin.x + 3.0, origin.y + ts.y * 0.4, ts.x - 6.0, ts.y * 0.6)
 
 
 ## Returns the first hazard rect overlapping `rect`, or an empty Rect2.
 func find_hazard(rect: Rect2) -> Rect2:
+	var hits := hazards_in(rect)
+	return hits[0] if not hits.is_empty() else Rect2()
+
+
+## Every hazard rect overlapping `rect`.
+func hazards_in(rect: Rect2) -> Array[Rect2]:
+	var result: Array[Rect2] = []
 	var first := tiles.local_to_map(tiles.to_local(rect.position))
 	var last := tiles.local_to_map(tiles.to_local(rect.end))
 	for y in range(first.y, last.y + 1):
@@ -111,8 +129,15 @@ func find_hazard(rect: Rect2) -> Rect2:
 				continue
 			var h := hazard_rect_for_cell(cell)
 			if h.intersects(rect):
-				return h
-	return Rect2()
+				result.append(h)
+	return result
+
+
+## The tile cell under a world point, as a world-space rect.
+func cell_rect_at(world_pos: Vector2) -> Rect2:
+	var ts := Vector2(tiles.tile_set.tile_size)
+	var cell := tiles.local_to_map(tiles.to_local(world_pos))
+	return Rect2(tiles.to_global(Vector2(cell) * ts), ts)
 
 
 ## Interactables, checkpoints and pickups placed in the room.

@@ -19,6 +19,10 @@ signal grapple_fired(origin: Vector2, direction: Vector2)
 signal grapple_latched(anchor: Vector2, on_enemy: bool) ## The hook holds; the pull starts.
 @warning_ignore("unused_signal")
 signal grapple_released(position: Vector2) ## The hook lets go (missed, refused or pull over) and flies back.
+@warning_ignore("unused_signal")
+signal grapple_deflected(position: Vector2) ## The hook touched a hazard: it never latches there.
+@warning_ignore("unused_signal")
+signal grapple_bounced(position: Vector2) ## An enemy pull ended in the upward rebound.
 
 # Player
 @warning_ignore("unused_signal")

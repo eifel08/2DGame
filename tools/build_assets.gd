@@ -16,12 +16,16 @@ extends SceneTree
 
 const TS := 32
 
-## '#' solid  '=' one-way  '^' spikes  'E' weak ground dummy  'F' weak flying dummy
+## '#' solid  '=' one-way  '^' floor spikes  'V' ceiling spikes (pointing down)
+## '<' / '>' wall spikes pointing left / right (the wall is on the other side)
+## 'E' weak ground dummy  'F' weak flying dummy
 ## 'G' strong dummy  'D' door (doorway to another room, see ROOMS)
 ## 'S' start checkpoint (+ player spawn)  'C' checkpoint  '$' shard (currency)
 ## 'N' guide NPC  'W' / 'K' / 'U' lore tablets  'T' checkpoint info tablet (see LORE)
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
-## player on the last safe ground. The flying dummy above the right pit is for pogo chains.
+## player on the last safe ground. Wall spikes ('<', right part of the room,
+## rows 10-12) and ceiling spikes ('V', under the block in row 13) are there to
+## check that the grappling hook never latches on a hazard. The flying dummy above the right pit is for pogo chains.
 ## The first 7 columns lie LEFT of the normal room (origin_x = -7): solid rock
 ## around a hidden pocket (Type 1) behind the west wall. The camera only goes
 ## there once the pocket is found.
@@ -36,11 +40,11 @@ const ROOM_LAYOUT := [
 	"########.....##......................##..........................##...#",
 	"########.....##.....$................##..............$...........##...#",
 	"########.....##...======.............##............======........##...#",
-	"########.....##..................F...##..........................##...#",
-	"########.....##................$.....##..........................##...#",
-	"########.....##..............=====...##.....$....................##...#",
+	"########.....##..................F...##.........................<##...#",
+	"########.....##................$.....##.........................<##...#",
+	"########.....##..............=====...##.....$...................<##...#",
 	"########.....##......................##...####...................##...#",
-	"########.....##..........$...........##..........................##...#",
+	"########.....##..........$...........##...VVVV...................##...#",
 	"########.....##........=====.........##..........................##...#",
 	"########.....##......................##..........................##...#",
 	"########.....##....$.................##.................F........##...#",
@@ -291,6 +295,12 @@ const EDGE_LEFT := 8
 const ONE_WAY := Vector2i(16, 0)
 const SPIKES := Vector2i(17, 0)
 const ATLAS_COLUMNS := 18
+## Ceiling and wall spikes reuse the floor spike tile with transform flags.
+const SPIKE_TURNS := {
+	"V": TileSetAtlasSource.TRANSFORM_FLIP_V,
+	"<": TileSetAtlasSource.TRANSFORM_TRANSPOSE,
+	">": TileSetAtlasSource.TRANSFORM_TRANSPOSE | TileSetAtlasSource.TRANSFORM_FLIP_H,
+}
 
 ## Player clips: frames/fps give the length; sx/sy squash, bob, lean (skew),
 ## body color, and an optional arm sweep [from, to] for attacks.
@@ -985,6 +995,8 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					tiles.set_cell(cell, 0, ONE_WAY)
 				"^":
 					tiles.set_cell(cell, 0, SPIKES)
+				"V", "<", ">": # The same spike tile, turned (Room.hazard_rect_for_cell reads the flags).
+					tiles.set_cell(cell, 0, SPIKES, SPIKE_TURNS[ch])
 				"P", "S":
 					var marker := Marker2D.new()
 					marker.name = "PlayerSpawn"
@@ -1147,7 +1159,7 @@ func _is_solid_char(layout: Array, x: int, y: int) -> bool:
 func _pocket_rect(layout: Array, wx: int, top: int, bottom: int, pass_dir: int, ox: int) -> Rect2:
 	var open := func(cx: int, cy: int) -> bool:
 		return cy >= 0 and cy < layout.size() and cx >= 0 and cx < (layout[cy] as String).length() \
-			and not (layout[cy][cx] in ["#", "I", "X", "x", "Z", "z", "^"])
+			and not (layout[cy][cx] in ["#", "I", "X", "x", "Z", "z", "^", "V", "<", ">"])
 	var queue: Array[Vector2i] = []
 	var seen := {}
 	for cy in range(top, bottom + 1):
