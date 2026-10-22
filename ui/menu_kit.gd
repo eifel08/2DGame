@@ -1,8 +1,8 @@
 class_name MenuKit
 extends RefCounted
 ## Shared menu building blocks. Every control made here works the same with
-## mouse and keyboard/gamepad: hovering focuses it, arrows/WASD/D-pad move the
-## focus, and Enter/Space/Z/A or a mouse click confirms.
+## mouse and keyboard/gamepad: hovering focuses it, arrows/D-pad move the
+## focus, and Enter/Space/A or a mouse click confirms.
 
 
 const FOCUS_COLOR := Color("#ffd36b")

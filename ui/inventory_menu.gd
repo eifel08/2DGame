@@ -1,6 +1,6 @@
 class_name InventoryMenu
 extends CanvasLayer
-## Inventory window (I / Tab / Esc, gamepad Back) with two tabs:
+## Inventory window (I / Esc, gamepad Back) with two tabs:
 ##   Status    - shards (the only number), health and energy as bars
 ##   Abilities - the spell cross (left, a D-pad: SpellCross) and every
 ##               equippable spell the player knows (right)
@@ -14,7 +14,7 @@ extends CanvasLayer
 ##   Left / Right on the tab row      switch tab (also Q / E, PgUp / PgDn)
 ##   Down / Up                        move between the tab row and the cards
 ##   Arrow keys                       move between cards
-##   Z / Enter / Space (confirm)
+##   Enter / Space (confirm)
 ##     on an equipped spell (cross or pool)  unequip it
 ##     on a free spell (pool)                then choose a cross node; an
 ##                                           occupied slot is replaced
@@ -282,7 +282,7 @@ func _build() -> void:
 	tabs.tab_changed.connect(_on_tab_changed) # After the tabs exist.
 
 	var keys := Label.new()
-	keys.text = "Left / Right  tab    Down / Up  move    Z / Enter  confirm    Backspace  cancel    I / Tab / Esc  close"
+	keys.text = "Left / Right  tab    Down / Up  move    Enter  confirm    Backspace  cancel    I / Esc  close"
 	keys.add_theme_font_size_override("font_size", 10)
 	keys.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	root.add_child(keys)

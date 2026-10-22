@@ -2,7 +2,8 @@ class_name SettingsPanel
 extends PanelContainer
 ## Settings: audio volumes, screen shake, fullscreen and key bindings. Used
 ## by the title screen and the pause menu. Mouse and keyboard both work;
-## to rebind, confirm a key button, then press the new key (Esc cancels).
+## to rebind, confirm a key button, then press the new key or gamepad button
+## (Esc cancels). A key another action holds is swapped (Settings.rebind).
 
 signal closed
 
@@ -51,7 +52,7 @@ func refresh() -> void:
 	for key in _checks:
 		_checks[key].set_pressed_no_signal(Settings.get(key))
 	for action in _key_buttons:
-		_key_buttons[action].text = Settings.key_name(action)
+		_key_buttons[action].text = "%s  ·  %s" % [Settings.key_name(action), Settings.button_name(action)]
 
 
 func _build() -> void:
@@ -101,7 +102,7 @@ func _build() -> void:
 		box.add_child(check)
 		rows.append([check])
 
-	box.add_child(MenuKit.label("CONTROLS  (confirm a key, then press the new key)", 12, Color("#7fa2ff")))
+	box.add_child(MenuKit.label("CONTROLS  (confirm, then press the new key or button)", 12, Color("#7fa2ff")))
 	var grid := GridContainer.new()
 	grid.columns = 4
 	grid.add_theme_constant_override("h_separation", 12)
@@ -160,13 +161,18 @@ func is_rebinding() -> bool:
 
 
 func _input(event: InputEvent) -> void:
-	if not visible or _rebinding == "" or not (event is InputEventKey) or not event.pressed or event.echo:
+	if not visible or _rebinding == "" or not event.is_pressed() or event.is_echo():
+		return
+	if not (event is InputEventKey or event is InputEventJoypadButton):
 		return
 	get_viewport().set_input_as_handled()
 	var action := _rebinding
 	_rebinding = ""
-	if event.physical_keycode != KEY_ESCAPE:
-		Settings.rebind(action, event.physical_keycode)
+	if event is InputEventJoypadButton:
+		Settings.rebind_button(action, event.button_index)
+	elif not event.is_action_pressed(&"ui_cancel"):
+		if not Settings.rebind(action, event.physical_keycode):
+			Sfx.play("ui_move") # A reserved key: nothing changes.
 	refresh()
 	_key_buttons[action].grab_focus()
 

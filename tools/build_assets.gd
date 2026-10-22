@@ -631,20 +631,24 @@ func _joy_axis(axis: JoyAxis, value: float) -> InputEventJoypadMotion:
 
 func _build_input_map() -> void:
 	var actions := {
-		"move_left": [_key(KEY_LEFT), _key(KEY_A), _joy_button(JOY_BUTTON_DPAD_LEFT), _joy_axis(JOY_AXIS_LEFT_X, -1.0)],
-		"move_right": [_key(KEY_RIGHT), _key(KEY_D), _joy_button(JOY_BUTTON_DPAD_RIGHT), _joy_axis(JOY_AXIS_LEFT_X, 1.0)],
-		"move_up": [_key(KEY_UP), _key(KEY_W), _joy_button(JOY_BUTTON_DPAD_UP), _joy_axis(JOY_AXIS_LEFT_Y, -1.0)],
-		"move_down": [_key(KEY_DOWN), _key(KEY_S), _joy_button(JOY_BUTTON_DPAD_DOWN), _joy_axis(JOY_AXIS_LEFT_Y, 1.0)],
-		"jump": [_key(KEY_SPACE), _key(KEY_Z), _joy_button(JOY_BUTTON_A)],
-		"attack": [_key(KEY_J), _key(KEY_X), _joy_button(JOY_BUTTON_X)],
-		"dash": [_key(KEY_K), _key(KEY_C), _key(KEY_SHIFT), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
-		"heal": [_key(KEY_L), _key(KEY_V), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
-		"grapple": [_key(KEY_H), _key(KEY_B), _joy_button(JOY_BUTTON_LEFT_STICK)],
+		# Rebindable actions (Settings.REBINDABLE): exactly one key and one
+		# gamepad button each, no duplicates. No WASD or other hidden extra
+		# keys: a key only triggers what the settings list shows for it.
+		"move_left": [_key(KEY_LEFT), _joy_button(JOY_BUTTON_DPAD_LEFT), _joy_axis(JOY_AXIS_LEFT_X, -1.0)],
+		"move_right": [_key(KEY_RIGHT), _joy_button(JOY_BUTTON_DPAD_RIGHT), _joy_axis(JOY_AXIS_LEFT_X, 1.0)],
+		"move_up": [_key(KEY_UP), _joy_button(JOY_BUTTON_DPAD_UP), _joy_axis(JOY_AXIS_LEFT_Y, -1.0)],
+		"move_down": [_key(KEY_DOWN), _joy_button(JOY_BUTTON_DPAD_DOWN), _joy_axis(JOY_AXIS_LEFT_Y, 1.0)],
+		"jump": [_key(KEY_SPACE), _joy_button(JOY_BUTTON_A)],
+		"attack": [_key(KEY_J), _joy_button(JOY_BUTTON_X)],
+		"dash": [_key(KEY_K), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
+		"heal": [_key(KEY_L), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
+		"grapple": [_key(KEY_H), _joy_button(JOY_BUTTON_LEFT_STICK)],
 		# One Spell button; the held direction picks the spell (UltimateManager).
-		"spell": [_key(KEY_U), _key(KEY_N), _joy_button(JOY_BUTTON_Y)],
-		"interact": [_key(KEY_E), _key(KEY_F), _joy_button(JOY_BUTTON_B)],
-		"inventory": [_key(KEY_I), _key(KEY_TAB), _joy_button(JOY_BUTTON_BACK)],
-		"pause": [_key(KEY_ESCAPE), _key(KEY_P), _joy_button(JOY_BUTTON_START)],
+		"spell": [_key(KEY_U), _joy_button(JOY_BUTTON_Y)],
+		"interact": [_key(KEY_E), _joy_button(JOY_BUTTON_B)],
+		"inventory": [_key(KEY_I), _joy_button(JOY_BUTTON_BACK)],
+		"pause": [_key(KEY_ESCAPE), _joy_button(JOY_BUTTON_START)],
+		# Fixed debug actions (Settings.RESERVED: their keys cannot be rebound to).
 		"toggle_debug": [_key(KEY_F1), _key(KEY_QUOTELEFT)],
 		"reset_room": [_key(KEY_R)],
 		"debug_navigate": [_key(KEY_F2)],
@@ -652,12 +656,12 @@ func _build_input_map() -> void:
 		"menu_prev_tab": [_key(KEY_Q), _key(KEY_PAGEUP), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
 		"menu_next_tab": [_key(KEY_E), _key(KEY_PAGEDOWN), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
 		"menu_clear": [_key(KEY_BACKSPACE), _key(KEY_DELETE), _joy_button(JOY_BUTTON_X)],
-		# Built-in UI actions, extended so menus also work with WASD and Z.
-		"ui_accept": [_key(KEY_ENTER), _key(KEY_KP_ENTER), _key(KEY_SPACE), _key(KEY_Z), _joy_button(JOY_BUTTON_A)],
-		"ui_left": [_key(KEY_LEFT), _key(KEY_A), _joy_button(JOY_BUTTON_DPAD_LEFT), _joy_axis(JOY_AXIS_LEFT_X, -1.0)],
-		"ui_right": [_key(KEY_RIGHT), _key(KEY_D), _joy_button(JOY_BUTTON_DPAD_RIGHT), _joy_axis(JOY_AXIS_LEFT_X, 1.0)],
-		"ui_up": [_key(KEY_UP), _key(KEY_W), _joy_button(JOY_BUTTON_DPAD_UP), _joy_axis(JOY_AXIS_LEFT_Y, -1.0)],
-		"ui_down": [_key(KEY_DOWN), _key(KEY_S), _joy_button(JOY_BUTTON_DPAD_DOWN), _joy_axis(JOY_AXIS_LEFT_Y, 1.0)],
+		# Built-in UI actions (menus only): arrows, Enter / Space, D-pad, stick.
+		"ui_accept": [_key(KEY_ENTER), _key(KEY_KP_ENTER), _key(KEY_SPACE), _joy_button(JOY_BUTTON_A)],
+		"ui_left": [_key(KEY_LEFT), _joy_button(JOY_BUTTON_DPAD_LEFT), _joy_axis(JOY_AXIS_LEFT_X, -1.0)],
+		"ui_right": [_key(KEY_RIGHT), _joy_button(JOY_BUTTON_DPAD_RIGHT), _joy_axis(JOY_AXIS_LEFT_X, 1.0)],
+		"ui_up": [_key(KEY_UP), _joy_button(JOY_BUTTON_DPAD_UP), _joy_axis(JOY_AXIS_LEFT_Y, -1.0)],
+		"ui_down": [_key(KEY_DOWN), _joy_button(JOY_BUTTON_DPAD_DOWN), _joy_axis(JOY_AXIS_LEFT_Y, 1.0)],
 	}
 	for obsolete in ["ultimate", "cycle_ultimate", "ult_1", "ult_2", "ult_3", "ult_4", "ult_5", "ult_6", "ult_7", "ult_8"]:
 		if ProjectSettings.has_setting("input/" + obsolete):

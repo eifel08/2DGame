@@ -251,6 +251,9 @@ func _run() -> void:
 	# --- Grappling hook: aiming, terrain pull, enemy damage + safe stop, cancels ---
 	await _test_grapple()
 
+	# --- Key bindings: no WASD defaults, no duplicates, swap on conflict, Grapple on S ---
+	await _test_keybindings()
+
 	# --- Secret walls: Type 1 hidden pockets (incl. camera limits), Type 2 secret doorways ---
 	await _test_secret_walls()
 
@@ -2727,6 +2730,118 @@ func _jump_height(hold_frames: int) -> float:
 	await _frames(30)
 	return start_y - min_y
 
+
+
+## Sends a real keyboard event (physical key), like a key press on hardware.
+func _key_event(key: Key, pressed: bool) -> void:
+	var e := InputEventKey.new()
+	e.physical_keycode = key
+	e.pressed = pressed
+	Input.parse_input_event(e)
+	Input.flush_buffered_events()
+
+
+## The actions in the Input Map that a physical key triggers.
+func _actions_for(key: Key) -> Array:
+	var e := InputEventKey.new()
+	e.physical_keycode = key
+	e.pressed = true
+	var found := []
+	for action in InputMap.get_actions():
+		if not String(action).begins_with("ui_") and InputMap.event_is_action(e, action, true):
+			found.append(String(action))
+	return found
+
+
+func _test_keybindings() -> void:
+	Settings.reset_controls()
+	var wasd := []
+	for key in [KEY_W, KEY_A, KEY_S, KEY_D]:
+		wasd.append_array(_actions_for(key))
+		for action in [&"ui_up", &"ui_down", &"ui_left", &"ui_right"]:
+			var e := InputEventKey.new()
+			e.physical_keycode = key
+			if InputMap.event_is_action(e, action, true):
+				wasd.append(String(action))
+	_check("keys: W, A, S and D trigger nothing by default (no hidden WASD)", wasd.is_empty(), wasd)
+	var seen := {}
+	var dupes := []
+	var extra := []
+	for action in Settings.REBINDABLE:
+		var n_keys := 0
+		var n_buttons := 0
+		for e in InputMap.action_get_events(action):
+			var id := ""
+			if e is InputEventKey:
+				n_keys += 1
+				id = "key %d" % e.physical_keycode
+			elif e is InputEventJoypadButton:
+				n_buttons += 1
+				id = "button %d" % e.button_index
+			if id != "":
+				if seen.has(id):
+					dupes.append([id, seen[id], action])
+				seen[id] = action
+		if n_keys != 1 or n_buttons != 1:
+			extra.append([action, n_keys, n_buttons])
+	_check("keys: every action has exactly one key and one gamepad button", extra.is_empty(), extra)
+	_check("keys: no key or button is bound to two actions", dupes.is_empty(), dupes)
+
+	# Conflict: Heal takes Spell's key. Spell gets Heal's old key (a swap).
+	Settings.rebind("heal", KEY_U)
+	_check("keys: binding a taken key moves it (Heal gets U, Spell gets L)",
+		Settings.key_name("heal") == "U" and Settings.key_name("spell") == "L" and _actions_for(KEY_U) == ["heal"] and _actions_for(KEY_L) == ["spell"],
+		[Settings.key_name("heal"), Settings.key_name("spell"), _actions_for(KEY_U), _actions_for(KEY_L)])
+	Settings.rebind_button("grapple", JOY_BUTTON_A)
+	_check("keys: binding a taken gamepad button swaps it too (Grapple gets A, Jump gets L3)",
+		Settings.button_name("grapple") == "A" and Settings.button_name("jump") == "L3", [Settings.button_name("grapple"), Settings.button_name("jump")])
+	_check("keys: the fixed debug keys cannot be taken (R stays Reset Room)",
+		not Settings.rebind("jump", KEY_R) and Settings.key_name("jump") == "Space" and _actions_for(KEY_R) == ["reset_room"], [Settings.key_name("jump"), _actions_for(KEY_R)])
+	Settings.reset_controls()
+
+	# A saved conflict (e.g. an old settings file): the customized action keeps
+	# the key, the other one is left unbound.
+	var cfg := ConfigFile.new()
+	cfg.set_value("keys", "heal", int(KEY_U))
+	cfg.save(Settings.config_path)
+	Settings.load_settings()
+	Settings.apply()
+	_check("keys: a saved conflict unbinds the other action (Spell shows '-', U only heals)",
+		Settings.key_name("heal") == "U" and Settings.key_name("spell") == "-" and _actions_for(KEY_U) == ["heal"],
+		[Settings.key_name("heal"), Settings.key_name("spell"), _actions_for(KEY_U)])
+	Settings.reset_controls()
+
+	# Grapple on S: S throws the hook and is not Down (no swing, no pogo, no
+	# down-aim). Tested with real key events, in the air.
+	var p: Player = game.player
+	var hook: GrappleHook = game.combat.grapple
+	Settings.rebind("grapple", KEY_S)
+	_check("keys: S bound to Grapple triggers only Grapple", _actions_for(KEY_S) == ["grapple"] and Settings.key_name("move_down") == "Down",
+		[_actions_for(KEY_S), Settings.key_name("move_down")])
+	await _reset()
+	p.global_position = Vector2(1300, 200)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	await _frames(1)
+	_key_event(KEY_S, true)
+	await _frames(1)
+	var down_held := Input.is_action_pressed(&"move_down") or p.input.axis_y() != 0
+	await _frames(1)
+	_key_event(KEY_S, false)
+	_check("keys: Grapple on S fires the hook straight ahead in the air, not as a Down swing",
+		not down_held and not hook.is_idle() and not hook.swing_mode and hook.dir == Vector2.RIGHT and game.combat.attack.is_empty(),
+		[down_held, hook.phase, hook.swing_mode, hook.dir])
+	game.combat.reset()
+	# Now give S to Aim down: it leaves Grapple (Grapple gets Down instead).
+	Settings.rebind("move_down", KEY_S)
+	_check("keys: S moved to Aim down triggers only Aim down; Grapple takes the old key",
+		_actions_for(KEY_S) == ["move_down"] and Settings.key_name("grapple") == "Down", [_actions_for(KEY_S), Settings.key_name("grapple")])
+	_key_event(KEY_S, true)
+	var down_now := Input.is_action_pressed(&"move_down") and not Input.is_action_pressed(&"grapple")
+	_key_event(KEY_S, false)
+	_check("keys: S held is Down once it is bound to Aim down", down_now)
+	Settings.reset_controls()
+	await _reset()
 
 func _reset() -> void:
 	# Deterministic start: test room, start checkpoint, no dialogue/menus open.
