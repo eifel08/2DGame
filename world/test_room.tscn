@@ -1,32 +1,34 @@
-[gd_scene load_steps=19 format=4]
+[gd_scene load_steps=21 format=4]
 
-[ext_resource type="Script" path="res://world/room.gd" id="1_h6ftn"]
-[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_3ow3d"]
-[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="3_pg0mb"]
-[ext_resource type="Script" path="res://world/objects/door.gd" id="4_6ncxo"]
-[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="5_gqdkg"]
-[ext_resource type="Script" path="res://world/objects/coin.gd" id="6_lx7it"]
-[ext_resource type="PackedScene" path="res://world/objects/lore_stone.tscn" id="7_1s3id"]
-[ext_resource type="Script" path="res://world/objects/lore_object.gd" id="8_8raya"]
-[ext_resource type="Resource" path="res://dialogue/lore_spikes.tres" id="9_20reb"]
-[ext_resource type="PackedScene" path="res://world/objects/hidden_pocket_wall.tscn" id="10_xnge2"]
-[ext_resource type="Script" path="res://world/objects/hidden_pocket_wall.gd" id="11_wnm2o"]
-[ext_resource type="Resource" path="res://dialogue/lore_wall_jump.tres" id="12_2mfaw"]
-[ext_resource type="Resource" path="res://dialogue/lore_checkpoint.tres" id="13_b1yto"]
-[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="14_7s6w6"]
-[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="15_c2r5b"]
-[ext_resource type="PackedScene" path="res://world/objects/npc.tscn" id="16_jltem"]
-[ext_resource type="Resource" path="res://dialogue/guide.tres" id="17_c0jgf"]
-[ext_resource type="Resource" path="res://dialogue/lore_ultimates.tres" id="18_yb83v"]
+[ext_resource type="Script" path="res://world/room.gd" id="1_4jr3v"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_erfa4"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="3_e0y6r"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="4_18b0b"]
+[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="5_hi6sf"]
+[ext_resource type="Script" path="res://world/objects/coin.gd" id="6_cp5yk"]
+[ext_resource type="PackedScene" path="res://world/objects/grapple_peg.tscn" id="7_osawh"]
+[ext_resource type="Script" path="res://world/objects/grapple_peg.gd" id="8_5ybt2"]
+[ext_resource type="PackedScene" path="res://world/objects/lore_stone.tscn" id="9_8x7vh"]
+[ext_resource type="Script" path="res://world/objects/lore_object.gd" id="10_5cmkm"]
+[ext_resource type="Resource" path="res://dialogue/lore_spikes.tres" id="11_wx8gi"]
+[ext_resource type="PackedScene" path="res://world/objects/hidden_pocket_wall.tscn" id="12_koawt"]
+[ext_resource type="Script" path="res://world/objects/hidden_pocket_wall.gd" id="13_1mjou"]
+[ext_resource type="Resource" path="res://dialogue/lore_wall_jump.tres" id="14_id7ww"]
+[ext_resource type="Resource" path="res://dialogue/lore_checkpoint.tres" id="15_8bsce"]
+[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="16_s6fru"]
+[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="17_hwlwr"]
+[ext_resource type="PackedScene" path="res://world/objects/npc.tscn" id="18_tlgxa"]
+[ext_resource type="Resource" path="res://dialogue/guide.tres" id="19_ayfxo"]
+[ext_resource type="Resource" path="res://dialogue/lore_ultimates.tres" id="20_i0iom"]
 
 [node name="TestRoom" type="Node2D"]
-script = ExtResource("1_h6ftn")
+script = ExtResource("1_4jr3v")
 room_id = "test_room"
 main_rect = Rect2(0, 0, 2048, 768)
 
 [node name="Tiles" type="TileMapLayer" parent="."]
 tile_map_data = PackedByteArray("AAD5/wAAAAAAAAAAAAD6/wAAAAAAAAAAAAD7/wAAAAAAAAAAAAD8/wAAAAAAAAAAAAD9/wAAAAAAAAAAAAD+/wAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAGAAAAAAAiAAAAAAAMAAAAAAAjAAAAAAAEAAAAAAAkAAAAAAAEAAAAAAAlAAAAAAAEAAAAAAAmAAAAAAAEAAAAAAAnAAAAAAAEAAAAAAAoAAAAAAAEAAAAAAApAAAAAAAEAAAAAAAqAAAAAAAEAAAAAAArAAAAAAAEAAAAAAAsAAAAAAAEAAAAAAAtAAAAAAAEAAAAAAAuAAAAAAAEAAAAAAAvAAAAAAAEAAAAAAAwAAAAAAAEAAAAAAAxAAAAAAAEAAAAAAAyAAAAAAAEAAAAAAAzAAAAAAAEAAAAAAA0AAAAAAAEAAAAAAA1AAAAAAAEAAAAAAA2AAAAAAAEAAAAAAA3AAAAAAAEAAAAAAA4AAAAAAAEAAAAAAA5AAAAAAAEAAAAAAA6AAAAAAAEAAAAAAA7AAAAAAAEAAAAAAA8AAAAAAAEAAAAAAA9AAAAAAAEAAAAAAA+AAAAAAAEAAAAAAA/AAAAAAAAAAAAAAD5/wEAAAAAAAAAAAD6/wEAAAAAAAAAAAD7/wEAAAAAAAAAAAD8/wEAAAAAAAAAAAD9/wEAAAAAAAAAAAD+/wEAAAAAAAAAAAD//wEAAAAAAAAAAAAAAAEAAAACAAAAAAA/AAEAAAAIAAAAAAD5/wIAAAAAAAAAAAD6/wIAAAAAAAAAAAD7/wIAAAAAAAAAAAD8/wIAAAAAAAAAAAD9/wIAAAAAAAAAAAD+/wIAAAAAAAAAAAD//wIAAAAAAAAAAAAAAAIAAAACAAAAAAA/AAIAAAAIAAAAAAD5/wMAAAAAAAAAAAD6/wMAAAAAAAAAAAD7/wMAAAAAAAAAAAD8/wMAAAAAAAAAAAD9/wMAAAAAAAAAAAD+/wMAAAAAAAAAAAD//wMAAAAAAAAAAAAAAAMAAAACAAAAAAA/AAMAAAAIAAAAAAD5/wQAAAAAAAAAAAD6/wQAAAAAAAAAAAD7/wQAAAAAAAAAAAD8/wQAAAAAAAAAAAD9/wQAAAAAAAAAAAD+/wQAAAAAAAAAAAD//wQAAAAAAAAAAAAAAAQAAAACAAAAAAAeAAQAAAAJAAAAAAAfAAQAAAABAAAAAAAgAAQAAAAFAAAAAAAhAAQAAAAHAAAAAAA/AAQAAAAIAAAAAAD5/wUAAAAAAAAAAAD6/wUAAAAAAAAAAAD7/wUAAAAAAAAAAAD8/wUAAAAAAAAAAAD9/wUAAAAAAAAAAAD+/wUAAAAAAAAAAAD//wUAAAAAAAAAAAAAAAUAAAACAAAAAAABAAUAAAAQAAAAAAACAAUAAAAQAAAAAAADAAUAAAAQAAAAAAAEAAUAAAAQAAAAAAAFAAUAAAAQAAAAAAAYAAUAAAANAAAAAAAZAAUAAAAFAAAAAAAaAAUAAAAFAAAAAAAbAAUAAAAFAAAAAAAcAAUAAAAHAAAAAAAeAAUAAAAIAAAAAAAfAAUAAAACAAAAAAA/AAUAAAAIAAAAAAD5/wYAAAAAAAAAAAD6/wYAAAAAAAAAAAD7/wYAAAAAAAAAAAD8/wYAAAAAAAAAAAD9/wYAAAAAAAAAAAD+/wYAAAAAAAAAAAD//wYAAAAAAAAAAAAAAAYAAAACAAAAAAAGAAYAAAAJAAAAAAAHAAYAAAADAAAAAAAeAAYAAAAIAAAAAAAfAAYAAAACAAAAAAA0AAYAAAANAAAAAAA1AAYAAAAFAAAAAAA2AAYAAAAFAAAAAAA3AAYAAAAFAAAAAAA4AAYAAAAFAAAAAAA5AAYAAAAFAAAAAAA6AAYAAAABAAAAAAA7AAYAAAADAAAAAAA/AAYAAAAIAAAAAAD5/wcAAAAAAAAAAAD6/wcAAAAAAAAAAAD7/wcAAAAAAAAAAAD8/wcAAAAAAAAAAAD9/wcAAAAAAAAAAAD+/wcAAAAAAAAAAAD//wcAAAAAAAAAAAAAAAcAAAACAAAAAAAGAAcAAAAIAAAAAAAHAAcAAAACAAAAAAAeAAcAAAAIAAAAAAAfAAcAAAACAAAAAAA6AAcAAAAIAAAAAAA7AAcAAAACAAAAAAA/AAcAAAAIAAAAAAD5/wgAAAAAAAAAAAD6/wgAAAAAAAAAAAD7/wgAAAAAAAAAAAD8/wgAAAAAAAAAAAD9/wgAAAAAAAAAAAD+/wgAAAAAAAAAAAD//wgAAAAAAAAAAAAAAAgAAAACAAAAAAAGAAgAAAAIAAAAAAAHAAgAAAACAAAAAAAeAAgAAAAIAAAAAAAfAAgAAAACAAAAAAA6AAgAAAAIAAAAAAA7AAgAAAACAAAAAAA/AAgAAAAIAAAAAAD5/wkAAAAAAAAAAAD6/wkAAAAAAAAAAAD7/wkAAAAAAAAAAAD8/wkAAAAAAAAAAAD9/wkAAAAAAAAAAAD+/wkAAAAAAAAAAAD//wkAAAAAAAAAAAAAAAkAAAACAAAAAAAGAAkAAAAIAAAAAAAHAAkAAAACAAAAAAALAAkAAAAQAAAAAAAMAAkAAAAQAAAAAAANAAkAAAAQAAAAAAAOAAkAAAAQAAAAAAAPAAkAAAAQAAAAAAAQAAkAAAAQAAAAAAAeAAkAAAAIAAAAAAAfAAkAAAACAAAAAAAsAAkAAAAQAAAAAAAtAAkAAAAQAAAAAAAuAAkAAAAQAAAAAAAvAAkAAAAQAAAAAAAwAAkAAAAQAAAAAAAxAAkAAAAQAAAAAAA6AAkAAAAIAAAAAAA7AAkAAAACAAAAAAA/AAkAAAAIAAAAAAD5/woAAAAAAAAAAAD6/woAAAAAAAAAAAD7/woAAAAAAAAAAAD8/woAAAAAAAAAAAD9/woAAAAAAAAAAAD+/woAAAAAAAAAAAD//woAAAAAAAAAAAAAAAoAAAACAAAAAAAGAAoAAAAIAAAAAAAHAAoAAAACAAAAAAAeAAoAAAAIAAAAAAAfAAoAAAACAAAAAAA5AAoAAAARAAAAAEA6AAoAAAAIAAAAAAA7AAoAAAACAAAAAAA/AAoAAAAIAAAAAAD5/wsAAAAAAAAAAAD6/wsAAAAAAAAAAAD7/wsAAAAAAAAAAAD8/wsAAAAAAAAAAAD9/wsAAAAAAAAAAAD+/wsAAAAAAAAAAAD//wsAAAAAAAAAAAAAAAsAAAACAAAAAAAGAAsAAAAIAAAAAAAHAAsAAAACAAAAAAAeAAsAAAAIAAAAAAAfAAsAAAACAAAAAAA5AAsAAAARAAAAAEA6AAsAAAAIAAAAAAA7AAsAAAACAAAAAAA/AAsAAAAIAAAAAAD5/wwAAAAAAAAAAAD6/wwAAAAAAAAAAAD7/wwAAAAAAAAAAAD8/wwAAAAAAAAAAAD9/wwAAAAAAAAAAAD+/wwAAAAAAAAAAAD//wwAAAAAAAAAAAAAAAwAAAACAAAAAAAGAAwAAAAIAAAAAAAHAAwAAAACAAAAAAAWAAwAAAAQAAAAAAAXAAwAAAAQAAAAAAAYAAwAAAAQAAAAAAAZAAwAAAAQAAAAAAAaAAwAAAAQAAAAAAAeAAwAAAAIAAAAAAAfAAwAAAACAAAAAAA5AAwAAAARAAAAAEA6AAwAAAAIAAAAAAA7AAwAAAACAAAAAAA/AAwAAAAIAAAAAAD5/w0AAAAAAAAAAAD6/w0AAAAAAAAAAAD7/w0AAAAAAAAAAAD8/w0AAAAAAAAAAAD9/w0AAAAAAAAAAAD+/w0AAAAAAAAAAAD//w0AAAAAAAAAAAAAAA0AAAACAAAAAAAGAA0AAAAIAAAAAAAHAA0AAAACAAAAAAAeAA0AAAAIAAAAAAAfAA0AAAACAAAAAAAjAA0AAAANAAAAAAAkAA0AAAAFAAAAAAAlAA0AAAAFAAAAAAAmAA0AAAAHAAAAAAA6AA0AAAAIAAAAAAA7AA0AAAACAAAAAAA/AA0AAAAIAAAAAAD5/w4AAAAAAAAAAAD6/w4AAAAAAAAAAAD7/w4AAAAAAAAAAAD8/w4AAAAAAAAAAAD9/w4AAAAAAAAAAAD+/w4AAAAAAAAAAAD//w4AAAAAAAAAAAAAAA4AAAACAAAAAAAGAA4AAAAIAAAAAAAHAA4AAAACAAAAAAAeAA4AAAAIAAAAAAAfAA4AAAACAAAAAAAjAA4AAAARAAAAACAkAA4AAAARAAAAACAlAA4AAAARAAAAACAmAA4AAAARAAAAACA6AA4AAAAIAAAAAAA7AA4AAAACAAAAAAA/AA4AAAAIAAAAAAD5/w8AAAAAAAAAAAD6/w8AAAAAAAAAAAD7/w8AAAAAAAAAAAD8/w8AAAAAAAAAAAD9/w8AAAAAAAAAAAD+/w8AAAAAAAAAAAD//w8AAAAAAAAAAAAAAA8AAAACAAAAAAAGAA8AAAAIAAAAAAAHAA8AAAACAAAAAAAQAA8AAAAQAAAAAAARAA8AAAAQAAAAAAASAA8AAAAQAAAAAAATAA8AAAAQAAAAAAAUAA8AAAAQAAAAAAAeAA8AAAAIAAAAAAAfAA8AAAACAAAAAAA6AA8AAAAIAAAAAAA7AA8AAAACAAAAAAA/AA8AAAAIAAAAAAD5/xAAAAAAAAAAAAD6/xAAAAAAAAAAAAD7/xAAAAAAAAAAAAD8/xAAAAAAAAAAAAD9/xAAAAAAAAAAAAD+/xAAAAAAAAAAAAD//xAAAAAAAAAAAAAAABAAAAACAAAAAAAGABAAAAAIAAAAAAAHABAAAAACAAAAAAAeABAAAAAIAAAAAAAfABAAAAACAAAAAAA6ABAAAAAIAAAAAAA7ABAAAAACAAAAAAA/ABAAAAAIAAAAAAD5/xEAAAAAAAAAAAD6/xEAAAAAAAAAAAD7/xEAAAAAAAAAAAD8/xEAAAAAAAAAAAD9/xEAAAAAAAAAAAD+/xEAAAAAAAAAAAD//xEAAAAAAAAAAAAAABEAAAACAAAAAAAGABEAAAAIAAAAAAAHABEAAAACAAAAAAAeABEAAAAMAAAAAAAfABEAAAAGAAAAAAA6ABEAAAAIAAAAAAA7ABEAAAACAAAAAAA/ABEAAAAIAAAAAAD5/xIAAAAAAAAAAAD6/xIAAAAAAAAAAAD7/xIAAAAEAAAAAAD8/xIAAAAEAAAAAAD9/xIAAAAEAAAAAAD+/xIAAAAEAAAAAAD//xIAAAAEAAAAAAAAABIAAAACAAAAAAAGABIAAAAIAAAAAAAHABIAAAACAAAAAAAKABIAAAAQAAAAAAALABIAAAAQAAAAAAAMABIAAAAQAAAAAAANABIAAAAQAAAAAAAOABIAAAAQAAAAAAA6ABIAAAAMAAAAAAA7ABIAAAAGAAAAAAA/ABIAAAAMAAAAAAD5/xMAAAAAAAAAAAD6/xMAAAACAAAAAAAAABMAAAAKAAAAAAAGABMAAAAMAAAAAAAHABMAAAAGAAAAAAAoABMAAAAJAAAAAAApABMAAAABAAAAAAAqABMAAAABAAAAAAArABMAAAADAAAAAAD5/xQAAAAAAAAAAAD6/xQAAAACAAAAAAAoABQAAAAIAAAAAAApABQAAAAAAAAAAAAqABQAAAAAAAAAAAArABQAAAACAAAAAAD5/xUAAAAAAAAAAAD6/xUAAAACAAAAAAAoABUAAAAIAAAAAAApABUAAAAAAAAAAAAqABUAAAAAAAAAAAArABUAAAACAAAAAAD5/xYAAAAAAAAAAAD6/xYAAAAAAAAAAAD7/xYAAAABAAAAAAD8/xYAAAABAAAAAAD9/xYAAAABAAAAAAD+/xYAAAABAAAAAAD//xYAAAABAAAAAAAAABYAAAAAAAAAAAABABYAAAABAAAAAAACABYAAAABAAAAAAADABYAAAABAAAAAAAEABYAAAABAAAAAAAFABYAAAABAAAAAAAGABYAAAABAAAAAAAHABYAAAABAAAAAAAIABYAAAABAAAAAAAJABYAAAABAAAAAAAKABYAAAABAAAAAAALABYAAAABAAAAAAAMABYAAAABAAAAAAANABYAAAABAAAAAAAOABYAAAABAAAAAAAPABYAAAABAAAAAAAQABYAAAABAAAAAAARABYAAAADAAAAAAASABYAAAARAAAAAAATABYAAAARAAAAAAAUABYAAAARAAAAAAAVABYAAAARAAAAAAAWABYAAAAJAAAAAAAXABYAAAABAAAAAAAYABYAAAABAAAAAAAZABYAAAABAAAAAAAaABYAAAABAAAAAAAbABYAAAABAAAAAAAcABYAAAABAAAAAAAdABYAAAABAAAAAAAeABYAAAABAAAAAAAfABYAAAABAAAAAAAgABYAAAABAAAAAAAhABYAAAABAAAAAAAiABYAAAABAAAAAAAjABYAAAABAAAAAAAkABYAAAABAAAAAAAlABYAAAABAAAAAAAmABYAAAABAAAAAAAnABYAAAABAAAAAAAoABYAAAAAAAAAAAApABYAAAAAAAAAAAAqABYAAAAAAAAAAAArABYAAAAAAAAAAAAsABYAAAABAAAAAAAtABYAAAADAAAAAAAuABYAAAARAAAAAAAvABYAAAARAAAAAAAwABYAAAARAAAAAAAxABYAAAARAAAAAAAyABYAAAARAAAAAAAzABYAAAARAAAAAAA0ABYAAAARAAAAAAA1ABYAAAAJAAAAAAA2ABYAAAABAAAAAAA3ABYAAAABAAAAAAA4ABYAAAABAAAAAAA5ABYAAAABAAAAAAA6ABYAAAABAAAAAAA7ABYAAAABAAAAAAA8ABYAAAABAAAAAAA9ABYAAAABAAAAAAA+ABYAAAABAAAAAAA/ABYAAAABAAAAAAD5/xcAAAAAAAAAAAD6/xcAAAAAAAAAAAD7/xcAAAAAAAAAAAD8/xcAAAAAAAAAAAD9/xcAAAAAAAAAAAD+/xcAAAAAAAAAAAD//xcAAAAAAAAAAAAAABcAAAAAAAAAAAABABcAAAAAAAAAAAACABcAAAAAAAAAAAADABcAAAAAAAAAAAAEABcAAAAAAAAAAAAFABcAAAAAAAAAAAAGABcAAAAAAAAAAAAHABcAAAAAAAAAAAAIABcAAAAAAAAAAAAJABcAAAAAAAAAAAAKABcAAAAAAAAAAAALABcAAAAAAAAAAAAMABcAAAAAAAAAAAANABcAAAAAAAAAAAAOABcAAAAAAAAAAAAPABcAAAAAAAAAAAAQABcAAAAAAAAAAAARABcAAAAAAAAAAAASABcAAAABAAAAAAATABcAAAABAAAAAAAUABcAAAABAAAAAAAVABcAAAABAAAAAAAWABcAAAAAAAAAAAAXABcAAAAAAAAAAAAYABcAAAAAAAAAAAAZABcAAAAAAAAAAAAaABcAAAAAAAAAAAAbABcAAAAAAAAAAAAcABcAAAAAAAAAAAAdABcAAAAAAAAAAAAeABcAAAAAAAAAAAAfABcAAAAAAAAAAAAgABcAAAAAAAAAAAAhABcAAAAAAAAAAAAiABcAAAAAAAAAAAAjABcAAAAAAAAAAAAkABcAAAAAAAAAAAAlABcAAAAAAAAAAAAmABcAAAAAAAAAAAAnABcAAAAAAAAAAAAoABcAAAAAAAAAAAApABcAAAAAAAAAAAAqABcAAAAAAAAAAAArABcAAAAAAAAAAAAsABcAAAAAAAAAAAAtABcAAAAAAAAAAAAuABcAAAABAAAAAAAvABcAAAABAAAAAAAwABcAAAABAAAAAAAxABcAAAABAAAAAAAyABcAAAABAAAAAAAzABcAAAABAAAAAAA0ABcAAAABAAAAAAA1ABcAAAAAAAAAAAA2ABcAAAAAAAAAAAA3ABcAAAAAAAAAAAA4ABcAAAAAAAAAAAA5ABcAAAAAAAAAAAA6ABcAAAAAAAAAAAA7ABcAAAAAAAAAAAA8ABcAAAAAAAAAAAA9ABcAAAAAAAAAAAA+ABcAAAAAAAAAAAA/ABcAAAAAAAAAAAA=")
-tile_set = ExtResource("2_3ow3d")
+tile_set = ExtResource("2_erfa4")
 
 [node name="EnemySpawns" type="Node2D" parent="."]
 
@@ -57,9 +59,9 @@ metadata/flying = false
 
 [node name="Objects" type="Node2D" parent="."]
 
-[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("3_pg0mb")]
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("3_e0y6r")]
 position = Vector2(1024, 0)
-script = ExtResource("4_6ncxo")
+script = ExtResource("4_18b0b")
 door_id = "ceiling"
 target_room = "upper_room"
 target_door = "floor"
@@ -68,153 +70,169 @@ vertical = -1
 trigger_size = Vector2(128, 24)
 secret = false
 
-[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(112, 160)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(1776, 192)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin3" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin3" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(432, 288)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin4" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin4" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(1488, 288)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin5" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin5" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(784, 384)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin6" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin6" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(1200, 416)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin7" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin7" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(592, 480)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin8" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="GrapplePeg1" type="Area2D" parent="Objects" instance=ExtResource("7_osawh")]
+z_index = 1
+position = Vector2(1648, 464)
+collision_layer = 64
+collision_mask = 0
+monitoring = false
+script = ExtResource("8_5ybt2")
+
+[node name="Coin8" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(400, 576)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Lore1" type="Node2D" parent="Objects" instance=ExtResource("7_1s3id")]
+[node name="Lore1" type="Node2D" parent="Objects" instance=ExtResource("9_8x7vh")]
 z_index = 1
 position = Vector2(1360, 608)
-script = ExtResource("8_8raya")
-dialogue = ExtResource("9_20reb")
+script = ExtResource("10_5cmkm")
+dialogue = ExtResource("11_wx8gi")
 prompt = "Read"
 interact_size = Vector2(56, 48)
 
-[node name="PocketCoin1" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="GrapplePeg2" type="Area2D" parent="Objects" instance=ExtResource("7_osawh")]
+z_index = 1
+position = Vector2(1520, 592)
+collision_layer = 64
+collision_mask = 0
+monitoring = false
+script = ExtResource("8_5ybt2")
+
+[node name="PocketCoin1" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(-112, 704)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="PocketCoin2" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="PocketCoin2" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(-48, 704)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="HiddenPocketWall1" type="Node2D" parent="Objects" instance=ExtResource("10_xnge2")]
+[node name="HiddenPocketWall1" type="Node2D" parent="Objects" instance=ExtResource("12_koawt")]
 position = Vector2(16, 704)
-script = ExtResource("11_wnm2o")
+script = ExtResource("13_1mjou")
 secret_id = "halls_west_alcove"
 pass_dir = -1
 pocket_rect = Rect2(-160, 608, 160, 96)
 size = Vector2(32, 64)
 
-[node name="Lore2" type="Node2D" parent="Objects" instance=ExtResource("7_1s3id")]
+[node name="Lore2" type="Node2D" parent="Objects" instance=ExtResource("9_8x7vh")]
 z_index = 1
 position = Vector2(112, 704)
-script = ExtResource("8_8raya")
-dialogue = ExtResource("12_2mfaw")
+script = ExtResource("10_5cmkm")
+dialogue = ExtResource("14_id7ww")
 prompt = "Read"
 interact_size = Vector2(56, 48)
 
-[node name="Lore3" type="Node2D" parent="Objects" instance=ExtResource("7_1s3id")]
+[node name="Lore3" type="Node2D" parent="Objects" instance=ExtResource("9_8x7vh")]
 z_index = 1
 position = Vector2(240, 704)
-script = ExtResource("8_8raya")
-dialogue = ExtResource("13_b1yto")
+script = ExtResource("10_5cmkm")
+dialogue = ExtResource("15_8bsce")
 prompt = "Read"
 interact_size = Vector2(56, 48)
 
-[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("14_7s6w6")]
+[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("16_s6fru")]
 z_index = 1
 position = Vector2(336, 704)
-script = ExtResource("15_c2r5b")
+script = ExtResource("17_hwlwr")
 is_start = true
 prompt = "Save"
 interact_size = Vector2(56, 64)
 
-[node name="Npc1" type="Node2D" parent="Objects" instance=ExtResource("16_jltem")]
+[node name="Npc1" type="Node2D" parent="Objects" instance=ExtResource("18_tlgxa")]
 z_index = 1
 position = Vector2(496, 704)
-script = ExtResource("8_8raya")
-dialogue = ExtResource("17_c0jgf")
+script = ExtResource("10_5cmkm")
+dialogue = ExtResource("19_ayfxo")
 prompt = "Talk"
 interact_size = Vector2(64, 56)
 
-[node name="Lore4" type="Node2D" parent="Objects" instance=ExtResource("7_1s3id")]
+[node name="Lore4" type="Node2D" parent="Objects" instance=ExtResource("9_8x7vh")]
 z_index = 1
 position = Vector2(880, 704)
-script = ExtResource("8_8raya")
-dialogue = ExtResource("18_yb83v")
+script = ExtResource("10_5cmkm")
+dialogue = ExtResource("20_i0iom")
 prompt = "Read"
 interact_size = Vector2(56, 48)
 
-[node name="Coin9" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin9" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(976, 704)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Coin10" type="Node2D" parent="Objects" instance=ExtResource("5_gqdkg")]
+[node name="Coin10" type="Node2D" parent="Objects" instance=ExtResource("5_hi6sf")]
 z_index = 2
 position = Vector2(1008, 704)
-script = ExtResource("6_lx7it")
+script = ExtResource("6_cp5yk")
 value = 5
 
-[node name="Checkpoint2" type="Node2D" parent="Objects" instance=ExtResource("14_7s6w6")]
+[node name="Checkpoint2" type="Node2D" parent="Objects" instance=ExtResource("16_s6fru")]
 z_index = 1
 position = Vector2(1264, 704)
-script = ExtResource("15_c2r5b")
+script = ExtResource("17_hwlwr")
 is_start = false
 prompt = "Save"
 interact_size = Vector2(56, 64)
 
-[node name="Checkpoint3" type="Node2D" parent="Objects" instance=ExtResource("14_7s6w6")]
+[node name="Checkpoint3" type="Node2D" parent="Objects" instance=ExtResource("16_s6fru")]
 z_index = 1
 position = Vector2(1936, 704)
-script = ExtResource("15_c2r5b")
+script = ExtResource("17_hwlwr")
 is_start = false
 prompt = "Save"
 interact_size = Vector2(56, 64)
 
-[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("3_pg0mb")]
+[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("3_e0y6r")]
 position = Vector2(2032, 704)
-script = ExtResource("4_6ncxo")
+script = ExtResource("4_18b0b")
 door_id = "east"
 target_room = "boss_room"
 target_door = "west"

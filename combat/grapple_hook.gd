@@ -24,6 +24,9 @@ extends Node2D
 ##            fixed length around `anchor` (a pendulum). It lets go on jump /
 ##            grapple / dash, on damage, on touching terrain, or when the rope
 ##            crosses an enemy or a hazard (rope_obstructed)
+##   hold     a pull that reached a grapple peg: the hook stays attached and
+##            the player hangs still under the peg until any action but
+##            Left / Right (GrappleState)
 ##   retract  the tip flies back to the player, then idle
 ##
 ## What the hook can hit (physics layers, see project.godot):
@@ -46,6 +49,10 @@ extends Node2D
 ##            areas with a thin tip (Config.grapple.hazard_radius): the hook is
 ##            deflected and comes back. It never latches on or next to a
 ##            hazard (anchor_is_safe).
+##   pegs     GrapplePeg areas on layer 7 (PEG_MASK), found by the same three
+##            rays (areas only). A swing throw swings on the peg; any other
+##            throw pulls to it and then holds (phase "hold"). Pegs have no
+##            body collision: the player passes through them.
 ##   ignored  the hidden-wall layers (5, 6).
 ##
 ## Outcomes are reported through Events (grapple_fired, grapple_latched,
@@ -59,6 +66,7 @@ enum Aim { HORIZONTAL, UP, SWING }
 const WORLD_LAYER := 1
 const ONE_WAY_LAYER := 3
 const TERRAIN_MASK := (1 << (WORLD_LAYER - 1)) | (1 << (ONE_WAY_LAYER - 1))
+const PEG_MASK := GrapplePeg.MASK
 const HAND_OFFSET := Vector2(0.0, -4.0) ## Rope start, from the player's center.
 
 @onready var rope: Line2D = $Rope
@@ -75,6 +83,7 @@ var anchor := Vector2.ZERO ## Where the hook holds (global).
 var anchor_one_way := false ## The anchor is on a one-way platform.
 var platform_top := 0.0 ## Top of that platform (feet height after the pull).
 var target_enemy: Enemy ## The hooked enemy during an enemy pull, else null.
+var target_peg: GrapplePeg ## The hooked peg (pull, hold or swing), else null.
 var _enemy_offset := Vector2.ZERO ## Anchor relative to the hooked enemy.
 var cooldown := 0.0
 var buffer := 0.0
@@ -94,6 +103,7 @@ func setup(p_combat: CombatManager) -> void:
 func reset() -> void:
 	phase = "idle"
 	target_enemy = null
+	target_peg = null
 	cooldown = 0.0
 	buffer = 0.0
 	travelled = 0.0
@@ -118,8 +128,12 @@ func is_swinging() -> bool:
 	return phase == "swing"
 
 
+func is_holding() -> bool:
+	return phase == "hold"
+
+
 func is_latched() -> bool:
-	return phase == "pull" or phase == "swing"
+	return phase == "pull" or phase == "swing" or phase == "hold"
 
 
 # ---------- Aiming ----------
@@ -185,6 +199,7 @@ func fire(p: Player) -> void:
 	tip = rope_origin(p)
 	travelled = 0.0
 	target_enemy = null
+	target_peg = null
 	anchor_one_way = false
 	buffer = 0.0
 	phase = "fly"
@@ -231,7 +246,11 @@ func _step_fly(delta: float, p: Player) -> void:
 			enemy_d = d
 			enemy = e
 
-	var first := minf(minf(terrain_d, hazard_d), enemy_d)
+	# Pegs: their own layer, the same forgiving rays.
+	var peg := _cast_pegs(from, dist, r, p)
+	var peg_d: float = peg.distance
+
+	var first := minf(minf(minf(terrain_d, hazard_d), enemy_d), peg_d)
 	if first > dist:
 		tip = from + dir * dist
 		travelled += dist
@@ -243,6 +262,8 @@ func _step_fly(delta: float, p: Player) -> void:
 		_deflect()
 	elif enemy and enemy_d <= first:
 		_hook_enemy(enemy, p)
+	elif peg.peg and peg_d <= first:
+		_hook_peg(peg.peg, p)
 	else:
 		tip = terrain.point # The surface point (a side ray may have caught it).
 		_hook_terrain(p)
@@ -268,6 +289,26 @@ func _cast_terrain(from: Vector2, dist: float, r: float, p: Player) -> Dictionar
 		var d: float = (hit.position - start).dot(dir)
 		if d < best.distance:
 			best = {"distance": d, "point": hit.position}
+	return best
+
+
+## The nearest peg hit of the same three rays, on the peg layer (areas
+## only). A ray that starts inside a peg ignores it. Returns {distance, peg}.
+func _cast_pegs(from: Vector2, dist: float, r: float, p: Player) -> Dictionary:
+	var best := {"distance": INF, "peg": null}
+	var space := get_world_2d().direct_space_state
+	var side := dir.orthogonal() * r
+	for offset in [Vector2.ZERO, side, -side]:
+		var start: Vector2 = from + offset
+		var query := PhysicsRayQueryParameters2D.create(start, start + dir * dist, PEG_MASK, [p.get_rid()])
+		query.collide_with_areas = true
+		query.collide_with_bodies = false
+		var hit := space.intersect_ray(query)
+		if hit.is_empty() or not (hit.collider is GrapplePeg):
+			continue
+		var d: float = (hit.position - start).dot(dir)
+		if d < best.distance:
+			best = {"distance": d, "peg": hit.collider}
 	return best
 
 
@@ -307,6 +348,23 @@ func _hook_enemy(enemy: Enemy, p: Player) -> void:
 	_latch(true)
 
 
+## A peg holds at its center. Swing throw: a pendulum. Otherwise: a pull
+## that ends in a hold (begin_hold).
+func _hook_peg(peg: GrapplePeg, p: Player) -> void:
+	if not p.fsm.is_in("grapple"):
+		release()
+		return
+	target_peg = peg
+	anchor = peg.global_position
+	tip = anchor
+	_latch(false)
+
+
+## Called by GrappleState when a pull reaches a peg: the hook stays attached.
+func begin_hold() -> void:
+	phase = "hold"
+
+
 func _latch(on_enemy_hit: bool) -> void:
 	phase = "swing" if swing_mode else "pull"
 	_play("latch")
@@ -338,6 +396,7 @@ func release() -> void:
 		return
 	phase = "retract"
 	target_enemy = null
+	target_peg = null
 	_play("retract")
 	Events.grapple_released.emit(tip)
 
@@ -367,9 +426,12 @@ func _step_retract(delta: float, p: Player) -> void:
 ##   one-way platform standing on the platform, above the anchor
 ##   enemy            where the box touches the enemy's contact hitbox grown
 ##                    by the safety margin
+##   peg              hanging under it: the hands at the peg (hang_point)
 ## Returns the current center when the target is gone or already reached.
 func stop_point(p: Player) -> Vector2:
 	var c := p.get_center()
+	if target_peg:
+		return hang_point()
 	if anchor_one_way and target_enemy == null:
 		return Vector2(anchor.x, platform_top - Player.HEIGHT / 2.0 - 0.5)
 	var half := Vector2(Player.WIDTH, Player.HEIGHT) / 2.0
@@ -389,6 +451,15 @@ func stop_point(p: Player) -> Vector2:
 	if d == INF:
 		return c
 	return c + to.normalized() * d
+
+
+## The player's center while hanging from the hooked peg.
+func hang_point() -> Vector2:
+	return anchor + Vector2(0.0, Player.HEIGHT / 2.0)
+
+
+func on_peg() -> bool:
+	return target_peg != null
 
 
 func on_enemy() -> bool:

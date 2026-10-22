@@ -17,6 +17,13 @@ extends PlayerState
 ##          keeps the swing's speed), grapple, dash, damage (any state change),
 ##          touching terrain, or the rope crossing an enemy or a hazard.
 ##          Letting go keeps the swing's momentum.
+##   peg hold  a pull that reached a grapple peg (GrapplePeg): the hook stays
+##          attached and the player hangs still under the peg (no gravity,
+##          zero velocity). Left / Right only turn the player. Any other
+##          action pressed lets go at once and still does its job: Jump jumps
+##          (with the double jump back), Dash dashes, Attack / Spell fire
+##          from normal movement, Grapple only lets go. A swing throw at a
+##          peg swings around it instead (the swing part above).
 ##
 ## Back to "normal" afterwards. A pull ends when the stop point is reached,
 ## the path is blocked, the hooked enemy is gone, the time runs out, or the
@@ -26,6 +33,11 @@ extends PlayerState
 
 const STALL_FRAMES := 3 ## Steps in a row with almost no progress = blocked.
 const MIN_ROPE := 8.0 ## Shortest swing rope.
+## Actions that do NOT end a peg hold: Left / Right turn the player; the rest
+## open menus or debug tools and leave the player alone.
+const HOLD_KEEP: Array[StringName] = [
+	&"move_left", &"move_right", &"pause", &"inventory", &"toggle_debug", &"debug_navigate",
+]
 
 var hook: GrappleHook
 var latched := false ## The hook held, so the pull or swing has started.
@@ -52,7 +64,9 @@ func enter(params: Dictionary) -> void:
 
 
 func step(delta: float) -> void:
-	if hook.is_pulling():
+	if hook.is_holding():
+		_step_peg_hold()
+	elif hook.is_pulling():
 		if not latched:
 			_begin_pull()
 		_step_pull(delta)
@@ -124,8 +138,14 @@ func _step_pull(delta: float) -> void:
 
 
 ## Back to normal movement. `arrived`: the pull reached its stop point.
+## A pull that reaches a peg does not end: it becomes a peg hold.
 func _finish(arrived: bool) -> void:
 	var g = Config.grapple
+	if arrived and hook.on_peg():
+		p.global_position += hook.hang_point() - p.get_center() # Exactly under the peg.
+		p.velocity = Vector2.ZERO
+		hook.begin_hold()
+		return
 	if hook.on_enemy():
 		_settle()
 		if arrived and hook.enemy_alive():
@@ -210,6 +230,27 @@ func _release_swing(reason: String) -> void:
 			p.fsm.change("dash")
 			return
 	p.fsm.change("normal")
+
+
+# ---------- Peg hold (hook latched on a peg after a pull) ----------
+
+func _step_peg_hold() -> void:
+	p.velocity = Vector2.ZERO # Hangs still: no gravity, no drift.
+	var ix := p.input.axis_x()
+	if ix != 0:
+		p.facing = ix
+	for action in InputState.ACTIONS:
+		if action in HOLD_KEEP or not p.input.was_pressed(action):
+			continue
+		if action == &"grapple":
+			p.input.consume(&"grapple") # Lets go; does not fire a new hook this step.
+		if action == &"jump":
+			_jump_off()
+		elif action == &"dash" and Config.upgrades.dash and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
+			p.fsm.change("dash")
+		else:
+			p.fsm.change("normal") # Attack, Spell, Up / Down, ...: from normal movement.
+		return
 
 
 # ---------- Shared ----------

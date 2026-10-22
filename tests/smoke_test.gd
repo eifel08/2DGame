@@ -251,6 +251,9 @@ func _run() -> void:
 	# --- Grappling hook: aiming, terrain pull, enemy damage + safe stop, cancels ---
 	await _test_grapple()
 
+	# --- Grapple pegs: hook-only layer, static hold, swing ---
+	await _test_grapple_pegs()
+
 	# --- Key bindings: no WASD defaults, no duplicates, swap on conflict, Grapple on S ---
 	await _test_keybindings()
 
@@ -2756,6 +2759,170 @@ func _jump_height(hold_frames: int) -> float:
 	return start_y - min_y
 
 
+
+
+## Puts the player's center at `center`, still, facing `facing`.
+func _place_center(center: Vector2, facing: int) -> void:
+	var p: Player = game.player
+	p.global_position += center - p.get_center()
+	p.velocity = Vector2.ZERO
+	p.facing = facing
+
+
+## Throws the hook straight right at the hold peg from the air and waits for
+## the hold. Returns true once the player hangs from it.
+func _hang_from_peg(peg: GrapplePeg) -> bool:
+	var hook: GrappleHook = game.combat.grapple
+	await _reset()
+	game.combat.reset()
+	_place_center(peg.global_position + Vector2(-80, 0) - GrappleHook.HAND_OFFSET, 1)
+	await _frames(1)
+	_place_center(peg.global_position + Vector2(-80, 0) - GrappleHook.HAND_OFFSET, 1)
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	for i in 60:
+		if hook.is_holding():
+			return true
+		await _frames(1)
+	return false
+
+
+func _test_grapple_pegs() -> void:
+	var p: Player = game.player
+	var hook: GrappleHook = game.combat.grapple
+	await _reset()
+	var hold_peg := game.room.get_node_or_null("Objects/GrapplePeg2") as GrapplePeg
+	var swing_peg := game.room.get_node_or_null("Objects/GrapplePeg1") as GrapplePeg
+	_check("pegs: the test room has a hold peg and a swing peg 45 degrees up-right of it",
+		hold_peg != null and swing_peg != null and (swing_peg.global_position - hold_peg.global_position).normalized().is_equal_approx(Vector2(1, -1).normalized()),
+		[hold_peg, swing_peg])
+	if hold_peg == null or swing_peg == null:
+		return
+	var masks_clear := (p.collision_mask & GrapplePeg.MASK) == 0
+	for e in game.enemies:
+		masks_clear = masks_clear and (e.collision_mask & GrapplePeg.MASK) == 0
+	_check("pegs: alone on layer 7, and no player or enemy collides with that layer",
+		hold_peg.collision_layer == GrapplePeg.MASK and hold_peg.collision_mask == 0 and masks_clear and ProjectSettings.get_setting("layer_names/2d_physics/layer_7") == "grapple_peg",
+		[hold_peg.collision_layer, hold_peg.collision_mask, p.collision_mask])
+	# The body passes straight through a peg.
+	_place_center(hold_peg.global_position + Vector2(-60, 0), 1)
+	var through := not p.test_move(p.global_transform, Vector2(120, 0))
+	_check("pegs: the player's body passes through a peg", through)
+
+	# Mode B: a standard throw pulls to the peg and then HOLDS there, still.
+	var held := await _hang_from_peg(hold_peg)
+	var at := p.global_position
+	var still := true
+	for i in 30:
+		still = still and hook.is_holding() and p.state_name() == "grapple" and p.velocity == Vector2.ZERO
+		await _frames(1)
+	_check("pegs: a standard throw pulls the player to the peg and the hook stays attached",
+		held and hook.is_latched() and hook.anchor == hold_peg.global_position and p.get_center().distance_to(hook.hang_point()) < 1.0,
+		[held, hook.phase, hook.anchor, p.get_center()])
+	_check("pegs: the hold is static (no gravity, zero velocity, no drift)", still and p.global_position.distance_to(at) < 0.01, [still, p.global_position - at])
+	Input.action_press(&"move_left")
+	await _frames(2)
+	var turned_left := p.facing == -1 and hook.is_holding()
+	Input.action_release(&"move_left")
+	Input.action_press(&"move_right")
+	await _frames(2)
+	var turned_right := p.facing == 1 and hook.is_holding()
+	Input.action_release(&"move_right")
+	_check("pegs: Left / Right only turn the player during a hold", turned_left and turned_right and p.global_position.distance_to(at) < 0.01, [turned_left, turned_right])
+
+	# Reachable in play: standing on the block left of the pit, a plain
+	# throw right reaches the hold peg.
+	await _reset()
+	game.combat.reset()
+	p.global_position = Vector2(1390, 607)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	await _frames(3)
+	var on_block := p.grounded
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	var ledge_hold := false
+	for i in 60:
+		ledge_hold = ledge_hold or hook.is_holding()
+		await _frames(1)
+	_check("pegs: the hold peg is reachable from the block left of the pit (plain throw right)", on_block and ledge_hold, [on_block, hook.phase, p.get_center()])
+	game.combat.reset()
+
+	# Any other action lets go at once (and still does its job).
+	var released := {}
+	for action in [&"jump", &"move_down", &"move_up", &"attack", &"grapple", &"dash", &"spell"]:
+		if not await _hang_from_peg(hold_peg):
+			released[action] = "no hold"
+			continue
+		await _frames(2)
+		Input.action_press(action)
+		await _frames(2)
+		Input.action_release(action)
+		var ok := not hook.is_latched() and p.state_name() != "grapple"
+		if action == &"jump":
+			ok = ok and p.velocity.y < 0.0
+		elif action == &"dash":
+			ok = ok and p.state_name() == "dash"
+		elif action == &"grapple":
+			ok = ok and not hook.is_flying() # Lets go only; no new throw.
+		released[action] = [ok, p.state_name(), hook.phase] if not ok else true
+		await _frames(10)
+	var all_released := true
+	for action in released:
+		all_released = all_released and released[action] is bool and released[action]
+	_check("pegs: Jump, Down, Up, Attack, Grapple, Dash and Spell each end the hold at once", all_released, released)
+
+	# Mode A: a swing throw (Down in the air) swings around the peg.
+	await _reset()
+	game.combat.reset()
+	for e in game.enemies: # Out of the hook's path and the arc.
+		e.patrol = false
+		e.global_position = Vector2(200, 100)
+	for i in 60:
+		if p.state_name() == "normal":
+			break
+		await _frames(1)
+	var start := swing_peg.global_position + Vector2(-100, 100) - GrappleHook.HAND_OFFSET
+	_place_center(start, 1)
+	await _frames(1)
+	_place_center(start, 1)
+	var swing_log := []
+	var on_fired := func(o: Vector2, d: Vector2) -> void: swing_log.append(["fired", o, d])
+	var on_latched := func(a: Vector2, _e: bool) -> void: swing_log.append(["latched", a])
+	var on_ended := func(r: String) -> void: swing_log.append(["ended", r])
+	Events.grapple_fired.connect(on_fired)
+	Events.grapple_latched.connect(on_latched)
+	Events.grapple_swing_ended.connect(on_ended)
+	Input.action_press(&"move_down")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_down")
+	for i in 20:
+		if hook.is_swinging():
+			break
+		await _frames(1)
+	await _frames(1)
+	var gs: GrappleState = p.fsm.states["grapple"]
+	var rope := gs.rope_length
+	var dev := 0.0
+	var moved := 0.0
+	for i in 20:
+		if not hook.is_swinging():
+			break
+		dev = maxf(dev, absf(p.get_center().distance_to(hook.anchor) - rope))
+		moved = maxf(moved, p.get_center().distance_to(start))
+		await _frames(1)
+	_check("pegs: a swing throw (Down in the air) swings around the peg on a fixed rope",
+		hook.is_swinging() and hook.on_peg() and hook.anchor == swing_peg.global_position and dev < 1.5 and moved > 20.0,
+		[hook.phase, hook.anchor, dev, moved, swing_log])
+	Events.grapple_fired.disconnect(on_fired)
+	Events.grapple_latched.disconnect(on_latched)
+	Events.grapple_swing_ended.disconnect(on_ended)
+	game.combat.reset()
+	await _reset()
 
 ## Sends a real keyboard event (physical key), like a key press on hardware.
 func _key_event(key: Key, pressed: bool) -> void:

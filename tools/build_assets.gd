@@ -22,10 +22,14 @@ const TS := 32
 ## 'G' strong dummy  'D' door (doorway to another room, see ROOMS)
 ## 'S' start checkpoint (+ player spawn)  'C' checkpoint  '$' shard (currency)
 ## 'N' guide NPC  'W' / 'K' / 'U' lore tablets  'T' checkpoint info tablet (see LORE)
+## '+' grapple peg (GrapplePeg, centered in its cell; only the hook touches it)
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. Wall spikes ('<', right part of the room,
 ## rows 10-12) and ceiling spikes ('V', under the block in row 13) are there to
 ## check that the grappling hook never latches on a hazard. The flying dummy above the right pit is for pogo chains.
+## Two grapple pegs over the right pit: a low one level with the block left of
+## the pit (throw right from its top and hang there: static hold), and one 45
+## degrees up-right of it to swing on (Down + hook in the air).
 ## The first 7 columns lie LEFT of the normal room (origin_x = -7): solid rock
 ## around a hidden pocket (Type 1) behind the west wall. The camera only goes
 ## there once the pocket is found.
@@ -44,11 +48,11 @@ const ROOM_LAYOUT := [
 	"########.....##................$.....##.........................<##...#",
 	"########.....##..............=====...##.....$...................<##...#",
 	"########.....##......................##...####...................##...#",
-	"########.....##..........$...........##...VVVV...................##...#",
+	"########.....##..........$...........##...VVVV............+......##...#",
 	"########.....##........=====.........##..........................##...#",
 	"########.....##......................##..........................##...#",
 	"########.....##....$.................##.................F........##...#",
-	"########.....##..=====...........................K...............##...#",
+	"########.....##..=====...........................K....+..........##...#",
 	"##.....#.....##................................####....................",
 	"##.....I.......................................####....................",
 	"##.*.*.I..W...T..S....N...........U..$$.E.....C####..........E.....C..D",
@@ -281,6 +285,7 @@ const BREAKABLE_SCENE := "res://world/objects/breakable_wall.tscn"
 const RELIC_SCENE := "res://world/objects/relic.tscn"
 const HIDDEN_POCKET_SCENE := "res://world/objects/hidden_pocket_wall.tscn"
 const SECRET_DOORWAY_SCENE := "res://world/objects/secret_doorway.tscn"
+const GRAPPLE_PEG_SCENE := "res://world/objects/grapple_peg.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -1007,6 +1012,8 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, COIN_SCENE, "Coin", feet, {})
 				"*": # A shard inside a hidden pocket: own names, so other shards keep theirs.
 					_add_object(root, objects, counts, COIN_SCENE, "PocketCoin", feet, {})
+				"+":
+					_add_object(root, objects, counts, GRAPPLE_PEG_SCENE, "GrapplePeg", feet - Vector2(0, TS / 2.0), {})
 				"N":
 					_add_object(root, objects, counts, NPC_SCENE, "Npc", feet, {"dialogue": load(LORE[ch])})
 				"W", "K", "U", "T", "Q":

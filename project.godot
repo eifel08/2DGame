@@ -202,6 +202,7 @@ rendering/root_node_layout_direction=1
 2d_physics/layer_4="enemies"
 2d_physics/layer_5="hidden_wall_player"
 2d_physics/layer_6="hidden_wall_enemy"
+2d_physics/layer_7="grapple_peg"
 
 [rendering]
 
