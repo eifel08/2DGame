@@ -2,9 +2,12 @@ class_name GrappleHook
 extends Node2D
 ## Grappling hook. Owned and stepped by CombatManager (after the player moves).
 ##
-## Aiming (resolve_aim / aim_vector), read when the hook fires. Exactly
-## three cases; the direction always follows `facing` (Left / Right only
-## matter through normal movement, which turns the player):
+## Aiming (resolve_aim / aim_vector), read on the frame the hook fires.
+## Left / Right held on that frame turn the player AT ONCE (before the
+## trajectory is computed), so the hook always goes the held way, even when
+## normal movement would not have turned them yet (e.g. a wall slide, which
+## faces away from the wall). "Airborne" is `not is_on_floor()`. Exactly
+## three cases:
 ##
 ##   | Key                  | State              | Angle            | Action |
 ##   | UP                   | grounded / airborne| 90, straight up  | pull   |
@@ -77,6 +80,9 @@ var _enemy_offset := Vector2.ZERO ## Anchor relative to the hooked enemy.
 var cooldown := 0.0
 var buffer := 0.0
 var _anim_name := ""
+## Debug: the last throw's aim ray, drawn for DEBUG_AIM_TIME (see _draw).
+var _debug_aim := {}
+const DEBUG_AIM_TIME := 0.8
 
 
 func setup(p_combat: CombatManager) -> void:
@@ -119,22 +125,34 @@ func is_latched() -> bool:
 # ---------- Aiming ----------
 
 ## The three cases. `axis_y`: -1 Up held, 1 Down held, 0 neither.
-static func resolve_aim(axis_y: int, airborne: bool) -> Aim:
+## `verbose`: print the result (Config.debug.log_grapple_aim; fire() passes it).
+static func resolve_aim(axis_y: int, airborne: bool, verbose := false) -> Aim:
+	var aim := Aim.HORIZONTAL # 3. Everything else: straight ahead, pull.
 	if axis_y < 0:
-		return Aim.UP # 1. Up, grounded or airborne: straight up, pull.
-	if axis_y > 0 and airborne:
-		return Aim.SWING # 2. Down, airborne only: 45 degrees up, swing.
-	return Aim.HORIZONTAL # 3. Everything else: straight ahead, pull.
+		aim = Aim.UP # 1. Up, grounded or airborne: straight up, pull.
+	elif axis_y > 0 and airborne:
+		aim = Aim.SWING # 2. Down, airborne only: 45 degrees up, swing.
+	if verbose:
+		print("[grapple] resolve_aim: axis_y=%d airborne=%s -> %s" % [axis_y, airborne, Aim.keys()[aim]])
+	return aim
 
 
-static func aim_vector(aim: Aim, facing: int) -> Vector2:
+## The horizontal side is this frame's Left / Right input when one is held,
+## otherwise `facing`.
+static func aim_vector(aim: Aim, facing: int, axis_x := 0, verbose := false) -> Vector2:
+	var side := float(axis_x) if axis_x != 0 else float(facing)
+	var v: Vector2
 	match aim:
 		Aim.UP:
-			return Vector2.UP # 90 degrees.
+			v = Vector2.UP # 90 degrees.
 		Aim.SWING:
-			return Vector2(facing, -1.0).normalized() # 45 degrees up, facing side.
+			v = Vector2(side, -1.0).normalized() # 45 degrees up, toward the side.
 		_:
-			return Vector2(facing, 0.0) # 0 degrees, facing side.
+			v = Vector2(side, 0.0) # 0 degrees, toward the side.
+	if verbose:
+		print("[grapple] aim_vector: %s facing=%d axis_x=%d -> dir=(%.2f, %.2f) angle=%d deg (up = 90)"
+			% [Aim.keys()[aim], facing, axis_x, v.x, v.y, roundi(rad_to_deg(atan2(-v.y, absf(v.x))))])
+	return v
 
 
 # ---------- Per-step update ----------
@@ -164,12 +182,36 @@ func step(delta: float) -> void:
 	_update_visual()
 	if _anim_name != "" and anim.has_animation(_anim_name):
 		anim.advance(delta) # Manual mode: hitstop freezes the hook too.
+	if not _debug_aim.is_empty():
+		_debug_aim.time -= delta
+		if _debug_aim.time <= 0.0:
+			_debug_aim = {}
+		queue_redraw()
+
+
+## Debug trail: the resolved aim of the last throw, as a ray over the full
+## range with its case and angle (Config.debug.log_grapple_aim).
+func _draw() -> void:
+	if _debug_aim.is_empty() or not Config.debug.log_grapple_aim:
+		return
+	var a := clampf(_debug_aim.time / DEBUG_AIM_TIME, 0.0, 1.0)
+	var from := to_local(_debug_aim.from)
+	var d: Vector2 = _debug_aim.dir
+	var col := {Aim.UP: Color("#7cf3ff"), Aim.SWING: Color("#ffb347"), Aim.HORIZONTAL: Color("#8dffb0")}[_debug_aim.aim] as Color
+	draw_dashed_line(from, from + d * Config.grapple.max_range, Color(col, a), 2.0, 6.0)
+	var label := "%s %d°" % [Aim.keys()[_debug_aim.aim], roundi(rad_to_deg(atan2(-d.y, absf(d.x))))]
+	draw_string(ThemeDB.fallback_font, from + Vector2(-30, -30), label, HORIZONTAL_ALIGNMENT_CENTER, 60, 10, Color(col, a))
 
 
 func fire(p: Player) -> void:
-	var aim := resolve_aim(p.input.axis_y(), not p.grounded)
-	dir = aim_vector(aim, p.facing)
+	var verbose: bool = Config.debug.log_grapple_aim
+	var ix := p.input.axis_x()
+	if ix != 0:
+		p.facing = ix # Turn on this very frame, before the trajectory.
+	var aim := resolve_aim(p.input.axis_y(), not p.is_on_floor(), verbose)
+	dir = aim_vector(aim, p.facing, ix, verbose)
 	swing_mode = aim == Aim.SWING
+	_debug_aim = {"from": rope_origin(p), "dir": dir, "aim": aim, "time": DEBUG_AIM_TIME}
 	tip = rope_origin(p)
 	travelled = 0.0
 	target_enemy = null

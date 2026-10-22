@@ -2186,6 +2186,10 @@ func _test_grapple() -> void:
 	_check("grapple case 3: no direction (or Left / Right) fires straight ahead, toward facing, grounded or airborne",
 		aim.call(0, 1) == Vector2.RIGHT and aim.call(0, -1) == Vector2.LEFT and aim.call(0, 1, false) == Vector2.RIGHT
 		and mode.call(0, true) == GrappleHook.Aim.HORIZONTAL and mode.call(0, false) == GrappleHook.Aim.HORIZONTAL)
+	_check("grapple: Left / Right held on the throw frame win over facing (straight that way)",
+		GrappleHook.aim_vector(GrappleHook.Aim.HORIZONTAL, 1, -1) == Vector2.LEFT and GrappleHook.aim_vector(GrappleHook.Aim.HORIZONTAL, -1, 1) == Vector2.RIGHT
+		and GrappleHook.aim_vector(GrappleHook.Aim.SWING, 1, -1).is_equal_approx(Vector2(-diag.x, diag.y))
+		and GrappleHook.aim_vector(GrappleHook.Aim.UP, 1, -1) == Vector2.UP)
 	_check("grapple case 1: Up fires straight up (pull), grounded or airborne",
 		aim.call(-1, 1) == Vector2.UP and aim.call(-1, -1, false) == Vector2.UP
 		and mode.call(-1, true) == GrappleHook.Aim.UP and mode.call(-1, false) == GrappleHook.Aim.UP)
@@ -2249,6 +2253,27 @@ func _test_grapple() -> void:
 	_check("grapple: a latched pull refreshes the double jump", p.air_jumps_used == 0, p.air_jumps_used)
 	await _frames(15)
 	_check("grapple: the hook comes back and cools down", hook.is_idle(), hook.phase)
+
+	# Wall slide: sliding faces AWAY from the wall, but holding toward it
+	# and throwing turns the player at once and fires into the wall.
+	await _reset()
+	p.global_position = Vector2(32 + Player.WIDTH / 2.0 + 1.0, 320)
+	p.velocity = Vector2.ZERO
+	Input.action_press(&"move_left")
+	await _frames(20)
+	var slid := [p.wall_sliding, p.facing]
+	var at_throw := []
+	var on_fire := func(_o: Vector2, d: Vector2) -> void: at_throw.append([d, p.facing])
+	Events.grapple_fired.connect(on_fire)
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_left")
+	Events.grapple_fired.disconnect(on_fire)
+	_check("grapple: holding Left during a wall slide fires left (the player turns on the throw frame)",
+		slid == [true, 1] and at_throw.size() == 1 and at_throw[0] == [Vector2.LEFT, -1], [slid, at_throw])
+	await _frames(30)
+	game.combat.reset()
 
 	# No direction: straight out toward the facing side, onto the pillar.
 	await _reset()

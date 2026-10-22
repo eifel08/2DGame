@@ -127,6 +127,9 @@ class DebugFlags:
 	var paused := false
 	var time_scale := 1.0
 	var overlay_open := false ## Set by the debug overlay while it is visible.
+	## Grapple aim debugging: prints resolve_aim / aim_vector on every throw
+	## and draws the resolved aim ray. On in debug builds (editor, tests).
+	var log_grapple_aim := OS.is_debug_build()
 
 
 var upgrades: Upgrades
