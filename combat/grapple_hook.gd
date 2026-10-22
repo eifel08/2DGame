@@ -2,13 +2,15 @@ class_name GrappleHook
 extends Node2D
 ## Grappling hook. Owned and stepped by CombatManager (after the player moves).
 ##
-## Aiming (resolve_aim / aim_vector), read when the hook fires:
-##   no direction held    straight out, toward the facing side      -> pull
-##   Left or Right held   straight out to that side (turns you)     -> pull
-##   Up held              straight up (wins over everything else)   -> pull
-##   Down held, AIRBORNE  45 degrees up toward the facing side (or  -> swing
-##                        the held side)
-##   Down on the ground   no swing: like no direction (straight out)
+## Aiming (resolve_aim / aim_vector), read when the hook fires. Exactly
+## three cases; the direction always follows `facing` (Left / Right only
+## matter through normal movement, which turns the player):
+##
+##   | Key                  | State              | Angle            | Action |
+##   | UP                   | grounded / airborne| 90, straight up  | pull   |
+##   | DOWN                 | airborne only      | 45 up, facing    | swing  |
+##   | anything else        | grounded / airborne| 0, facing        | pull   |
+##   | (none, LEFT, RIGHT, DOWN on the ground)                              |
 ##
 ## Phases (the player is in the "grapple" state, player/states/grapple_state.gd,
 ## from the throw until the hook lets go):
@@ -116,23 +118,23 @@ func is_latched() -> bool:
 
 # ---------- Aiming ----------
 
-static func resolve_aim(axis_x: int, axis_y: int, airborne: bool) -> Aim:
+## The three cases. `axis_y`: -1 Up held, 1 Down held, 0 neither.
+static func resolve_aim(axis_y: int, airborne: bool) -> Aim:
 	if axis_y < 0:
-		return Aim.UP
+		return Aim.UP # 1. Up, grounded or airborne: straight up, pull.
 	if axis_y > 0 and airborne:
-		return Aim.SWING
-	return Aim.HORIZONTAL
+		return Aim.SWING # 2. Down, airborne only: 45 degrees up, swing.
+	return Aim.HORIZONTAL # 3. Everything else: straight ahead, pull.
 
 
-static func aim_vector(aim: Aim, axis_x: int, facing: int) -> Vector2:
-	var side := signf(axis_x) if axis_x != 0 else float(facing)
+static func aim_vector(aim: Aim, facing: int) -> Vector2:
 	match aim:
 		Aim.UP:
-			return Vector2.UP
+			return Vector2.UP # 90 degrees.
 		Aim.SWING:
-			return Vector2(side, -1.0).normalized()
+			return Vector2(facing, -1.0).normalized() # 45 degrees up, facing side.
 		_:
-			return Vector2(side, 0.0)
+			return Vector2(facing, 0.0) # 0 degrees, facing side.
 
 
 # ---------- Per-step update ----------
@@ -165,11 +167,8 @@ func step(delta: float) -> void:
 
 
 func fire(p: Player) -> void:
-	var ix := p.input.axis_x()
-	var aim := resolve_aim(ix, p.input.axis_y(), not p.grounded)
-	dir = aim_vector(aim, ix, p.facing)
-	if ix != 0 and aim != Aim.UP:
-		p.facing = ix
+	var aim := resolve_aim(p.input.axis_y(), not p.grounded)
+	dir = aim_vector(aim, p.facing)
 	swing_mode = aim == Aim.SWING
 	tip = rope_origin(p)
 	travelled = 0.0

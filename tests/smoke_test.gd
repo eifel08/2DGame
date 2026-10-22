@@ -2179,18 +2179,21 @@ func _test_grapple() -> void:
 	var p: Player = game.player
 	var hook: GrappleHook = game.combat.grapple
 	var g = Config.grapple
-	var aim := func(ax: int, ay: int, facing: int, airborne := true) -> Vector2:
-		return GrappleHook.aim_vector(GrappleHook.resolve_aim(ax, ay, airborne), ax, facing)
+	var aim := func(ay: int, facing: int, airborne := true) -> Vector2:
+		return GrappleHook.aim_vector(GrappleHook.resolve_aim(ay, airborne), facing)
+	var mode := GrappleHook.resolve_aim
 	var diag := Vector2(1, -1).normalized()
-	_check("grapple: no direction fires straight out toward the facing side", aim.call(0, 0, 1) == Vector2.RIGHT and aim.call(0, 0, -1) == Vector2.LEFT)
-	_check("grapple: Left / Right fire straight out to that side",
-		aim.call(1, 0, -1) == Vector2.RIGHT and aim.call(-1, 0, 1) == Vector2.LEFT)
-	_check("grapple: Up fires straight up (also with Left / Right held)", aim.call(0, -1, 1) == Vector2.UP and aim.call(1, -1, 1) == Vector2.UP)
-	_check("grapple: Down in the air is a swing, 45 degrees up toward the facing side",
-		GrappleHook.resolve_aim(0, 1, true) == GrappleHook.Aim.SWING and aim.call(0, 1, 1).is_equal_approx(diag)
-		and aim.call(0, 1, -1).is_equal_approx(Vector2(-diag.x, diag.y)))
-	_check("grapple: Down on the ground is no swing (straight out)",
-		GrappleHook.resolve_aim(0, 1, false) == GrappleHook.Aim.HORIZONTAL and aim.call(0, 1, 1, false) == Vector2.RIGHT)
+	_check("grapple case 3: no direction (or Left / Right) fires straight ahead, toward facing, grounded or airborne",
+		aim.call(0, 1) == Vector2.RIGHT and aim.call(0, -1) == Vector2.LEFT and aim.call(0, 1, false) == Vector2.RIGHT
+		and mode.call(0, true) == GrappleHook.Aim.HORIZONTAL and mode.call(0, false) == GrappleHook.Aim.HORIZONTAL)
+	_check("grapple case 1: Up fires straight up (pull), grounded or airborne",
+		aim.call(-1, 1) == Vector2.UP and aim.call(-1, -1, false) == Vector2.UP
+		and mode.call(-1, true) == GrappleHook.Aim.UP and mode.call(-1, false) == GrappleHook.Aim.UP)
+	_check("grapple case 2: Down in the air is a swing, 45 degrees up toward the facing side",
+		mode.call(1, true) == GrappleHook.Aim.SWING and aim.call(1, 1).is_equal_approx(diag)
+		and aim.call(1, -1).is_equal_approx(Vector2(-diag.x, diag.y)))
+	_check("grapple case 3: Down on the ground is no swing (straight ahead, pull)",
+		mode.call(1, false) == GrappleHook.Aim.HORIZONTAL and aim.call(1, 1, false) == Vector2.RIGHT)
 	_check("grapple: the range is short (8 tiles)", is_equal_approx(g.max_range, 256.0), g.max_range)
 	_check("grapple: the hook has a forgiving tolerance", g.hook_radius >= 12.0 and g.hazard_radius < g.hook_radius, [g.hook_radius, g.hazard_radius])
 	var god: bool = Config.upgrades.god_mode
@@ -2225,7 +2228,7 @@ func _test_grapple() -> void:
 	await _frames(2)
 	Input.action_release(&"grapple")
 	Input.action_release(&"move_left")
-	_check("grapple: Left held fires the hook left and turns the player", hook.dir == Vector2.LEFT and p.facing == -1, [hook.dir, p.facing])
+	_check("grapple: Left held turns the player, and the hook fires straight ahead toward facing (left)", hook.dir == Vector2.LEFT and p.facing == -1, [hook.dir, p.facing])
 	var hold_y := p.global_position.y
 	var drift := 0.0
 	var held := true
