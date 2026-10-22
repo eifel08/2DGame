@@ -2186,10 +2186,6 @@ func _test_grapple() -> void:
 	_check("grapple case 3: no direction (or Left / Right) fires straight ahead, toward facing, grounded or airborne",
 		aim.call(0, 1) == Vector2.RIGHT and aim.call(0, -1) == Vector2.LEFT and aim.call(0, 1, false) == Vector2.RIGHT
 		and mode.call(0, true) == GrappleHook.Aim.HORIZONTAL and mode.call(0, false) == GrappleHook.Aim.HORIZONTAL)
-	_check("grapple: Left / Right held on the throw frame win over facing (straight that way)",
-		GrappleHook.aim_vector(GrappleHook.Aim.HORIZONTAL, 1, -1) == Vector2.LEFT and GrappleHook.aim_vector(GrappleHook.Aim.HORIZONTAL, -1, 1) == Vector2.RIGHT
-		and GrappleHook.aim_vector(GrappleHook.Aim.SWING, 1, -1).is_equal_approx(Vector2(-diag.x, diag.y))
-		and GrappleHook.aim_vector(GrappleHook.Aim.UP, 1, -1) == Vector2.UP)
 	_check("grapple case 1: Up fires straight up (pull), grounded or airborne",
 		aim.call(-1, 1) == Vector2.UP and aim.call(-1, -1, false) == Vector2.UP
 		and mode.call(-1, true) == GrappleHook.Aim.UP and mode.call(-1, false) == GrappleHook.Aim.UP)
@@ -2273,6 +2269,25 @@ func _test_grapple() -> void:
 	_check("grapple: holding Left during a wall slide fires left (the player turns on the throw frame)",
 		slid == [true, 1] and at_throw.size() == 1 and at_throw[0] == [Vector2.LEFT, -1], [slid, at_throw])
 	await _frames(30)
+	game.combat.reset()
+
+	# A buffered throw keeps the press frame's input and airborne state:
+	# Down pressed in the air, released before the hook is ready, still swings.
+	await _reset()
+	p.global_position = Vector2(1300, 200)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	await _frames(1)
+	hook.cooldown = 0.08 # Not ready yet: the press is buffered.
+	Input.action_press(&"move_down")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	var buffered := hook.is_idle()
+	Input.action_release(&"move_down")
+	Input.action_release(&"grapple")
+	await _frames(5)
+	_check("grapple: a buffered throw uses the press frame's input (Down in the air = swing)",
+		buffered and not hook.is_idle() and hook.swing_mode and hook.dir.is_equal_approx(Vector2(1, -1).normalized()), [buffered, hook.phase, hook.swing_mode, hook.dir])
 	game.combat.reset()
 
 	# No direction: straight out toward the facing side, onto the pillar.

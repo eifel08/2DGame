@@ -17,7 +17,6 @@ const TOGGLES := [
 	["upgrades.god_mode", "God Mode"],
 	["debug.show_hitboxes", "Hitboxes & Stats"],
 	["debug.show_anim_labels", "Anim States"],
-	["debug.log_grapple_aim", "Grapple Aim Log"],
 	["debug.screen_shake", "Screen Shake"],
 	["debug.paused", "Pause"],
 	["combat.hazard_to_safe_ground", "Spikes → Safe Ground"],
