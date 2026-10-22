@@ -4,12 +4,19 @@ extends Node
 ## It knows nothing about combat or input: other systems call its methods
 ## (gain_energy_from_hit, spend_energy, channel_heal_chunk...) and listen to Events.
 
+## Maximum stats. Set them in the Inspector (player.tscn > HealthEnergy)
+## or in code; upgrades add on top through the bonus fields below.
+@export_group("Max stats")
+@export_range(1.0, 1000.0, 1.0) var base_max_health := 100.0
+@export_range(1.0, 1000.0, 1.0) var base_max_energy := 100.0
+@export_group("")
+
 var health := 100.0
 var energy := 0.0
 var iframe_timer := 0.0
 ## Named invulnerability sources, e.g. "dash", "cast", "ability".
 var invuln_flags := {}
-## Growth hooks for later upgrades (e.g. max-health items). Added to Config base values.
+## Growth from upgrades (e.g. max-health relics). Added to the base values.
 var max_health_bonus := 0.0
 var max_energy_bonus := 0.0
 ## Extra multiplier for energy gain (wired to the owner's stat modifiers).
@@ -17,11 +24,23 @@ var energy_gain_source: Callable = func() -> float: return 1.0
 
 
 func get_max_health() -> float:
-	return Config.vitals.max_health + max_health_bonus
+	return base_max_health + max_health_bonus
 
 
 func get_max_energy() -> float:
-	return Config.vitals.max_energy + max_energy_bonus
+	return base_max_energy + max_energy_bonus
+
+
+## Changes a maximum for good (future upgrades). Current values are kept
+## within the new limits.
+func set_base_max_health(value: float) -> void:
+	base_max_health = maxf(1.0, value)
+	health = minf(health, get_max_health())
+
+
+func set_base_max_energy(value: float) -> void:
+	base_max_energy = maxf(1.0, value)
+	set_energy(minf(energy, get_max_energy()))
 
 
 func reset() -> void:

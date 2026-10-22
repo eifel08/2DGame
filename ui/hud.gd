@@ -2,16 +2,20 @@ class_name Hud
 extends Control
 ## Screen-space HUD, clean by default:
 ##   - smooth health bar (no numbers)
-##   - energy bar with a color-coded threshold mark per equipped ultimate,
-##     plus a left-to-right hotkey strip (bound keys, 1 2 3 4 by default) underneath;
-##     it shows as many slots as the slot capacity allows
-##     Colors follow energy tiers (Config.ENERGY_TIERS), not specific spells,
-##     so whatever is slotted later shows its minimum energy clearly.
+##   - energy bar with a color-coded threshold mark per spell in the loadout
+##     (Mana Discharge and the Up / Side / Down slots). Colors follow energy
+##     tiers (Config.ENERGY_TIERS), not specific spells.
+##   - the spell cross (child node SpellCross, a D-pad diagram): Mana
+##     Discharge in the center, the Up and Down slots above and below, the
+##     Side slot on BOTH the left and the right. The Spell key shows in its
+##     top-left corner.
 ##   - shard (currency) counter, top-right
 ## Exact health / energy numbers appear only in stats mode (Config.stats_visible()).
 
 const BAR_W := 260.0
-const SLOT_BOX := 26.0
+const CROSS_CELL := 22.0
+const CROSS_GAP := 3.0
+const CROSS_POS := Vector2(326.0, 13.0)
 
 var player: Player
 var ultimates: UltimateManager
@@ -22,6 +26,7 @@ var denied_flash := 0.0
 var damage_flash := 0.0
 var shard_pulse := 0.0
 var boss_provider: Callable = func() -> Node: return null ## Returns the active boss or null.
+var spell_cross: SpellCross
 
 
 func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -> void:
@@ -31,6 +36,11 @@ func setup(p_player: Player, p_ultimates: UltimateManager, p_data: PlayerData) -
 	Events.ultimate_denied.connect(func(_a: RefCounted, _r: String) -> void: denied_flash = 0.35)
 	Events.health_damaged.connect(func(_amount: float) -> void: damage_flash = 0.3)
 	Events.currency_collected.connect(func(_amount: int, _pos: Vector2) -> void: shard_pulse = 0.25)
+	spell_cross = SpellCross.new()
+	spell_cross.name = "SpellCross"
+	spell_cross.position = CROSS_POS
+	add_child(spell_cross)
+	spell_cross.build(ultimates, false, CROSS_CELL, CROSS_GAP)
 
 
 func _process(delta: float) -> void:
@@ -45,6 +55,7 @@ func _process(delta: float) -> void:
 		ghost_health = hp
 	smooth_health = lerpf(smooth_health, hp, minf(1.0, delta * 14.0))
 	ghost_health = hp if ghost_health < hp else lerpf(ghost_health, hp, minf(1.0, delta * 3.0))
+	spell_cross.refresh(player.health.get_max_energy(), player.health.energy)
 	queue_redraw()
 
 
@@ -53,7 +64,7 @@ func _draw() -> void:
 		return
 	var font := ThemeDB.fallback_font
 	# Backing panel: marks the HUD corner as UI, not as open room space.
-	draw_rect(Rect2(8, 8, 330, slot_rect(0).end.y + 6.0), Color(0.02, 0.03, 0.07, 0.55))
+	draw_rect(Rect2(8, 8, CROSS_POS.x + spell_cross.size.x + 2.0, CROSS_POS.y + spell_cross.size.y + 2.0), Color(0.02, 0.03, 0.07, 0.55))
 	var h := player.health
 	var stats := Config.stats_visible()
 	var x := 20.0
@@ -77,7 +88,7 @@ func _draw() -> void:
 		var pulse := 0.75 + 0.25 * sin(Time.get_ticks_msec() / 80.0)
 		draw_rect(Rect2(x0, y, x1 - x0, 14), Color(1, 1, 1, pulse))
 	if stats:
-		draw_string(font, Vector2(bx + BAR_W + 8, y + 12), "%.1f / %.0f" % [h.health, h.get_max_health()],
+		draw_string(font, Vector2(stats_x(), y + 12), "%.1f / %.0f" % [h.health, h.get_max_health()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#ffd0d0"))
 
 	# Energy
@@ -93,15 +104,16 @@ func _draw() -> void:
 		_draw_heal_glow(Rect2(bx, ey, BAR_W, 14), h)
 	_draw_thresholds(font, bx, ey, h)
 	if stats:
-		draw_string(font, Vector2(bx + BAR_W + 8, ey + 12), "%.1f / %.0f" % [h.energy, h.get_max_energy()],
+		draw_string(font, Vector2(stats_x(), ey + 12), "%.1f / %.0f" % [h.energy, h.get_max_energy()],
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c8f4ff"))
 
-	_draw_slot_strip(font, h)
+	# The Spell key, in the empty top-left corner of the cross.
+	draw_string(font, CROSS_POS + Vector2(1, 11), spell_key_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.8))
 
-	# Dash cooldown pip (no text), under the slot strip.
+	# Dash cooldown pip (no text), under the energy bar.
 	if Config.upgrades.dash:
 		var cd := clampf(player.dash_cooldown_timer / maxf(0.001, Config.movement.dash_cooldown), 0.0, 1.0)
-		var dy := slot_rect(0).end.y + 6.0
+		var dy := ey + 26.0
 		draw_rect(Rect2(bx, dy, 40, 3), Color(1, 1, 1, 0.12))
 		draw_rect(Rect2(bx, dy, 40 * (1.0 - cd), 3), Color("#8890a8") if cd > 0.0 else Color("#d9f6ff"))
 
@@ -122,17 +134,17 @@ func _draw() -> void:
 
 	# Control hints (bottom).
 	draw_string(font, Vector2(0, view.y - 12),
-		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Ultimates 1-%d · Interact E · Inventory I/Tab · Debug F1/`" % ultimates.slot_count(),
+		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Grapple H · Spell %s (+ ↑ ← → ↓) · Interact E · Inventory I/Tab · Debug F1/`" % spell_key_label(),
 		HORIZONTAL_ALIGNMENT_RIGHT, view.x - 14, 10, Color(1, 1, 1, 0.5))
 	if Config.debug.paused:
 		draw_string(font, Vector2(0, view.y / 2.0), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, view.x, 22)
 
 
-## One mark per equipped slot at its energy threshold, colored by energy
-## tier (no numbers). Bright when affordable, dim when not. Empty slots have
-## no mark, so the bar always reflects the current loadout.
+## One mark per spell in the loadout at its energy threshold, colored by
+## energy tier (no numbers). Bright when affordable, dim when not. Empty slots
+## have no mark, so the bar always reflects the current loadout.
 func _draw_thresholds(_font: Font, bx: float, ey: float, h: HealthEnergy) -> void:
-	for slot in ultimates.slot_count():
+	for slot in [UltimateManager.NEUTRAL, PlayerData.SLOT_UP, PlayerData.SLOT_SIDE, PlayerData.SLOT_DOWN]:
 		var ability := ultimates.get_slot(slot)
 		if ability == null:
 			continue
@@ -184,34 +196,14 @@ func _draw_boss_bar(font: Font) -> void:
 	draw_rect(Rect2(bar.position.x + w * 0.5 - 1.0, bar.position.y, 2.0, bar.size.y), Color(1, 1, 1, 0.35)) # Phase 2 mark.
 
 
-## Screen rect of a hotkey box in the slot strip. Slots always run
-## left-to-right: 1, 2, 3, 4 (up to 8 with a larger capacity).
-func slot_rect(slot: int) -> Rect2:
-	return Rect2(48.0 + slot * (SLOT_BOX + 6.0), 66.0, SLOT_BOX, SLOT_BOX)
+## Debug numbers sit right of the spell cross.
+func stats_x() -> float:
+	return CROSS_POS.x + spell_cross.size.x + 10.0
 
 
-## Hotkey strip under the energy bar: icon + the slot's actual key (follows
-## rebinding in Settings), border in the ability's tier color, bright when
-## there is enough energy.
-func _draw_slot_strip(font: Font, h: HealthEnergy) -> void:
-	for slot in ultimates.slot_count():
-		var r := slot_rect(slot)
-		var ability := ultimates.get_slot(slot)
-		draw_rect(r, Color(0, 0, 0, 0.55))
-		if ability == null:
-			draw_rect(r, Color(1, 1, 1, 0.18), false, 1.0)
-			AbilityIcon.draw_symbol(self, "empty", r.get_center(), SLOT_BOX * 0.36, Color(1, 1, 1, 0.5))
-		else:
-			var ready := h.can_afford(ability.get_cost())
-			var tier := Config.energy_tier_color(ability.get_cost())
-			draw_rect(r, Color(tier, 1.0 if ready else 0.4), false, 2.0 if ready else 1.0)
-			AbilityIcon.draw_symbol(self, ability.icon, r.get_center() + Vector2(0, 1), SLOT_BOX * 0.32, Color(ability.color, 1.0 if ready else 0.35))
-		draw_string(font, r.position + Vector2(3, 10), hotkey_label(slot), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.8))
-
-
-## The keyboard key bound to a slot ("1".."4" by default), shortened to fit.
-func hotkey_label(slot: int) -> String:
-	var key := Settings.key_name("ult_%d" % (slot + 1))
+## The keyboard key bound to the Spell button ("U" by default), shortened to fit.
+func spell_key_label() -> String:
+	var key := Settings.key_name(String(UltimateManager.SPELL_ACTION))
 	return key if key.length() <= 3 else key.substr(0, 3)
 
 

@@ -2,23 +2,31 @@ class_name InventoryMenu
 extends CanvasLayer
 ## Inventory window (I / Tab / Esc, gamepad Back) with two tabs:
 ##   Status    - shards (the only number), health and energy as bars
-##   Abilities - the usable hotkey slots (top, as many as the slot capacity)
-##               and every unlocked ability (bottom)
+##   Abilities - the spell cross (left, a D-pad: SpellCross) and every
+##               equippable spell the player knows (right)
+##
+## The cross: Center = Mana Discharge (fixed: it cannot be moved or removed),
+## Up / Down = their slots, Left AND Right = the one Side slot (both cards
+## always show the same spell). Focusing a side card frames it in gold and
+## gives the other side card a dim mirror frame.
 ##
 ## Keyboard only, no mouse needed:
 ##   Left / Right on the tab row      switch tab (also Q / E, PgUp / PgDn)
 ##   Down / Up                        move between the tab row and the cards
 ##   Arrow keys                       move between cards
 ##   Z / Enter / Space (confirm)
-##     on an equipped ability (slot or grid)  unequip it
-##     on an unequipped ability (grid)        then choose a slot; an occupied
-##                                            slot is replaced
-##   Backspace / Delete               cancel the slot choice, or clear the focused slot
+##     on an equipped spell (cross or pool)  unequip it
+##     on a free spell (pool)                then choose a cross node; an
+##                                           occupied slot is replaced
+##     on the Center node                    nothing: Mana Discharge is fixed
+##   Backspace / Delete               cancel the slot choice, or clear the focused node
 ## Loadout changes only work while standing at the saved checkpoint.
 ## The game simulation is paused while the window is open.
 
 const STATUS_TAB := 0
 const ABILITIES_TAB := 1
+## Corner tag of an equipped spell in the pool, per slot.
+const SLOT_TAGS: Array[String] = ["Up", "Side", "Down"]
 
 var game: Node
 var panel: PanelContainer
@@ -27,7 +35,7 @@ var tab_bar: TabBar
 var shards_label: Label
 var health_bar: StatBar
 var energy_bar: StatBar
-var slot_cards: Array[AbilityCard] = []
+var cross: SpellCross
 var pool_cards: Array[AbilityCard] = []
 var pool_grid: GridContainer
 var detail_icon: AbilityIcon
@@ -92,9 +100,14 @@ func _on_tab_changed(_tab: int) -> void:
 
 # ---------- Loadout actions ----------
 
-## Confirm on a top slot.
-func press_slot(slot: int) -> void:
+## Confirm on a node of the spell cross ("Up", "Left", "Center", "Right", "Down").
+func press_node(node_name: String) -> void:
 	var manager: UltimateManager = game.ultimates
+	var slot := SpellCross.slot_of(node_name)
+	if slot == UltimateManager.NEUTRAL:
+		_flash_notice() # Mana Discharge is fixed to the neutral Spell input.
+		refresh()
+		return
 	if pending_ability_id != "":
 		# Assign the chosen ability here (an occupied slot is replaced).
 		if manager.equip(slot, pending_ability_id):
@@ -119,11 +132,23 @@ func press_pool(ability: UltimateAbility) -> void:
 		pending_ability_id = ""
 		refresh()
 		return
-	# Unequipped -> choose a slot: focus the first empty slot (or slot 1).
+	# Unequipped -> choose a node: focus the first empty slot (or Up).
 	pending_ability_id = ability.id
 	refresh()
 	var target: int = game.player_data.equipped.find("")
-	slot_cards[target if target >= 0 and target < manager.slot_count() else 0].grab_focus()
+	cross.card(node_for_slot(target if target >= 0 else PlayerData.SLOT_UP)).grab_focus()
+
+
+## The cross node that stands for a slot (the Side slot -> "Left").
+static func node_for_slot(slot: int) -> String:
+	match slot:
+		PlayerData.SLOT_UP:
+			return "Up"
+		PlayerData.SLOT_SIDE:
+			return "Left"
+		PlayerData.SLOT_DOWN:
+			return "Down"
+	return "Center"
 
 
 func _on_clear_pressed() -> void:
@@ -131,10 +156,9 @@ func _on_clear_pressed() -> void:
 		pending_ability_id = ""
 		refresh()
 		return
-	var focus := get_viewport().gui_get_focus_owner()
-	var slot := slot_cards.find(focus)
-	if slot >= 0:
-		press_slot(slot)
+	var node_name := cross.node_name_of(get_viewport().gui_get_focus_owner())
+	if node_name != "":
+		press_node(node_name)
 
 
 func _flash_notice() -> void:
@@ -152,27 +176,25 @@ func refresh() -> void:
 	var max_energy := h.get_max_energy()
 
 	shards_label.text = str(game.player_data.currency)
-	health_bar.set_values(h.health, h.get_max_health(), Config.vitals.max_health, Color("#ff5e6c"))
-	energy_bar.set_values(h.energy, max_energy, Config.vitals.max_energy, Color("#4fd1ff"))
+	health_bar.set_values(h.health, h.get_max_health(), h.base_max_health, Color("#ff5e6c"))
+	energy_bar.set_values(h.energy, max_energy, h.base_max_energy, Color("#4fd1ff"))
 
-	for slot in slot_cards.size():
-		slot_cards[slot].visible = slot < manager.slot_count() # Only usable slots appear.
-		slot_cards[slot].show_ability(manager.get_slot(slot), max_energy, slot + 1)
-	# Every unlocked ability keeps a crisp icon; equipped ones show their key.
+	cross.refresh(max_energy)
+	# Every known spell keeps a crisp icon; equipped ones show their direction.
 	for card in pool_cards:
 		var slot := manager.slot_of(card.ability.id)
-		card.show_ability(card.ability, max_energy, slot + 1 if slot >= 0 else 0)
+		card.show_ability(card.ability, max_energy, SLOT_TAGS[slot] if slot >= 0 else "")
 		card.button_pressed = card.ability.id == pending_ability_id
 
 	if not manager.can_change_loadout():
 		notice_label.text = "Abilities can only be changed at your saved checkpoint."
 		notice_label.add_theme_color_override("font_color", Color("#ffb3b3"))
 	elif pending_ability_id != "":
-		notice_label.text = "Choose a key slot for %s. An occupied slot is replaced. Backspace cancels." \
+		notice_label.text = "Choose Up, Side or Down for %s. An occupied slot is replaced. Backspace cancels." \
 			% manager.get_ability(pending_ability_id).display_name
 		notice_label.add_theme_color_override("font_color", Color("#ffd36b"))
 	else:
-		notice_label.text = "Confirm an equipped ability to remove it. Confirm a free one, then pick its slot."
+		notice_label.text = "Mana Discharge (center) is fixed. Confirm an equipped spell to remove it; confirm a free one, then pick Up, Side or Down."
 		notice_label.add_theme_color_override("font_color", Color("#8dffb0"))
 	var focus := get_viewport().gui_get_focus_owner() if get_viewport() else null
 	if focus is AbilityCard:
@@ -180,7 +202,7 @@ func refresh() -> void:
 	elif pending_ability_id != "":
 		_show_details(manager.get_ability(pending_ability_id))
 	else:
-		_show_details(manager.get_slot(0))
+		_show_details(manager.neutral_spell())
 
 
 ## Name + description are only shown for the focused ability.
@@ -188,7 +210,7 @@ func _show_details(ability: UltimateAbility) -> void:
 	if ability == null:
 		detail_icon.set_icon("empty", Color.WHITE)
 		detail_name.text = "Free slot"
-		detail_desc.text = "Choose an ability below to place it on this key."
+		detail_desc.text = "Choose a spell on the right to place it here."
 		detail_gauge.visible = false
 		return
 	detail_icon.set_icon(ability.icon, ability.color)
@@ -228,8 +250,8 @@ func _build() -> void:
 	panel.anchor_bottom = 0.5
 	panel.offset_left = -380.0 # Wide enough for eight cards in a row.
 	panel.offset_right = 380.0
-	panel.offset_top = -230.0
-	panel.offset_bottom = 230.0
+	panel.offset_top = -255.0
+	panel.offset_bottom = 255.0
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.04, 0.05, 0.1, 0.96)
 	style.border_color = Color("#6f7fb8")
@@ -256,6 +278,7 @@ func _build() -> void:
 	root.add_child(tabs)
 	tabs.add_child(_build_status_tab())
 	tabs.add_child(_build_abilities_tab())
+	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(cross.card("Up")) # Down from the tabs enters the cross.
 	tabs.tab_changed.connect(_on_tab_changed) # After the tabs exist.
 
 	var keys := Label.new()
@@ -300,25 +323,33 @@ func _build_abilities_tab() -> Control:
 	box.name = "Abilities"
 	box.add_theme_constant_override("separation", 6)
 
-	box.add_child(_section("EQUIPPED"))
-	var slots := HBoxContainer.new()
-	slots.add_theme_constant_override("separation", 8)
-	box.add_child(slots)
-	for slot in PlayerData.MAX_SLOTS: # Left to right: keys 1, 2, 3, ... (hidden past the capacity).
-		var card := AbilityCard.new()
-		var s := slot
-		card.pressed.connect(func() -> void: press_slot(s))
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 28)
+	box.add_child(top)
+
+	var left := VBoxContainer.new()
+	top.add_child(left)
+	left.add_child(_section("SPELL + DIRECTION"))
+	cross = SpellCross.new()
+	cross.name = "SpellCross"
+	left.add_child(cross)
+	cross.build(game.ultimates, true, 76.0, 6.0) # Cards are 76 px (AbilityCard).
+	for node_name in SpellCross.NODES:
+		var card: AbilityCard = cross.card(node_name)
+		var n: String = node_name
+		card.pressed.connect(func() -> void: press_node(n))
 		card.focus_entered.connect(func() -> void:
 			if pending_ability_id == "":
-				_show_details(game.ultimates.get_slot(s)))
-		slots.add_child(card)
-		slot_cards.append(card)
+				_show_details(game.ultimates.get_slot(SpellCross.slot_of(n))))
 
-	box.add_child(_section("UNLOCKED"))
+	var right := VBoxContainer.new()
+	top.add_child(right)
+	right.add_child(_section("KNOWN SPELLS"))
 	pool_grid = GridContainer.new()
-	pool_grid.columns = 8
+	pool_grid.columns = 4
 	pool_grid.add_theme_constant_override("h_separation", 8)
-	box.add_child(pool_grid)
+	pool_grid.add_theme_constant_override("v_separation", 8)
+	right.add_child(pool_grid)
 
 	# Detail area: enough fixed height that the last line is never clipped.
 	var detail := HBoxContainer.new()

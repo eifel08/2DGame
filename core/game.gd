@@ -30,10 +30,11 @@ const ENEMY_SCENES := {
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
 const RESPAWN_FADE_TIME := 0.45
-## Abilities the player starts with equipped, in hotkey order (keys 1-4).
-## Every registered ability starts known (in the pool); the debug overlay
-## can forget or relearn them.
-const STARTING_ABILITIES: Array[String] = ["nova_burst", "spirit_volley", "ascendant_form", "comet_dash"]
+## Spells the player starts with in the Up, Side and Down slots (PlayerData
+## SLOT_UP / SLOT_SIDE / SLOT_DOWN). The neutral spell, Mana Discharge, is
+## fixed and needs no entry. Every registered spell starts known (in the
+## pool); the debug overlay can forget or relearn them.
+const STARTING_LOADOUT: Array[String] = ["radiant_lance", "comet_dash", "meteor_slam"]
 
 @onready var room_root: Node2D = $RoomRoot
 @onready var enemies_root: Node2D = $Enemies
@@ -87,9 +88,9 @@ func _ready() -> void:
 	ultimates.setup(UltimateContext.new(player, combat, effects, input), player_data)
 	for ability in UltimateRegistry.create_default():
 		ultimates.register(ability)
-	for i in STARTING_ABILITIES.size():
-		player_data.unlock(STARTING_ABILITIES[i])
-		player_data.equip(i, STARTING_ABILITIES[i])
+	for i in STARTING_LOADOUT.size():
+		player_data.unlock(STARTING_LOADOUT[i])
+		player_data.equip(i, STARTING_LOADOUT[i])
 	for ability_id in ultimates.abilities:
 		player_data.unlock(ability_id)
 	feedback.setup(camera, effects)
@@ -781,8 +782,7 @@ func make_save_data() -> Dictionary:
 		"position": [pos.x, pos.y],
 		"currency": player_data.currency,
 		"unlocked": player_data.unlocked.duplicate(),
-		"equipped": player_data.equipped.duplicate(),
-		"slot_capacity": player_data.slot_capacity,
+		"equipped": player_data.equipped.duplicate(), # [up, side, down]
 		"max_health_bonus": player.health.max_health_bonus,
 		"max_energy_bonus": player.health.max_energy_bonus,
 		"playtime": playtime,
@@ -801,15 +801,19 @@ func apply_save_data(data: Dictionary) -> void:
 	world.from_dict(data)
 	player_data.currency = int(data.get("currency", 0))
 	var unlocked: Array[String] = []
-	for id in data.get("unlocked", STARTING_ABILITIES):
+	for id in data.get("unlocked", STARTING_LOADOUT):
 		unlocked.append(String(id))
 	player_data.unlocked = unlocked
 	var equipped := PlayerData.empty_slots()
 	var saved_equipped: Array = data.get("equipped", [])
-	for i in mini(saved_equipped.size(), equipped.size()):
-		equipped[i] = String(saved_equipped[i])
+	if saved_equipped.size() == PlayerData.SLOT_COUNT:
+		for i in PlayerData.SLOT_COUNT:
+			var id := String(saved_equipped[i])
+			equipped[i] = id if id != PlayerData.NEUTRAL_SPELL else ""
+	else: # A save from the old numbered hotkeys: start from the default loadout.
+		for i in PlayerData.SLOT_COUNT:
+			equipped[i] = STARTING_LOADOUT[i] if player_data.is_unlocked(STARTING_LOADOUT[i]) else ""
 	player_data.equipped = equipped
-	player_data.set_capacity(int(data.get("slot_capacity", PlayerData.DEFAULT_CAPACITY)))
 	player.health.max_health_bonus = float(data.get("max_health_bonus", 0.0))
 	player.health.max_energy_bonus = float(data.get("max_energy_bonus", 0.0))
 	playtime = float(data.get("playtime", 0.0))

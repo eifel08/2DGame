@@ -640,15 +640,8 @@ func _build_input_map() -> void:
 		"dash": [_key(KEY_K), _key(KEY_C), _key(KEY_SHIFT), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
 		"heal": [_key(KEY_L), _key(KEY_V), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
 		"grapple": [_key(KEY_H), _key(KEY_B), _joy_button(JOY_BUTTON_LEFT_STICK)],
-		"ult_1": [_key(KEY_1), _joy_button(JOY_BUTTON_Y)],
-		"ult_2": [_key(KEY_2), _joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)],
-		"ult_3": [_key(KEY_3), _joy_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)],
-		"ult_4": [_key(KEY_4), _joy_button(JOY_BUTTON_RIGHT_STICK)],
-		# Extra slots, usable when the slot capacity allows (keyboard only).
-		"ult_5": [_key(KEY_5)],
-		"ult_6": [_key(KEY_6)],
-		"ult_7": [_key(KEY_7)],
-		"ult_8": [_key(KEY_8)],
+		# One Spell button; the held direction picks the spell (UltimateManager).
+		"spell": [_key(KEY_U), _key(KEY_N), _joy_button(JOY_BUTTON_Y)],
 		"interact": [_key(KEY_E), _key(KEY_F), _joy_button(JOY_BUTTON_B)],
 		"inventory": [_key(KEY_I), _key(KEY_TAB), _joy_button(JOY_BUTTON_BACK)],
 		"pause": [_key(KEY_ESCAPE), _key(KEY_P), _joy_button(JOY_BUTTON_START)],
@@ -666,7 +659,7 @@ func _build_input_map() -> void:
 		"ui_up": [_key(KEY_UP), _key(KEY_W), _joy_button(JOY_BUTTON_DPAD_UP), _joy_axis(JOY_AXIS_LEFT_Y, -1.0)],
 		"ui_down": [_key(KEY_DOWN), _key(KEY_S), _joy_button(JOY_BUTTON_DPAD_DOWN), _joy_axis(JOY_AXIS_LEFT_Y, 1.0)],
 	}
-	for obsolete in ["ultimate", "cycle_ultimate"]:
+	for obsolete in ["ultimate", "cycle_ultimate", "ult_1", "ult_2", "ult_3", "ult_4", "ult_5", "ult_6", "ult_7", "ult_8"]:
 		if ProjectSettings.has_setting("input/" + obsolete):
 			ProjectSettings.set_setting("input/" + obsolete, null)
 	for action in actions:

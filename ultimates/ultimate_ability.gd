@@ -16,8 +16,11 @@ var id := ""
 var display_name := ""
 var kind := "" ## Short label shown in the HUD and debug overlay.
 var color := Color.WHITE
-var icon := "" ## Symbol drawn by ui/ability_icon.gd ("nova", "volley", "ascend", "comet", "aegis", "stasis", "beam", "slam").
+var icon := "" ## Symbol drawn by ui/ability_icon.gd ("nova", "volley", "ascend", "comet", "aegis", "stasis", "beam", "slam", "discharge").
 var description := ""
+## Fixed spells (Mana Discharge) belong to the neutral Spell input for good:
+## they never appear in the equippable pool and cannot be unequipped.
+var fixed := false
 var is_running := false
 
 

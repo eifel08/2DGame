@@ -214,10 +214,9 @@ func _run() -> void:
 		[p.health.health, p.health.energy])
 	await _frames(5)
 
-	# --- All four ultimates ---
+	# --- Four spells, cast with Spell + a direction ---
 	for ult_id in ["nova_burst", "spirit_volley", "ascendant_form", "comet_dash"]:
 		await _reset()
-		var key: StringName = UltimateManager.SLOT_ACTIONS[game.ultimates.slot_of(ult_id)]
 		var target: DummyEnemy = _first_enemy(false)
 		target.patrol = false
 		await _frames(3)
@@ -225,10 +224,9 @@ func _run() -> void:
 		p.facing = 1
 		p.health.set_energy(100.0)
 		var cost: float = Config.ultimates[ult_id].cost
-		Input.action_press(key)
-		await _frames(2)
-		Input.action_release(key)
-		_check("%s (key %s) spends its cost" % [ult_id, key], is_equal_approx(p.health.energy, 100.0 - cost), p.health.energy)
+		var slot := PlayerData.SLOT_SIDE if ult_id == "comet_dash" else PlayerData.SLOT_UP
+		await _cast_spell(ult_id, slot)
+		_check("%s (Spell + %s) spends its cost" % [ult_id, PlayerData.SLOT_NAMES[slot]], is_equal_approx(p.health.energy, 100.0 - cost), p.health.energy)
 		await _frames(60)
 		if ult_id == "ascendant_form":
 			_check("ascendant form buffs the player", p.stat("damage_mul") > 1.0, p.modifiers.keys())
@@ -237,17 +235,14 @@ func _run() -> void:
 
 	# --- Insufficient energy is refused ---
 	await _reset()
-	var ascendant_key: StringName = UltimateManager.SLOT_ACTIONS[game.ultimates.slot_of("ascendant_form")]
 	p.health.set_energy(50.0)
-	Input.action_press(ascendant_key)
-	await _frames(2)
-	Input.action_release(ascendant_key)
-	_check("ultimate refused without energy", is_equal_approx(p.health.energy, 50.0) and p.state_name() == "normal", p.health.energy)
+	await _cast_spell("ascendant_form")
+	_check("a spell is refused without energy", is_equal_approx(p.health.energy, 50.0) and p.state_name() == "normal", p.health.energy)
 
 	# --- New spells: Repulse Aegis, Stasis Field, Radiant Lance, Meteor Slam ---
 	await _test_new_spells()
 
-	# --- Spell pool and slot capacity (debug overlay) ---
+	# --- Spell + direction, the spell pool, Mana Discharge, max stats ---
 	await _test_spell_management()
 
 	# --- Meteor Slam ground hop, Stasis cost, camera look up / down ---
@@ -363,20 +358,26 @@ func _run() -> void:
 			dropped_left += 1
 	_check("shards falling on spikes despawn", dropped_left == 0 and game.player_data.currency == shards_now, [dropped_left, game.player_data.currency])
 
-	# --- Empty slots (0-4 equipped) ---
+	# --- Empty slots (0-3 directional spells; Mana Discharge is fixed) ---
 	await _reset()
 	var loadout: Array = game.player_data.equipped.duplicate()
 	await _frames(3)
-	_check("slot can be emptied at a checkpoint", game.ultimates.unequip(1) and game.ultimates.get_slot(1) == null)
-	_check("loadout has 3 equipped", game.player_data.equipped_count() == 3, game.player_data.equipped)
+	_check("the Side slot can be emptied at a checkpoint",
+		game.ultimates.unequip(PlayerData.SLOT_SIDE) and game.ultimates.get_slot(PlayerData.SLOT_SIDE) == null)
+	_check("loadout has 2 directional spells left", game.player_data.equipped_count() == 2, game.player_data.equipped)
 	p.health.set_energy(100.0)
-	Input.action_press(&"ult_2")
+	Input.action_press(&"move_right")
+	Input.action_press(&"spell")
 	await _frames(2)
-	Input.action_release(&"ult_2")
-	_check("empty slot key does nothing", is_equal_approx(p.health.energy, 100.0) and p.state_name() == "normal", p.health.energy)
-	for i in 4:
+	Input.action_release(&"spell")
+	Input.action_release(&"move_right")
+	_check("Spell + an empty direction does nothing (no fallback to the neutral spell)",
+		is_equal_approx(p.health.energy, 100.0) and p.state_name() == "normal", p.health.energy)
+	for i in PlayerData.SLOT_COUNT:
 		game.ultimates.unequip(i)
-	_check("all slots can be empty", game.player_data.equipped_count() == 0)
+	_check("all directional slots can be empty", game.player_data.equipped_count() == 0)
+	_check("Mana Discharge can never be removed",
+		not game.ultimates.unequip(UltimateManager.NEUTRAL, true) and game.ultimates.get_slot(UltimateManager.NEUTRAL) is ManaDischarge)
 	for i in loadout.size():
 		game.player_data.equip(i, loadout[i])
 	Events.loadout_changed.emit()
@@ -409,27 +410,55 @@ func _run() -> void:
 	_check("left arrow switches back to the status tab", inv.tabs.current_tab == 0, inv.tabs.current_tab)
 	await _ui_action(&"ui_right")
 	await _ui_action(&"ui_down")
-	_check("down enters the slot row", get_viewport().gui_get_focus_owner() == inv.slot_cards[0], get_viewport().gui_get_focus_owner())
+	var cross: SpellCross = inv.cross
+	_check("down enters the spell cross (Up)", get_viewport().gui_get_focus_owner() == cross.card("Up"), get_viewport().gui_get_focus_owner())
 	await _ui_action(&"ui_accept")
-	_check("confirm on an equipped slot unequips it", eq[0] == "", eq)
+	_check("confirm on an equipped cross node unequips it", eq[PlayerData.SLOT_UP] == "", eq)
 	await _focus_pool_card(inv, "nova_burst")
 	await _ui_action(&"ui_accept")
-	_check("confirm on a free ability asks for a slot",
-		inv.pending_ability_id == "nova_burst" and get_viewport().gui_get_focus_owner() == inv.slot_cards[0], inv.pending_ability_id)
+	_check("confirm on a free spell asks for a node (focus: the first empty one)",
+		inv.pending_ability_id == "nova_burst" and get_viewport().gui_get_focus_owner() == cross.card("Up"), inv.pending_ability_id)
 	await _ui_action(&"ui_accept")
-	_check("the ability goes into the chosen slot", eq[0] == "nova_burst" and inv.pending_ability_id == "", eq)
-	await _focus_pool_card(inv, "spirit_volley")
+	_check("the spell goes into the chosen slot", eq[PlayerData.SLOT_UP] == "nova_burst" and inv.pending_ability_id == "", eq)
+	await _focus_pool_card(inv, "comet_dash")
 	await _ui_action(&"ui_accept")
-	_check("confirm on an equipped ability in the grid unequips it", eq[1] == "", eq)
-	await _ui_action(&"ui_accept") # Spirit Volley is free now -> choose a slot.
-	await _ui_action(&"ui_right") # From the first free slot (2) to slot 3 (occupied).
+	_check("confirm on an equipped spell in the pool unequips it", eq[PlayerData.SLOT_SIDE] == "", eq)
+	await _ui_action(&"ui_accept") # Comet Dash is free now -> choose a node (focus: Left, the empty Side slot).
+	_check("an empty Side slot is chosen through the Left card", get_viewport().gui_get_focus_owner() == cross.card("Left"), get_viewport().gui_get_focus_owner())
+	await _ui_action(&"ui_down") # Left -> Down (occupied by Meteor Slam).
 	await _ui_action(&"ui_accept")
-	_check("choosing an occupied slot replaces its ability",
-		eq[2] == "spirit_volley" and not eq.has("ascendant_form") and eq[1] == "", eq)
-	await _focus_pool_card(inv, "ascendant_form")
+	_check("choosing an occupied node replaces its spell",
+		eq[PlayerData.SLOT_DOWN] == "comet_dash" and not eq.has("meteor_slam") and eq[PlayerData.SLOT_SIDE] == "", eq)
+	await _focus_pool_card(inv, "stasis_field")
+	await _ui_action(&"ui_accept")
+	cross.card("Right").grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	_check("the Right card fills the same Side slot", eq[PlayerData.SLOT_SIDE] == "stasis_field", eq)
+	_check("both side cards always show the same spell",
+		cross.card("Left").ability == cross.card("Right").ability and cross.card("Left").ability.id == "stasis_field")
+	_check("the center card is Mana Discharge", cross.card("Center").ability is ManaDischarge)
+	cross.card("Left").grab_focus()
+	await _frames(1)
+	_check("focusing Left: Left has the focus frame, Right a dim mirror frame",
+		cross.card("Left").has_focus() and cross.card("Right").mirror and not cross.card("Left").mirror)
+	await _ui_action(&"ui_right") # Left -> Center
+	_check("focusing the center: no mirror frames", cross.card("Center").has_focus() and not cross.card("Left").mirror and not cross.card("Right").mirror)
+	await _ui_action(&"ui_right") # Center -> Right
+	_check("focusing Right: Left gets the mirror frame", cross.card("Right").has_focus() and cross.card("Left").mirror and not cross.card("Right").mirror)
+	_check("the mirror frame is dimmer than the focus frame", AbilityCard.MIRROR_COLOR.a < AbilityCard.FOCUS_COLOR.a)
+	var before_center := eq.duplicate()
+	cross.card("Center").grab_focus()
+	await _frames(1)
 	await _ui_action(&"ui_accept")
 	await _ui_action(&"menu_clear")
-	_check("Backspace cancels the slot choice", inv.pending_ability_id == "" and not eq.has("ascendant_form"), eq)
+	_check("Mana Discharge (center) cannot be removed or replaced", eq == before_center and game.ultimates.get_slot(UltimateManager.NEUTRAL) is ManaDischarge, eq)
+	var pool_ids := inv.pool_cards.map(func(c: AbilityCard) -> String: return c.ability.id)
+	_check("Mana Discharge is not in the pool of equippable spells", not pool_ids.has("mana_discharge"), pool_ids)
+	await _focus_pool_card(inv, "spirit_volley")
+	await _ui_action(&"ui_accept")
+	await _ui_action(&"menu_clear")
+	_check("Backspace cancels the slot choice", inv.pending_ability_id == "" and not eq.has("spirit_volley"), eq)
 	var crisp := true
 	for card in inv.pool_cards:
 		crisp = crisp and not card.icon_view.dim
@@ -437,7 +466,7 @@ func _run() -> void:
 	_check("no empty-slot placeholder card", inv.pool_grid.get_child_count() == inv.pool_cards.size())
 	var details_numeric := digit.search(inv.detail_name.text + inv.detail_desc.text) != null
 	var card_text := ""
-	for card in inv.pool_cards + inv.slot_cards:
+	for card in inv.pool_cards + inv.cross.nodes.values():
 		card_text += card.text
 	_check("inventory shows icons, no text or numbers on cards", card_text == "" and not details_numeric, card_text)
 	Input.action_press(&"inventory")
@@ -449,10 +478,20 @@ func _run() -> void:
 
 	# --- Left-to-right order and text ---
 	var hud: Hud = game.hud
-	_check("HUD slot strip runs 1-2-3-4 left to right",
-		hud.slot_rect(0).position.x < hud.slot_rect(1).position.x and hud.slot_rect(2).position.x < hud.slot_rect(3).position.x)
-	_check("inventory slots run 1-2-3-4 left to right",
-		inv.slot_cards[0].get_index() == 0 and inv.slot_cards[3].get_index() == 3 and inv.panel.layout_direction == Control.LAYOUT_DIRECTION_LTR)
+	var hc := hud.spell_cross
+	var at := func(n: String) -> Vector2: return (hc.card(n) as Control).position
+	_check("HUD spell cross: a D-pad (Up above, Down below, Left and Right beside the center)",
+		at.call("Up").y < at.call("Center").y and at.call("Down").y > at.call("Center").y
+		and at.call("Left").x < at.call("Center").x and at.call("Right").x > at.call("Center").x
+		and is_equal_approx(at.call("Up").x, at.call("Center").x) and is_equal_approx(at.call("Left").y, at.call("Center").y))
+	hc.refresh(p.health.get_max_energy(), p.health.energy)
+	var view := func(n: String) -> UltimateAbility: return (hc.card(n) as SpellNodeView).ability
+	_check("HUD spell cross shows the loadout (Mana Discharge in the center, the Side spell on both sides)",
+		view.call("Center") is ManaDischarge and view.call("Left") == view.call("Right")
+		and view.call("Up") == game.ultimates.get_slot(PlayerData.SLOT_UP) and view.call("Down") == game.ultimates.get_slot(PlayerData.SLOT_DOWN))
+	_check("HUD node hierarchy: Hud/SpellCross/{Up, Left, Center, Right, Down}",
+		hud.get_node_or_null("SpellCross/Up") != null and hud.get_node_or_null("SpellCross/Right") != null and hud.get_node_or_null("SpellCross/Center") != null)
+	_check("the inventory is laid out left to right", inv.panel.layout_direction == Control.LAYOUT_DIRECTION_LTR)
 	var tl: Label = game.dialogue.text_label
 	_check("dialogue text is LTR and does not re-wrap while typing",
 		tl.text_direction == Control.TEXT_DIRECTION_LTR and tl.visible_characters_behavior == TextServer.VC_CHARS_AFTER_SHAPING)
@@ -473,8 +512,9 @@ func _run() -> void:
 		tablet_spots.size() == 1 and tablet_spots[0][0] == "test_room"
 		and start_cp.global_position.x - tablet_spots[0][1] > 20.0 and start_cp.global_position.x - tablet_spots[0][1] < 140.0, tablet_spots)
 
-	# --- 4 dedicated ultimate keys, no switching ---
-	_check("ultimate hotkeys 1-4 exist", InputMap.has_action(&"ult_1") and InputMap.has_action(&"ult_4"))
+	# --- One Spell button (+ direction), no numbered hotkeys, no switching ---
+	_check("one Spell button exists; the numbered hotkeys are gone",
+		InputMap.has_action(&"spell") and not InputMap.has_action(&"ult_1") and not InputMap.has_action(&"ult_8") and Settings.REBINDABLE.has("spell"))
 	_check("no ultimate switching action", not InputMap.has_action(&"cycle_ultimate"))
 	_check("energy tiers have distinct colors",
 		Config.energy_tier_color(25.0) != Config.energy_tier_color(50.0)
@@ -543,7 +583,8 @@ func _run() -> void:
 	var original := data.equipped.duplicate()
 	await _frames(3)
 	_check("starts at a checkpoint", p.at_checkpoint)
-	_check("swap allowed at checkpoint", game.ultimates.equip(0, "comet_dash") and data.equipped[0] == "comet_dash" and data.equipped[3] == original[0], data.equipped)
+	_check("swap allowed at checkpoint", game.ultimates.equip(PlayerData.SLOT_UP, "comet_dash") and data.equipped[PlayerData.SLOT_UP] == "comet_dash"
+		and data.equipped[PlayerData.SLOT_SIDE] == original[PlayerData.SLOT_UP], data.equipped)
 	p.global_position += Vector2(200, 0)
 	await _frames(3)
 	_check("swap refused away from checkpoint", not p.at_checkpoint and not game.ultimates.equip(0, original[0]), data.equipped)
@@ -1251,11 +1292,10 @@ func _run() -> void:
 	_check("the HUD has no pop-up text system", not "banner_text" in game.hud and not game.hud.has_method("show_banner"))
 	_check("the secret and relic sounds play nothing celebratory", Sfx.count("victory") == 0 and Sfx.count("secret") == 0 and Sfx.count("relic") == 0)
 
-	# --- HUD shows the bound hotkeys on the ability slots ---
-	_check("HUD slots show keys 1-4 by default", game.hud.hotkey_label(0) == "1" and game.hud.hotkey_label(3) == "4",
-		[game.hud.hotkey_label(0), game.hud.hotkey_label(3)])
-	Settings.rebind("ult_1", KEY_Q)
-	_check("HUD slot follows a rebound key", game.hud.hotkey_label(0) == "Q", game.hud.hotkey_label(0))
+	# --- HUD shows the bound Spell key on the spell cross ---
+	_check("HUD shows the Spell key (U by default)", game.hud.spell_key_label() == "U", game.hud.spell_key_label())
+	Settings.rebind("spell", KEY_Q)
+	_check("HUD follows a rebound Spell key", game.hud.spell_key_label() == "Q", game.hud.spell_key_label())
 	Settings.reset_controls()
 
 	# --- The pause menu has no path to the inventory ---
@@ -1359,8 +1399,8 @@ func _test_new_spells() -> void:
 	var p: Player = game.player
 	var data: PlayerData = game.player_data
 	var loadout := data.equipped.duplicate()
-	_check("eight spells are registered and known from the start",
-		game.ultimates.abilities.size() == 8 and data.unlocked.size() == 8, data.unlocked)
+	_check("nine spells are registered; the eight equippable ones are known from the start",
+		game.ultimates.abilities.size() == 9 and data.unlocked.size() == 8 and not data.unlocked.has("mana_discharge"), data.unlocked)
 
 	# Repulse Aegis: a parry. Consumes all energy, a tiny window, enemy contact only.
 	await _reset()
@@ -1369,13 +1409,13 @@ func _test_new_spells() -> void:
 	_check("aegis is a tight parry (no wind-up, a short window)",
 		is_zero_approx(Config.ultimates.repulse_aegis.cast_time) and window <= 0.25, window)
 	p.health.set_energy(10.0)
-	await _cast_slot0("repulse_aegis")
+	await _cast_spell("repulse_aegis")
 	_check("aegis refused below its threshold", is_equal_approx(p.health.energy, 10.0) and not aegis.is_running, p.health.energy)
 	var striker: DummyEnemy = game.spawn_enemy_kind("strong", p.global_position + Vector2(200, 0))
 	striker.patrol = false
 	await _frames(3)
 	p.health.set_energy(80.0)
-	await _cast_slot0("repulse_aegis")
+	await _cast_spell("repulse_aegis")
 	_check("aegis consumes all energy", is_zero_approx(p.health.energy) and is_equal_approx(aegis.consumed, 80.0), [p.health.energy, aegis.consumed])
 	await _frames(1)
 	_check("aegis window opens at once (within a few frames)", aegis.is_running and p.hit_guards.has(RepulseAegis.GUARD_ID))
@@ -1394,7 +1434,7 @@ func _test_new_spells() -> void:
 	late.patrol = false
 	await _frames(3)
 	p.health.set_energy(80.0)
-	await _cast_slot0("repulse_aegis")
+	await _cast_spell("repulse_aegis")
 	await _frames(int(ceil(window * 60.0)) + 4)
 	_check("the aegis window closes quickly", not aegis.is_running and not aegis.countered and is_zero_approx(p.health.energy), aegis.remaining)
 	p.global_position = late.global_position
@@ -1409,19 +1449,19 @@ func _test_new_spells() -> void:
 	var touch_x: float = near.global_position.x - near.size.x / 2.0 - Player.WIDTH / 2.0
 	p.global_position = Vector2(touch_x - 30.0, near.global_position.y)
 	p.health.set_energy(50.0)
-	await _cast_slot0("repulse_aegis")
+	await _cast_spell("repulse_aegis")
 	await _frames(int(ceil(window * 60.0)) + 4)
 	_check("aegis does not reach an enemy a step away", not aegis.countered and is_equal_approx(near.health, near.max_health), near.health)
 	p.global_position = Vector2(touch_x - 3.0, near.global_position.y)
 	p.health.set_energy(50.0)
-	await _cast_slot0("repulse_aegis")
+	await _cast_spell("repulse_aegis")
 	await _frames(2)
 	_check("aegis counters an enemy at the player's skin", aegis.countered and near.health < near.max_health, near.health)
 
 	# No projectile repel: a projectile hurts as usual during the window.
 	await _reset()
 	p.health.set_energy(40.0)
-	await _cast_slot0("repulse_aegis")
+	await _cast_spell("repulse_aegis")
 	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(14, 0), "velocity": Vector2(-200, 0), "hostile": true, "damage": 20.0})
 	await _frames(3)
 	_check("aegis does not block projectiles",
@@ -1437,7 +1477,7 @@ func _test_new_spells() -> void:
 	p.health.set_energy(100.0)
 	var far: Enemy = game.spawn_enemy_kind("weak", p.global_position + Vector2(-200, 0))
 	game.combat.projectiles.spawn({"position": p.get_center() + Vector2(0, -60), "velocity": Vector2(0, -20), "hostile": true, "life": 9.0})
-	await _cast_slot0("stasis_field")
+	await _cast_spell("stasis_field")
 	await _frames(3)
 	_check("stasis spends its cost", is_equal_approx(p.health.energy, 100.0 - sf.cost), p.health.energy)
 	var frozen_at := frozen.global_position
@@ -1461,14 +1501,14 @@ func _test_new_spells() -> void:
 	p.global_position = beam_target.global_position + Vector2(-160, 0)
 	p.facing = 1
 	p.health.set_energy(100.0)
-	await _cast_slot0("radiant_lance")
+	await _cast_spell("radiant_lance", PlayerData.SLOT_SIDE)
 	await _frames(20)
 	_check("lance spends its cost", is_equal_approx(p.health.energy, 100.0 - Config.ultimates.radiant_lance.cost), p.health.energy)
 	_check("lance fires forward and damages", lance.dir == Vector2.RIGHT and beam_target.health < beam_target.max_health, [lance.dir, beam_target.health])
 	await _frames(30)
 	p.health.set_energy(100.0)
 	Input.action_press(&"move_up")
-	await _cast_slot0("radiant_lance")
+	await _cast_spell("radiant_lance", PlayerData.SLOT_UP)
 	await _frames(16)
 	var rect := lance.beam_rect()
 	Input.action_release(&"move_up")
@@ -1483,7 +1523,7 @@ func _test_new_spells() -> void:
 	p.global_position = slam_target.global_position + Vector2(-50, -90)
 	p.health.set_energy(100.0)
 	var slams := slam.slam_count
-	await _cast_slot0("meteor_slam")
+	await _cast_spell("meteor_slam", PlayerData.SLOT_DOWN)
 	var dive_invulnerable := false
 	for i in 30:
 		if p.state_name() == "ability":
@@ -1511,60 +1551,155 @@ func _test_spell_management() -> void:
 	var loadout := data.equipped.duplicate()
 	await _reset()
 
-	# Capacity: fewer slots empties the extra ones and disables their keys.
-	game.ultimates.set_capacity(2)
-	_check("capacity limits the usable slots", game.ultimates.slot_count() == 2 and data.equipped[2] == "" and data.equipped[3] == ""
-		and game.ultimates.get_slot(2) == null, data.equipped)
-	_check("no equipping past the capacity", not game.ultimates.equip(2, "comet_dash"), data.equipped)
-	p.health.set_energy(100.0)
-	Input.action_press(&"ult_3")
-	await _frames(2)
-	Input.action_release(&"ult_3")
-	_check("a key past the capacity does nothing", is_equal_approx(p.health.energy, 100.0), p.health.energy)
-	game.inventory.toggle()
-	await _frames(2)
-	var shown: int = game.inventory.slot_cards.filter(func(c: Control) -> bool: return c.visible).size()
-	game.inventory.toggle()
-	_check("the inventory shows only usable slots", shown == 2, shown)
+	# Spell + direction picks the slot. Up wins, then Down, then the sides.
+	var pick := UltimateManager.slot_for_input
+	_check("Spell alone is the neutral spell; Up / Down / Left / Right pick their slots",
+		pick.call(0, 0) == UltimateManager.NEUTRAL and pick.call(0, -1) == PlayerData.SLOT_UP and pick.call(0, 1) == PlayerData.SLOT_DOWN
+		and pick.call(1, 0) == PlayerData.SLOT_SIDE and pick.call(-1, 0) == PlayerData.SLOT_SIDE)
+	_check("Up wins over Left / Right, Down too", pick.call(1, -1) == PlayerData.SLOT_UP and pick.call(-1, 1) == PlayerData.SLOT_DOWN)
+	_check("the default loadout: Lance up, Comet Dash to the side, Meteor Slam down",
+		game.STARTING_LOADOUT == ["radiant_lance", "comet_dash", "meteor_slam"], game.STARTING_LOADOUT)
 
-	# More slots than the default: keys 5-8 exist and work.
-	game.ultimates.set_capacity(6)
-	_check("capacity can grow past four", game.ultimates.equip(5, "stasis_field") and game.ultimates.get_slot(5) != null, data.equipped)
-	await _frames(3)
-	Input.action_press(&"ult_6")
+	# A Side spell goes toward the held side (the player turns).
+	p.facing = 1
+	p.health.set_energy(100.0)
+	game.ultimates.equip(PlayerData.SLOT_SIDE, "stasis_field", true)
+	Input.action_press(&"move_left")
+	Input.action_press(&"spell")
 	await _frames(2)
-	Input.action_release(&"ult_6")
-	_check("slot six casts with its own key", is_equal_approx(p.health.energy, 100.0 - Config.ultimates.stasis_field.cost), p.health.energy)
-	_check("hotkeys 1-8 exist and are rebindable", InputMap.has_action(&"ult_8") and Settings.REBINDABLE.has("ult_8"))
-	_check("capacity is saved", int(game.make_save_data().get("slot_capacity", 0)) == 6)
-	game.ultimates.set_capacity(99)
-	_check("capacity is clamped to the hotkey count", data.slot_capacity == PlayerData.MAX_SLOTS, data.slot_capacity)
+	Input.action_release(&"spell")
+	Input.action_release(&"move_left")
+	_check("Spell + Left casts the Side spell facing left",
+		p.facing == -1 and is_equal_approx(p.health.energy, 100.0 - Config.ultimates.stasis_field.cost), [p.facing, p.health.energy])
+	await _frames(30)
+
+	# Mana Discharge is fixed for good.
+	game.ultimates.set_known("mana_discharge", false)
+	_check("Mana Discharge cannot be forgotten, equipped or unequipped",
+		data.is_unlocked("mana_discharge") and not game.ultimates.equip(PlayerData.SLOT_UP, "mana_discharge", true)
+		and not data.equipped.has("mana_discharge") and not game.ultimates.unequip(UltimateManager.NEUTRAL, true))
 
 	# Known spells: forgetting removes from the pool and the loadout.
-	game.ultimates.set_capacity(4)
-	game.ultimates.equip(0, "radiant_lance", true)
+	game.ultimates.equip(PlayerData.SLOT_UP, "radiant_lance", true)
 	game.ultimates.set_known("radiant_lance", false)
 	_check("a forgotten spell leaves the pool and its slot",
-		not data.is_unlocked("radiant_lance") and data.equipped[0] == "" and not game.ultimates.equip(0, "radiant_lance"), data.equipped)
+		not data.is_unlocked("radiant_lance") and data.equipped[PlayerData.SLOT_UP] == "" and not game.ultimates.equip(PlayerData.SLOT_UP, "radiant_lance"), data.equipped)
 
 	# Debug overlay controls drive the same rules.
 	dbg.toggle()
 	await _frames(2)
-	_check("debug overlay lists every spell", dbg._known_checks.size() == game.ultimates.abilities.size())
+	_check("debug overlay lists every equippable spell", dbg._known_checks.size() == game.ultimates.abilities.size() - 1 and not dbg._known_checks.has("mana_discharge"))
 	_check("debug checkbox mirrors a forgotten spell", not dbg._known_checks["radiant_lance"].button_pressed)
 	dbg._known_checks["radiant_lance"].button_pressed = true
 	_check("debug checkbox teaches a spell", data.is_unlocked("radiant_lance"))
 	dbg._known_checks["meteor_slam"].button_pressed = false
 	_check("debug checkbox forgets a spell", not data.is_unlocked("meteor_slam"))
-	dbg._capacity_slider.value = 3
-	_check("debug slider sets the capacity", data.slot_capacity == 3 and game.ultimates.slot_count() == 3, data.slot_capacity)
 	dbg.toggle()
-
 	game.ultimates.set_known("meteor_slam", true)
-	game.ultimates.set_capacity(PlayerData.DEFAULT_CAPACITY)
+
+	# Saves keep the three directional slots only.
+	var saved: Dictionary = game.make_save_data()
+	_check("the save stores the Up / Side / Down slots (no capacity, no neutral spell)",
+		(saved.equipped as Array).size() == PlayerData.SLOT_COUNT and not saved.has("slot_capacity") and not (saved.equipped as Array).has("mana_discharge"), saved.equipped)
+
 	data.equipped = loadout
 	Events.loadout_changed.emit()
 	await _reset()
+	await _test_mana_discharge()
+	await _test_max_stats()
+
+
+func _test_mana_discharge() -> void:
+	var p: Player = game.player
+	var md: ManaDischarge = game.ultimates.get_ability("mana_discharge")
+	var cfg: Dictionary = Config.ultimates.mana_discharge
+	_check("Mana Discharge deals minimal damage", cfg.damage > 0.0 and cfg.damage < Config.combat.attack_damage * 0.5, cfg.damage)
+
+	# Full energy: a real wave, sized by MAX energy, that hurts a little.
+	await _reset()
+	var target: DummyEnemy = _first_enemy(false)
+	target.patrol = false
+	await _frames(3)
+	p.global_position = target.global_position + Vector2(-90, 0)
+	await _frames(2)
+	p.health.set_energy(100.0)
+	var hp := target.health
+	await _cast_neutral()
+	_check("Spell alone casts Mana Discharge and drains ALL energy", is_zero_approx(p.health.energy) and is_equal_approx(md.consumed, 100.0) and p.state_name() == "cast",
+		[p.health.energy, md.consumed, p.state_name()])
+	await _frames(40)
+	_check("a full discharge is a real wave sized by max energy",
+		not md.failed and is_equal_approx(md.max_radius, cfg.radius_per_energy * p.health.get_max_energy()), [md.failed, md.max_radius])
+	_check("the wave deals its minimal damage", is_equal_approx(hp - target.health, cfg.damage), hp - target.health)
+
+	# Partial energy above the cost: still drains everything.
+	await _reset()
+	p.health.set_energy(70.0)
+	await _cast_neutral()
+	_check("Mana Discharge always drains everything (70 of 100)", is_zero_approx(p.health.energy) and is_equal_approx(md.consumed, 70.0) and not md.failed,
+		[p.health.energy, md.consumed])
+	await _frames(40)
+
+	# The radius grows with the max energy (upgrades).
+	var base: float = p.health.base_max_energy
+	_check("the wave radius scales with max energy", is_equal_approx(md.wave_radius(200.0), md.wave_radius(100.0) * 2.0))
+	p.health.set_base_max_energy(200.0)
+	p.health.set_energy(200.0)
+	await _cast_neutral()
+	await _frames(15)
+	_check("a bigger energy capacity gives a bigger wave", is_equal_approx(md.max_radius, cfg.radius_per_energy * 200.0), md.max_radius)
+	await _frames(30)
+	p.health.set_base_max_energy(base)
+
+	# Too little energy: it still casts, drains the rest, and fizzles.
+	await _reset()
+	target = _first_enemy(false)
+	target.patrol = false
+	await _frames(3)
+	p.global_position = target.global_position + Vector2(-40, 0)
+	await _frames(2)
+	p.health.set_energy(cfg.cost * 0.5)
+	hp = target.health
+	await _cast_neutral()
+	_check("a low-energy discharge still casts and drains the rest", is_zero_approx(p.health.energy) and p.state_name() == "cast", [p.health.energy, p.state_name()])
+	var ran := false
+	var gone_after := -1
+	for i in 40:
+		await _frames(1)
+		ran = ran or md.is_running
+		if ran and not md.is_running:
+			gone_after = i
+			break
+	_check("a failed discharge fizzles: a tiny ring, gone almost at once",
+		md.failed and md.max_radius <= cfg.fizzle_radius and gone_after >= 0 and gone_after <= 15, [md.failed, md.max_radius, gone_after])
+	_check("a failed discharge deals no damage", is_equal_approx(target.health, hp), target.health)
+	p.health.set_energy(0.0)
+	await _frames(10)
+	await _cast_neutral()
+	_check("even with no energy at all it casts (and fails)", p.state_name() == "cast" and md.failed, p.state_name())
+	await _frames(30)
+
+
+func _test_max_stats() -> void:
+	var p: Player = game.player
+	var h := p.health
+	var exported := {}
+	for prop in h.get_property_list():
+		if prop.usage & PROPERTY_USAGE_EDITOR and prop.name in ["base_max_health", "base_max_energy"]:
+			exported[prop.name] = true
+	_check("max health and max energy are exported stats (Inspector)", exported.size() == 2, exported)
+	var hp_base := h.base_max_health
+	var en_base := h.base_max_energy
+	h.set_base_max_health(150.0)
+	h.set_base_max_energy(120.0)
+	_check("changing the max stats changes the limits (bonuses on top)",
+		is_equal_approx(h.get_max_health(), 150.0 + h.max_health_bonus) and is_equal_approx(h.get_max_energy(), 120.0 + h.max_energy_bonus))
+	h.set_energy(120.0)
+	h.set_base_max_energy(50.0)
+	_check("lowering max energy clamps the current energy", is_equal_approx(h.energy, 50.0 + h.max_energy_bonus), h.energy)
+	h.set_base_max_health(hp_base)
+	h.set_base_max_energy(en_base)
+	h.full_heal()
 
 
 func _test_slam_hop_and_look() -> void:
@@ -1579,7 +1714,7 @@ func _test_slam_hop_and_look() -> void:
 	_check("slam test starts on the ground", p.grounded)
 	p.health.set_energy(100.0)
 	var slams := slam.slam_count
-	await _cast_slot0("meteor_slam")
+	await _cast_spell("meteor_slam", PlayerData.SLOT_DOWN)
 	var hop_seen := false
 	var hop_vulnerable := true
 	var hop_height := 0.0
@@ -1603,7 +1738,7 @@ func _test_slam_hop_and_look() -> void:
 	await _reset()
 	p.health.set_energy(100.0)
 	slams = slam.slam_count
-	await _cast_slot0("meteor_slam")
+	await _cast_spell("meteor_slam", PlayerData.SLOT_DOWN)
 	for i in 10:
 		if slam.phase == "hop" and p.state_name() == "ability":
 			break
@@ -2003,7 +2138,7 @@ func _test_damage_sources(pit_left: float) -> void:
 	var slams := slam.slam_count
 	p.global_position = spike_drop + Vector2(0, -110)
 	p.health.set_energy(100.0)
-	await _cast_slot0("meteor_slam")
+	await _cast_spell("meteor_slam", PlayerData.SLOT_DOWN)
 	var dived := false
 	for i in 40:
 		if p.state_name() == "ability":
@@ -2040,7 +2175,6 @@ func _test_damage_sources(pit_left: float) -> void:
 	await _reset()
 
 
-## Puts an ability in slot 1 (ignoring the checkpoint rule) and presses its key.
 func _test_grapple() -> void:
 	var p: Player = game.player
 	var hook: GrappleHook = game.combat.grapple
@@ -2512,11 +2646,27 @@ func _start_wall_pull() -> void:
 	await _frames(2)
 
 
-func _cast_slot0(ability_id: String) -> void:
-	game.ultimates.equip(0, ability_id, true)
-	Input.action_press(&"ult_1")
+## Puts a spell in a directional slot (ignoring the checkpoint rule) and
+## casts it: Spell + that slot's direction (Side: toward the facing side).
+## A direction key that is already held stays held afterwards.
+func _cast_spell(ability_id: String, slot := PlayerData.SLOT_UP) -> void:
+	var p: Player = game.player
+	game.ultimates.equip(slot, ability_id, true)
+	var dir: StringName = [&"move_up", &"move_right" if p.facing > 0 else &"move_left", &"move_down"][slot]
+	var held := Input.is_action_pressed(dir)
+	Input.action_press(dir)
+	Input.action_press(&"spell")
 	await _frames(2)
-	Input.action_release(&"ult_1")
+	Input.action_release(&"spell")
+	if not held:
+		Input.action_release(dir)
+
+
+## Casts the neutral spell (Spell with no direction).
+func _cast_neutral() -> void:
+	Input.action_press(&"spell")
+	await _frames(2)
+	Input.action_release(&"spell")
 
 
 func _jump_height(hold_frames: int) -> float:
@@ -2577,15 +2727,10 @@ func _ui_action(action: StringName) -> void:
 
 ## Moves keyboard focus onto the grid card of `ability_id` using arrows only.
 func _focus_pool_card(inv: InventoryMenu, ability_id: String) -> void:
-	if not get_viewport().gui_get_focus_owner() in inv.pool_cards:
-		await _ui_action(&"ui_down")
-	for i in 6:
-		await _ui_action(&"ui_left")
-	for i in 6:
-		var f := get_viewport().gui_get_focus_owner() as AbilityCard
-		if f and f.ability and f.ability.id == ability_id:
-			return
-		await _ui_action(&"ui_right")
+	for card in inv.pool_cards:
+		if card.ability.id == ability_id:
+			card.grab_focus()
+	await _frames(1)
 
 
 func _door(door_id: String) -> Door:

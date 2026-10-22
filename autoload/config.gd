@@ -99,8 +99,8 @@ class Grapple:
 
 
 class Vitals:
-	var max_health := 100.0
-	var max_energy := 100.0
+	# Max health and max energy live on the player's stats node
+	# (HealthEnergy.base_max_health / base_max_energy, editable in the Inspector).
 	var energy_per_hit := 11.0
 	var energy_gain_mul := 1.0
 	var iframe_duration := 1.0
@@ -153,6 +153,12 @@ func restore_defaults() -> void:
 	debug = DebugFlags.new()
 	camera = CameraCfg.new()
 	ultimates = {
+		# Mana Discharge (the neutral spell): always drains ALL energy. `cost`
+		# is the least energy for a real wave; below it the wave fizzles out
+		# at once and deals nothing. The wave's full radius scales with MAX
+		# energy (`radius_per_energy` px per point), its damage is minimal.
+		"mana_discharge": {"cost": 20.0, "cast_time": 0.1, "damage": 4.0, "radius_per_energy": 1.6,
+			"expand_time": 0.35, "fizzle_radius": 18.0, "fizzle_time": 0.12},
 		"nova_burst": {"cost": 33.0, "cast_time": 0.35, "damage": 45.0, "radius": 230.0, "expand_time": 0.3},
 		"spirit_volley": {"cost": 50.0, "cast_time": 0.2, "count": 10.0, "damage": 12.0, "interval": 0.04, "speed": 460.0, "homing": 7.0},
 		"ascendant_form": {"cost": 100.0, "cast_time": 0.6, "duration": 8.0, "damage_mul": 2.0, "speed_mul": 1.25, "range_mul": 1.45},

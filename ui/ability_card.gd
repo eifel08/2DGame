@@ -3,11 +3,18 @@ extends Button
 ## Icon-only ability button: a symbol plus an energy gauge (no text).
 ## Name and description appear in the inventory's detail area on focus.
 ## Fully keyboard operable: arrows move focus, Enter/Space presses.
+## Focus frame: a full gold frame. `mirror` draws a dim, thinner gold
+## frame instead: the spell cross sets it on the side card opposite the
+## focused one (both side cards show the same slot).
+
+const FOCUS_COLOR := Color(1.0, 0.83, 0.42, 1.0)
+const MIRROR_COLOR := Color(1.0, 0.83, 0.42, 0.4)
 
 var ability: UltimateAbility
 var icon_view: AbilityIcon
 var gauge: EnergyGauge
 var key_label: Label
+var mirror := false ## Dim "same slot" frame (see SpellCross).
 
 
 func _init() -> void:
@@ -17,6 +24,8 @@ func _init() -> void:
 	mouse_entered.connect(func() -> void:
 		if is_visible_in_tree():
 			grab_focus())
+	focus_entered.connect(queue_redraw)
+	focus_exited.connect(queue_redraw)
 	icon_view = AbilityIcon.new()
 	icon_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	icon_view.offset_left = 12
@@ -41,8 +50,8 @@ func _init() -> void:
 	add_child(key_label)
 
 
-## `key` > 0 (slot number 1-4) shows that slot's bound key in the corner.
-func show_ability(p_ability: UltimateAbility, max_energy: float, key := 0, dim := false) -> void:
+## `key`: a short label for the corner (e.g. "Up"), or "" for none.
+func show_ability(p_ability: UltimateAbility, max_energy: float, key := "", dim := false) -> void:
 	ability = p_ability
 	if ability:
 		icon_view.set_icon(ability.icon, ability.color, dim)
@@ -51,4 +60,17 @@ func show_ability(p_ability: UltimateAbility, max_energy: float, key := 0, dim :
 	else:
 		icon_view.set_icon("empty", Color.WHITE, dim)
 		gauge.visible = false
-	key_label.text = Settings.key_name("ult_%d" % key) if key > 0 else "" # The bound key.
+	key_label.text = key
+
+
+func set_mirror(on: bool) -> void:
+	if mirror != on:
+		mirror = on
+		queue_redraw()
+
+
+func _draw() -> void:
+	if has_focus(): # Primary selection: full gold frame.
+		draw_rect(Rect2(Vector2.ZERO, size).grow(-1.5), FOCUS_COLOR, false, 3.0)
+	elif mirror: # Secondary: a dim, thinner frame on the linked side card.
+		draw_rect(Rect2(Vector2.ZERO, size).grow(-3.0), MIRROR_COLOR, false, 1.5)

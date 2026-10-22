@@ -68,6 +68,12 @@ static func draw_symbol(c: CanvasItem, symbol: String, center: Vector2, r: float
 			c.draw_line(center + Vector2(0, -r * 0.9), center + Vector2(0, r * 0.35), col, maxf(1.5, r * 0.16), true)
 			c.draw_colored_polygon(PackedVector2Array([center + Vector2(-r * 0.45, r * 0.15), center + Vector2(r * 0.45, r * 0.15), center + Vector2(0, r * 0.6)]), col)
 			c.draw_line(center + Vector2(-r * 0.95, r * 0.8), center + Vector2(r * 0.95, r * 0.8), col, maxf(1.5, r * 0.12), true)
+		"discharge": # Core with radiating sparks (Mana Discharge).
+			c.draw_circle(center, r * 0.3, col)
+			for i in 8:
+				var d := Vector2.from_angle(TAU * i / 8.0)
+				c.draw_line(center + d * r * 0.45, center + d * r * (0.95 if i % 2 == 0 else 0.75), col, maxf(1.0, r * 0.1), true)
+			c.draw_arc(center, r * 0.6, 0.0, TAU, 24, Color(col, 0.45), maxf(1.0, r * 0.06), true)
 		"empty": # Empty slot.
 			c.draw_arc(center, r * 0.7, 0.0, TAU, 24, Color(col, 0.45), 1.5, true)
 			c.draw_line(center + Vector2(-r * 0.45, r * 0.45), center + Vector2(r * 0.45, -r * 0.45), Color(col, 0.45), 1.5, true)

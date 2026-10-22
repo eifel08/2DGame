@@ -32,8 +32,8 @@ To pull later changes: `git pull` inside the `2DGame` folder, then reopen the pr
 | Dash | K / C / Shift | RB |
 | Heal (hold, chunk by chunk) | L / V (on the ground) | LB |
 | Grappling hook (Left / Right or Up to aim; Down in the air = swing) | H / B | L3 |
-| Ultimate slot 1 / 2 / 3 / 4 | 1 / 2 / 3 / 4 | Y / RT / LT / R3 |
-| Ultimate slot 5 – 8 (only when the slot capacity allows) | 5 / 6 / 7 / 8 | — |
+| Spell: Mana Discharge (no direction held) | U / N | Y |
+| Spell: Up / Side / Down slot | U / N + Up, Left or Right, Down | Y + direction |
 | Interact (talk, read, save) | E / F (checkpoints: also Down) | B |
 | Pause menu | Esc / P | Start |
 | Inventory | I / Tab | Back / Select |
@@ -100,7 +100,7 @@ Press **H** (or **B**) to throw the hook. It flies out up to **256 px** (8 tiles
 - **Misses** fly back and end the hold. After the hook is back there is a short cooldown (0.3 s).
 - Tuning: `Config.grapple` and the debug overlay (*Grapple Hook*: range, speeds, tolerance, safe gap, bounce, cooldown). The debug toggle *Grapple Hook* turns the ability off.
 
-### Energy, healing and ultimates
+### Energy, healing and spells
 - **One shared energy meter.** Basic attacks fill it.
 - **Two ways to heal:**
   1. **Channel (risk and reward):** hold L on the ground. Healing comes in **chunks**.
@@ -111,10 +111,24 @@ Press **H** (or **B**) to throw the hook. It flies out up to **256 px** (8 tiles
      - Chunk size, energy cost, duration and pause are in `Config.vitals` (`heal_chunk_*`) and in the debug overlay.
   2. **Save at a checkpoint:** see below. Saving restores full health.
 - **Heal-ready glow:** the energy bar glows green, with a light sweep, whenever it holds enough energy for one full heal chunk. A small green dot under the bar marks a chunk's cost.
-- **Hotkey slots (1–4 by default).** Each slot holds one ultimate, or nothing. There is no switching.
-  - The **slot capacity** sets how many slots are usable: 1 to 8, default 4 (keys 1–8). It is saved per slot file and can be changed in the debug overlay. Lowering it empties the slots past the new limit.
-  - Defaults: 1 Nova Burst, 2 Spirit Volley, 3 Ascendant Form, 4 Comet Dash. All eight spells start **known** (in the inventory pool).
-- **The eight spells.** Energy thresholds are defaults in `Config.ultimates` and can be tuned live in the debug overlay.
+- **One Spell button (U / N, gamepad Y) plus a direction.** The direction held when you press it picks the spell:
+
+  | Input | Spell |
+  | --- | --- |
+  | Spell alone | **Mana Discharge**, always. It is fixed to this input for good: it cannot be unequipped, moved or forgotten. |
+  | Spell + Up | The **Up** slot |
+  | Spell + Left / Right | The **Side** slot, cast toward that side (you turn that way). One slot serves both sides. |
+  | Spell + Down | The **Down** slot |
+
+  - Up wins over Down, and both win over Left / Right. An empty slot casts nothing; it never falls back to Mana Discharge.
+  - Default loadout: Up **Radiant Lance**, Side **Comet Dash**, Down **Meteor Slam**. All eight equippable spells start **known** (in the inventory pool).
+  - Saves store the three directional slots. A save from the old numbered hotkeys loads with the default loadout.
+- **Mana Discharge** (the neutral spell, `ultimates/abilities/mana_discharge.gd`):
+  - It **always drains ALL your energy**.
+  - With at least **20** energy (`cost`), it releases a wave. The wave's full radius scales with your **maximum** energy: `radius_per_energy` × max energy, 160 px at 100. Energy upgrades widen it.
+  - The wave deals **minimal damage** (4) to every enemy it passes, once each.
+  - With less than 20 energy it still casts and still drains what is left, but it **fails**: a small broken ring flickers and is gone almost at once. No damage.
+- **The eight equippable spells.** Energy thresholds are defaults in `Config.ultimates` and can be tuned live in the debug overlay.
 
   | Spell | Type | Energy | What it does |
   | --- | --- | --- | --- |
@@ -126,7 +140,8 @@ Press **H** (or **B**) to throw the hook. It flies out up to **256 px** (8 tiles
   | **Stasis Field** | Emergency escape | 80 | Near-instant (0.05 s) pulse: enemies and hostile projectiles within **90 px** freeze in place for **0.8 s**. A last-second escape, not area control. Frozen enemies cannot move or hurt you but can still be hit. Frozen projectiles hang harmless, then fly on. |
   | **Radiant Lance** | Beam | 60 | A long piercing beam forward, or straight up while holding Up. It stops at walls and hits each enemy once. |
   | **Meteor Slam** | Dive strike | 30 | Invulnerable straight-down plunge that hits enemies on the way, then a wide ground shockwave and short landing i-frames. Cast in the air, it dives at once. **Cast on the ground, you first hop up** (about 0.25 s): the hop is a **vulnerable** wind-up, and a hit during it cancels the slam. |
-- **Color-coded energy bar, no numbers.** Each equipped slot puts a mark on the bar at the energy it needs. Under the bar, the hotkey strip shows the four slots from left to right, each with its icon and its **actual key** (1–4 by default; a key rebound in Settings shows its new name). A mark or slot is bright when there is enough energy.
+- **Color-coded energy bar, no numbers.** Mana Discharge and each equipped slot put a mark on the bar at the energy they need. A mark is bright when there is enough energy.
+- **Spell cross (HUD, right of the bars).** A D-pad diagram, `Hud/SpellCross` with the child nodes `Up`, `Left`, `Center`, `Right`, `Down` (`ui/spell_cross.gd`, `ui/spell_node_view.gd`). Mana Discharge sits in the center. The Up and Down slots are above and below it. The Side slot appears on **both** the left and the right; the two always match. Each node is framed in its energy-tier color and is bright when affordable. The Spell key (U by default, follows rebinding) shows in the cross's top-left corner.
   - The color follows the energy tier, not the spell: green (low), yellow, orange, pink (full).
   - Empty slots have no mark.
 - **No exact stats for the player.** Abilities, tooltips and lore never show energy numbers. Each ability shows a small gauge filled to its requirement instead. Exact values appear only in the debug stats view.
@@ -237,7 +252,7 @@ Shards (◆) lie on ledges around the room, and destroyed enemies drop them. The
 
 ### Dialogue, lore and explanations
 Walk up to an NPC or a lore tablet. An "E Talk" or "E Read" prompt appears. Press E to open the dialogue. Press E, Space or J to reveal the page and then to turn it. The game pauses while dialogue is open.
-- **Archivist Mira** (next to the start) explains healing, checkpoints, currency, the ultimate keys and the loadout rule.
+- **Archivist Mira** (next to the start) explains healing, checkpoints, currency, the Spell button with its directions, and the loadout rule.
 - **Tablets** explain wall jumps (left shaft), spikes and the pogo (on the raised block), and the four ultimates (center).
 
 Dialogue texts are `DialogueData` resources in `dialogue/`. Edit them in the Inspector, or create new ones (FileSystem → New Resource → DialogueData). Assign one to any `lore_stone.tscn` or `npc.tscn` instance.
@@ -245,11 +260,13 @@ Dialogue texts are `DialogueData` resources in `dialogue/`. Edit them in the Ins
 ### Inventory and loadout (I / Tab)
 The game pauses while the inventory is open. It has two tabs (switch with Q / E):
 - **Status:** shards (the only number), plus health and energy as bars. A bar's frame grows when its maximum increases (`max_health_bonus` / `max_energy_bonus`; the debug overlay has buttons to test this).
-- **Abilities:** the top row shows hotkey slots 1–4, left to right. The bottom grid shows every unlocked ability with a normal, crisp icon. Equipped ones carry their key number.
+- **Abilities:** the spell cross on the left (the same D-pad as the HUD, as large focusable cards), and every known equippable spell on the right. Equipped spells in the pool carry their direction (Up, Side, Down).
   - Cards show **icons and energy gauges only**. The name and description appear below only for the focused card.
-  - **Keyboard flow:** Left / Right on the tab row switches tabs, and Down enters the cards.
-    - Confirm (Z / Enter / Space) on an **equipped** ability, in a slot or in the grid, **unequips** it.
-    - Confirm on a **free** ability, then choose slot 1–4. An empty slot takes it. An occupied slot has its ability **replaced**.
+  - **Linked side cards:** Left and Right are one slot. Changing either changes both. When one side card has the focus, it gets the full gold frame, and the other side card gets a **dim, thinner mirror frame**. That shows they share a slot without moving the focus.
+  - **Keyboard flow:** Left / Right on the tab row switches tabs, and Down enters the cross (Up card). Arrows move like a D-pad inside the cross.
+    - Confirm (Z / Enter / Space) on an **equipped** spell, in the cross or in the pool, **unequips** it.
+    - Confirm on a **free** spell, then choose Up, a side or Down (the focus jumps to the first empty slot). An occupied slot has its spell **replaced**.
+    - The **center** card (Mana Discharge) cannot be changed; confirming it only flashes the notice.
     - Backspace cancels the slot choice.
   - **Changes only work at the checkpoint where you saved.** Elsewhere you can browse but not change anything, and `UltimateManager.equip` / `unequip` enforce this in code too.
 
@@ -284,7 +301,7 @@ Gameplay code never draws art or builds sounds. It only asks for things **by nam
 The UI is always laid out left to right, even on a system set to a right-to-left language. This is set in `project.godot` (`root_node_layout_direction`) and on every panel. Dialogue text is laid out for the whole page before typing starts, so lines never shift or re-wrap while the letters appear.
 
 ### HUD
-The HUD is clean by default: health and energy bars, threshold marks, the hotkey strip and the shard count. It has no numbers except the shards. Turn on **Hitboxes & Stats** in the debug overlay (or simply open it) to see exact health, energy, enemy health, damage numbers and hitboxes.
+The HUD is clean by default: health and energy bars, threshold marks, the spell cross and the shard count. It has no numbers except the shards. Turn on **Hitboxes & Stats** in the debug overlay (or simply open it) to see exact health, energy, enemy health, damage numbers and hitboxes.
 
 ## Test checklist
 
@@ -313,23 +330,24 @@ The HUD is clean by default: health and energy bars, threshold marks, the hotkey
 | Explicit saving | Walk to the middle flame: nothing happens. Press E or Down: you snap to the flame and are fully healed. |
 | Spikes vs death | Walk into a spike pit: you reappear just before it. Let health run out (debug: *Take Damage*): you wake at the flame where you saved. |
 | Shards on spikes | Destroy the right-hand dummy near its pit so shards fly in: they vanish. |
-| Loadout | At your saved flame: I, Right (Abilities), Down. Confirm on an equipped ability to remove it. Confirm on a free one, then pick a slot (an occupied slot is replaced). |
+| Loadout | At your saved flame: I, Right (Abilities), Down. Confirm on an equipped spell to remove it. Confirm on a free one, then pick Up, a side or Down (an occupied slot is replaced). Focus the Left card: the Right card shows a dim mirror frame. |
 | Icons and details | Move focus over ability cards: the name and description appear only for the focused one. |
-| Left to right | Slots read 1-2-3-4 left to right in the HUD and the inventory. Dialogue types from the left. |
-| Hotkeys on slots | Settings → rebind Ultimate 1: the first HUD slot shows the new key. |
+| Spell cross | The HUD shows a cross right of the bars: Mana Discharge in the middle, the Side spell on both sides. Dialogue types from the left. |
+| Spell key | Settings → rebind *Spell*: the HUD cross shows the new key. |
+| Mana Discharge | Hit dummies until the bar is over its first mark, then press U alone: a wave spreads and barely scratches the dummies; the bar is empty. Press U again with a nearly empty bar: a tiny ring flickers out, no damage. |
 | Checkpoint tablet | The only tablet stands just before the first flame. Saving at any flame shows no text and starts the trance. |
 | Dialogue | Walk to the robed NPC right of the start, press E. |
 | Debug, keyboard only | F1, then F2: arrows, Enter, Left/Right on sliders. F2 again resumes. |
-| Repulse Aegis | F1 → *Max Energy*. Put the Aegis on a key (F1 → *Auto-Equip Known* with capacity 8, or the inventory at a flame). Walk toward a dummy and cast it **just before** you touch it: a gold hexagon flashes and shrinks, you take no damage, and the dummy takes 150 damage (100 energy × 1.5). Cast it early: the hexagon vanishes, the energy is gone, and the touch hurts. In the Boss Room, a shard still hurts during the window. |
+| Repulse Aegis | F1 → *Max Energy*. Put the Aegis on a direction (the inventory at a flame, or F1 → *Clear Loadout* then *Auto-Equip Known*). Walk toward a dummy and cast it **just before** you touch it: a gold hexagon flashes and shrinks, you take no damage, and the dummy takes 150 damage (100 energy × 1.5). Cast it early: the hexagon vanishes, the energy is gone, and the touch hurts. In the Boss Room, a shard still hurts during the window. |
 | Stasis Field | Let a dummy walk right up to you, then cast: a small blue ring snaps open, the dummy stops and turns blue for under a second. An enemy a few steps away is not affected. In the Boss Room, cast it as a shard is about to hit you: it hangs in the air. |
 | Hazards ignore i-frames | F1 → *Take Damage*, then at once walk into the spike pit: you still lose health. Cast Meteor Slam above a spike pit: the dive does not protect you. A dummy touching you during i-frames still does nothing. |
-| Radiant Lance | Face a dummy and cast: a pink beam hits it. Hold Up while casting: the beam fires straight up. |
-| Meteor Slam | Jump above a dummy and cast: you plunge down (invulnerable), land with a green shockwave and the dummy is hit. Cast it on the ground: you hop up first. Get touched by a dummy during the hop: you are hurt and no slam follows. |
+| Radiant Lance | Put it on the Side slot, face a dummy and cast (U + toward it): a pink beam hits it. On the Up slot (U + Up): the beam fires straight up. |
+| Meteor Slam | Jump above a dummy and press U + Down: you plunge down (invulnerable), land with a green shockwave and the dummy is hit. Cast it on the ground: you hop up first. Get touched by a dummy during the hop: you are hurt and no slam follows. |
 | Known spells | F1 → *Spells*: untick a spell. It leaves the inventory pool and its slot. Tick it again to relearn it. |
 | Grappling hook | Testing Halls, left shaft: jump, hold Left and press H: you hang still for a moment, then you are pulled to the wall and can double jump again. Press H facing right: the hook flies straight to the pillar. Hold Up and press H below the top-left platform: you land on it. Under the central hanging wall, hold Up and press H: you are pulled to its underside. Hook a dummy from a distance: it is not hurt yet; you stop just short of it, bounce up almost as high as a pogo, and then it takes the hit. |
 | Grapple swing | Right half of the Testing Halls, high up: jump, hold Down and press H. The hook flies up at 45° to the ceiling and you swing. Press Jump at the bottom of the arc to fling yourself forward. Swing into a wall, or let a flyer cross the rope: you let go at once. |
 | Grapple vs. hazards | Testing Halls: aim the hook at the wall spikes (east wall, mid height) or straight up at the ceiling spikes (under the small middle block). It sparks off and comes back; you are not pulled. |
-| Slot capacity | F1 → *Spells → Equip Slots*: drag to 2. The HUD and inventory show two slots, and key 3 does nothing. Drag to 8: keys 1–8 work. |
+| Max stats | Select `Player/HealthEnergy` in `player/player.tscn`: *Max stats → Base Max Health / Base Max Energy*. Raise max energy: Mana Discharge's wave grows with it. |
 
 ## Project layout
 
@@ -351,7 +369,7 @@ stats/health_energy.gd   health, shared energy, healing, i-frames, growth bonuse
 combat/                  melee, pogo, damage API, contact/hazard damage, projectiles;
   grapple_hook.gd/.tscn  the grappling hook: aiming, flight, latching, enemy hits, rope visuals
   damage.gd              the three damage sources (enemy, projectile, hazard) and their i-frame rules
-ultimates/               ability base class, slot manager (keys 1-8, capacity), the 8 abilities
+ultimates/               spell base class, spell manager (Spell + direction), Mana Discharge + 8 equippable spells
 enemies/
   enemy.gd               shared enemy base (tiers, health, contact damage)
   dummy_enemy.gd         weak / strong training dummies (ground + flying)
@@ -373,12 +391,12 @@ core/arena_director.gd   arena waves: start, next wave, clear, abort
 effects/fx/               one scene per visual effect (placeholders), FxPlayer
 audio/sfx.tscn, sfx/     the Sfx autoload: one AudioStreamPlayer per sound + .wav placeholders
 GUIDELINES.md            binding design rules A-D (transitions, secret walls, no celebrations)
-tests/smoke_test.tscn    automated headless test (399 checks)
+tests/smoke_test.tscn    automated headless test (422 checks)
 ```
 
 ## Extending
 
-- **New ultimate:** extend `UltimateAbility` in `ultimates/abilities/`, add a config block to `Config.ultimates`, and register it in `ultimate_registry.gd`. Every registered ability starts known; `UltimateManager.set_known(id, false)` removes one. It then appears in the inventory pool, in the debug overlay's *Spells* list and cost sliders, and can be slotted at a checkpoint. Give it an icon by adding a `match` case in `ui/ability_icon.gd`.
+- **New spell:** extend `UltimateAbility` in `ultimates/abilities/`, add a config block to `Config.ultimates`, and register it in `ultimate_registry.gd`. Every registered spell starts known; `UltimateManager.set_known(id, false)` removes one. It then appears in the inventory pool, in the debug overlay's *Spells* list and cost sliders, and can be put on Up, Side or Down at a checkpoint. (`fixed = true` is reserved for the neutral spell.) Give it an icon by adding a `match` case in `ui/ability_icon.gd`.
   - Optional hooks, no engine changes needed:
     - `pay_cost(health)`: a special energy rule (Repulse Aegis consumes the whole meter).
     - `Player.add_hit_guard(id, callable)`: intercept incoming enemy and projectile hits (counters, shields). The callable gets `(damage, attacker, source)`; check `source` (`Damage.Source`).
@@ -398,4 +416,4 @@ tests/smoke_test.tscn    automated headless test (399 checks)
 godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn
 ```
 
-It plays the game through real input actions and checks 399 behaviors. New in this version: the grappling hook rework. The new aim table (straight out by default, Up, Down in the air for a swing, no swing on the ground), the forgiving tolerance on edges and enemies, the delayed enemy hit (nothing on contact, the standard damage only after the near-pogo rebound, nothing when the pull is cancelled), and the swing: a fixed rope length, an undamped arc that climbs the far side as high as it started, and letting go on jump (with the double jump back), the hook key, damage, terrain and an enemy across the rope; a hazard across a rope is detected too. Before that: the grappling hook refinements. The short range (256 px), the hold in the air while the hook flies, the double jump given back after a pull (and kept by a jump cancel), latching a one-way platform and landing on it, the pull to a solid ceiling, wall and ceiling spikes deflecting the hook without a latch, a pull or damage, the oriented hazard areas of wall and ceiling spikes, and the upward rebound after an enemy pull. Before that: the grappling hook. Its three aims (diagonal by default, Left / Right, Up; Down reserved), the pull to a wall and diagonally onto a pillar, normal movement afterwards, the hook coming back, misses at max range without a pull, refused anchors next to spikes, an undiscovered hidden pocket wall stopping the hook, the cancels (jump, a hit, a room reset), and on an enemy the standard attack damage, the pull toward it, the stop short of its contact hitbox and no contact damage. Before that: the two secret wall types. Type 1 hidden pockets: covered contents (shards and an enemy), one-way until found, found by walking through, permanently un-hidden, saved, and kept through room changes and save loads. The far-west pocket of the Testing Halls lies outside the normal room: the camera stays clamped until the player breaks through, then scrolls in, never past the tiles. Type 2 secret doorways: semi-transparent entry, an exit that matches the wall tile, no collision, back and forth twice, never consumed or saved. Also: GUIDELINES.md documents both types, and every room's camera limits stay within its tiles. Before that: illusion walls. Before that: the Stasis Field's doubled cost; the Meteor Slam ground hop (it rises first, is vulnerable during the hop, a hit cancels the slam, then the invulnerable dive slams); camera look up / down (a tap does nothing, a hold pans, moving snaps back, never outside the room); and the physical upward transition (the player emerges at the threshold inside the floor gap, climbs out, arcs over the floor without drifting back, lands beside the gap, either side at random, not invulnerable). Before that: the three damage sources (spikes hurt through post-hit i-frames, dash invulnerability and the Meteor Slam dive; i-frames still block enemy contact and projectiles; God Mode still blocks hazards), the Repulse Aegis parry (no wind-up, a short window, a mistimed cast does not protect, only an enemy at the player's skin triggers it, projectiles are never blocked) and the Stasis Field as a short-range, short emergency freeze. Before that: the four new spells (Repulse Aegis consumes all energy, negates a contact or projectile hit and strikes back ×1.5; Stasis Field freezes enemies and projectiles in range, harmless while frozen, and wears off; Radiant Lance fires forward or up and damages; Meteor Slam dives with i-frames, lands, grants landing i-frames and damages), the slot capacity (fewer slots, more slots up to 8, keys past the limit do nothing, saved per slot) and the debug overlay's spell controls (known checkboxes, capacity slider). Before that: no celebrations anywhere (no victory/secret/relic sounds or celebration effects exist; an arena clear only plays the gate clunk). Before that: the room-design rules from GUIDELINES.md (A: landing ground at every point of a downward exit; B: upward exits place you beside the gap, either side at random; C: the secret wall breaks and its exit opens during an active arena). Before that: seamless exits (no fade, sound or marker; speed kept), the ceiling gap to the Upper Galleries and back, its standard enemies, the secret wall sitting in the outer wall and blocking until broken, and a quiet boss defeat (no fanfare, effect or freeze). Earlier: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.
+It plays the game through real input actions and checks 422 behaviors. New in this version: the spell overhaul. One Spell button and its directions (Up / Side / Down, Up winning; an empty slot casts nothing; Side turns you), Mana Discharge (fixed: cannot be equipped, removed or forgotten; drains all energy; a wave sized by max energy with minimal damage; with too little energy it still casts, drains the rest and fizzles out with no damage; even at zero energy), the D-pad cross in the HUD (layout, contents, node names) and the inventory (keyboard flow through the cross, the linked side slot on both cards, the focus frame and the dim mirror frame, the fixed center), saves with three directional slots, and the exported max health / max energy. Before that: the grappling hook rework. The new aim table (straight out by default, Up, Down in the air for a swing, no swing on the ground), the forgiving tolerance on edges and enemies, the delayed enemy hit (nothing on contact, the standard damage only after the near-pogo rebound, nothing when the pull is cancelled), and the swing: a fixed rope length, an undamped arc that climbs the far side as high as it started, and letting go on jump (with the double jump back), the hook key, damage, terrain and an enemy across the rope; a hazard across a rope is detected too. Before that: the grappling hook refinements. The short range (256 px), the hold in the air while the hook flies, the double jump given back after a pull (and kept by a jump cancel), latching a one-way platform and landing on it, the pull to a solid ceiling, wall and ceiling spikes deflecting the hook without a latch, a pull or damage, the oriented hazard areas of wall and ceiling spikes, and the upward rebound after an enemy pull. Before that: the grappling hook. Its three aims (diagonal by default, Left / Right, Up; Down reserved), the pull to a wall and diagonally onto a pillar, normal movement afterwards, the hook coming back, misses at max range without a pull, refused anchors next to spikes, an undiscovered hidden pocket wall stopping the hook, the cancels (jump, a hit, a room reset), and on an enemy the standard attack damage, the pull toward it, the stop short of its contact hitbox and no contact damage. Before that: the two secret wall types. Type 1 hidden pockets: covered contents (shards and an enemy), one-way until found, found by walking through, permanently un-hidden, saved, and kept through room changes and save loads. The far-west pocket of the Testing Halls lies outside the normal room: the camera stays clamped until the player breaks through, then scrolls in, never past the tiles. Type 2 secret doorways: semi-transparent entry, an exit that matches the wall tile, no collision, back and forth twice, never consumed or saved. Also: GUIDELINES.md documents both types, and every room's camera limits stay within its tiles. Before that: illusion walls. Before that: the Stasis Field's doubled cost; the Meteor Slam ground hop (it rises first, is vulnerable during the hop, a hit cancels the slam, then the invulnerable dive slams); camera look up / down (a tap does nothing, a hold pans, moving snaps back, never outside the room); and the physical upward transition (the player emerges at the threshold inside the floor gap, climbs out, arcs over the floor without drifting back, lands beside the gap, either side at random, not invulnerable). Before that: the three damage sources (spikes hurt through post-hit i-frames, dash invulnerability and the Meteor Slam dive; i-frames still block enemy contact and projectiles; God Mode still blocks hazards), the Repulse Aegis parry (no wind-up, a short window, a mistimed cast does not protect, only an enemy at the player's skin triggers it, projectiles are never blocked) and the Stasis Field as a short-range, short emergency freeze. Before that: the four new spells (Repulse Aegis consumes all energy, negates a contact or projectile hit and strikes back ×1.5; Stasis Field freezes enemies and projectiles in range, harmless while frozen, and wears off; Radiant Lance fires forward or up and damages; Meteor Slam dives with i-frames, lands, grants landing i-frames and damages), the slot capacity (fewer slots, more slots up to 8, keys past the limit do nothing, saved per slot) and the debug overlay's spell controls (known checkboxes, capacity slider). Before that: no celebrations anywhere (no victory/secret/relic sounds or celebration effects exist; an arena clear only plays the gate clunk). Before that: the room-design rules from GUIDELINES.md (A: landing ground at every point of a downward exit; B: upward exits place you beside the gap, either side at random; C: the secret wall breaks and its exit opens during an active arena). Before that: seamless exits (no fade, sound or marker; speed kept), the ceiling gap to the Upper Galleries and back, its standard enemies, the secret wall sitting in the outer wall and blocking until broken, and a quiet boss defeat (no fanfare, effect or freeze). Earlier: menu focus wrap-around (first and last buttons reachable), "New Game" slot text, no Inventory in the pause menu, the trance after saving, sounds as AudioStreamPlayer nodes, effects as scenes that free themselves, enemy spawn/roar/dissolve clips, the HUD showing bound hotkeys, arena-only short spawn telegraphs, a single checkpoint tablet, no text pop-ups and instant door transitions. From the previous version: the death animation and trance, respawn reviving weak and strong enemies with 0 energy, dead and spawning enemies being harmless, spawns kept away from the player, the off-centre pogo, the boss roar and dissolve, the arena victory feedback, the Proving Grounds arena, the secret wall and relic, all 5 save slots (write, read, load), the pause menu, settings, and the title screen with both keyboard and mouse. The test writes to `user://test_saves` only. Also covered: sealed room borders and camera limits, the heal-ready glow, both door transitions, the weak/strong/boss respawn rules, survivors healing on re-entry, boss tracking and aiming (facing, charge, leap, volley, phase 2), a full arena run that stays cleared, arena reset on death, chunk healing, explicit saving, the keyboard loadout flow and the earlier movement and combat rules. Exit code 0 means everything passed.

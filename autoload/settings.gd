@@ -6,14 +6,12 @@ extends Node
 ## Actions whose main keyboard key can be rebound in the settings menu.
 const REBINDABLE: Array[String] = [
 	"move_left", "move_right", "move_up", "move_down",
-	"jump", "attack", "dash", "heal", "grapple", "interact",
-	"ult_1", "ult_2", "ult_3", "ult_4", "ult_5", "ult_6", "ult_7", "ult_8", "inventory", "pause",
+	"jump", "attack", "dash", "heal", "grapple", "spell", "interact", "inventory", "pause",
 ]
 const LABELS := {
 	"move_left": "Move left", "move_right": "Move right", "move_up": "Aim up", "move_down": "Aim down",
 	"jump": "Jump", "attack": "Attack", "dash": "Dash", "heal": "Heal", "grapple": "Grapple", "interact": "Interact / Save",
-	"ult_1": "Ultimate 1", "ult_2": "Ultimate 2", "ult_3": "Ultimate 3", "ult_4": "Ultimate 4",
-	"ult_5": "Ultimate 5", "ult_6": "Ultimate 6", "ult_7": "Ultimate 7", "ult_8": "Ultimate 8",
+	"spell": "Spell (+ direction)",
 	"inventory": "Inventory", "pause": "Pause",
 }
 
