@@ -3,46 +3,54 @@ extends Node2D
 ## Grappling hook. Owned and stepped by CombatManager (after the player moves).
 ##
 ## Aiming (resolve_aim / aim_vector), read when the hook fires:
-##   no direction held   45 degrees up, toward the facing side
-##   Left or Right held  straight out to that side
-##   Up held             straight up (wins over Left / Right, like attacks)
-##   Down                RESERVED for a future modifier: Aim.DOWN exists, but
-##                       no input selects it yet; holding Down fires the default.
+##   no direction held    straight out, toward the facing side      -> pull
+##   Left or Right held   straight out to that side (turns you)     -> pull
+##   Up held              straight up (wins over everything else)   -> pull
+##   Down held, AIRBORNE  45 degrees up toward the facing side (or  -> swing
+##                        the held side)
+##   Down on the ground   no swing: like no direction (straight out)
 ##
 ## Phases (the player is in the "grapple" state, player/states/grapple_state.gd,
 ## from the throw until the hook lets go):
 ##   idle     nothing out; `cooldown` runs
 ##   fly      the tip travels up to Config.grapple.max_range. The player
-##            hangs still in the air meanwhile (no gravity), so they do not
-##            drop and snag on walls before the pull
-##   pull     the hook holds; the state pulls the player to stop_point()
+##            hangs still in the air meanwhile (no gravity)
+##   pull     latched (pull mode): the state pulls the player to stop_point()
+##   swing    latched (swing mode): the state swings the player on a rope of
+##            fixed length around `anchor` (a pendulum). It lets go on jump /
+##            grapple / dash, on damage, on touching terrain, or when the rope
+##            crosses an enemy or a hazard (rope_obstructed)
 ##   retract  the tip flies back to the player, then idle
 ##
 ## What the hook can hit (physics layers, see project.godot):
 ##   terrain  TERRAIN_MASK = layers 1 "world" (solid tiles, breakable walls,
-##            closed arena gates) and 3 "one_way" (platforms). It latches and
-##            pulls the player there. On a one-way platform the pull ends
-##            standing ON the platform. An undiscovered hidden pocket wall
-##            counts as terrain too, so the hook never reaches into a covered
-##            pocket (GUIDELINES.md, Type 1).
+##            closed arena gates) and 3 "one_way" (platforms). Three parallel
+##            rays (the path and Config.grapple.hook_radius to each side) make
+##            the hook forgiving. On a one-way platform a pull ends standing ON
+##            it. An undiscovered hidden pocket wall counts as terrain too, so
+##            the hook never reaches into a covered pocket (GUIDELINES.md, Type 1).
 ##   enemies  layer 4 is NOT in the mask. Like every attack, enemies are hit
-##            through CombatManager's enemy list (hitbox_active()). A hooked
-##            enemy takes the standard attack damage, then the player is
-##            pulled toward it, stops Config.grapple.enemy_safe_margin short
-##            of its contact hitbox and rebounds upward, like a pogo.
+##            through CombatManager's enemy list (hitbox_active()), with the
+##            same forgiving radius. A hooked enemy is NOT hurt on contact:
+##            the player is pulled toward it, stops
+##            Config.grapple.enemy_safe_margin short of its contact hitbox,
+##            rebounds upward (nearly a pogo) and only THEN strikes it for the
+##            standard attack damage (strike_enemy). A pull that is cancelled
+##            on the way deals no damage. In swing mode an enemy hit is a pull.
 ##   hazards  spikes on floors, walls and ceilings (tiles with the "hazard"
-##            flag; they have no collision). The flight path is checked
-##            against their areas: the hook is deflected and comes back. It
-##            never latches on or next to a hazard (anchor_is_safe).
+##            flag; they have no collision). The path is checked against their
+##            areas with a thin tip (Config.grapple.hazard_radius): the hook is
+##            deflected and comes back. It never latches on or next to a
+##            hazard (anchor_is_safe).
 ##   ignored  the hidden-wall layers (5, 6).
 ##
 ## Outcomes are reported through Events (grapple_fired, grapple_latched,
-## grapple_deflected, grapple_released, grapple_bounced, hit_landed);
-## Feedback plays the sounds and effects.
+## grapple_deflected, grapple_released, grapple_bounced, grapple_swing_ended,
+## hit_landed); Feedback plays the sounds and effects.
 ## Art: replace Rope (Line2D) and Tip/Visual; the AnimationPlayer clips are
 ## "fly", "latch" and "retract".
 
-enum Aim { DIAGONAL, HORIZONTAL, UP, DOWN }
+enum Aim { HORIZONTAL, UP, SWING }
 
 const WORLD_LAYER := 1
 const ONE_WAY_LAYER := 3
@@ -55,6 +63,7 @@ const HAND_OFFSET := Vector2(0.0, -4.0) ## Rope start, from the player's center.
 
 var combat: CombatManager
 var phase := "idle"
+var swing_mode := false ## Fired as a swing (Down in the air): latching starts a pendulum.
 var tip := Vector2.ZERO ## Hook position (global).
 var dir := Vector2.RIGHT ## Flight direction.
 var travelled := 0.0
@@ -97,26 +106,33 @@ func is_pulling() -> bool:
 	return phase == "pull"
 
 
+func is_swinging() -> bool:
+	return phase == "swing"
+
+
+func is_latched() -> bool:
+	return phase == "pull" or phase == "swing"
+
+
 # ---------- Aiming ----------
 
-static func resolve_aim(axis_x: int, axis_y: int) -> Aim:
+static func resolve_aim(axis_x: int, axis_y: int, airborne: bool) -> Aim:
 	if axis_y < 0:
 		return Aim.UP
-	# Reserved: `if axis_y > 0: return Aim.DOWN` once the down modifier is designed.
-	if axis_x != 0:
-		return Aim.HORIZONTAL
-	return Aim.DIAGONAL
+	if axis_y > 0 and airborne:
+		return Aim.SWING
+	return Aim.HORIZONTAL
 
 
 static func aim_vector(aim: Aim, axis_x: int, facing: int) -> Vector2:
+	var side := signf(axis_x) if axis_x != 0 else float(facing)
 	match aim:
 		Aim.UP:
 			return Vector2.UP
-		Aim.HORIZONTAL:
-			return Vector2(signf(axis_x), 0.0)
-		# Aim.DOWN: reserved, never selected yet (falls through to the default).
+		Aim.SWING:
+			return Vector2(side, -1.0).normalized()
 		_:
-			return Vector2(facing, -1.0).normalized()
+			return Vector2(side, 0.0)
 
 
 # ---------- Per-step update ----------
@@ -150,10 +166,11 @@ func step(delta: float) -> void:
 
 func fire(p: Player) -> void:
 	var ix := p.input.axis_x()
-	var aim := resolve_aim(ix, p.input.axis_y())
+	var aim := resolve_aim(ix, p.input.axis_y(), not p.grounded)
 	dir = aim_vector(aim, ix, p.facing)
-	if aim == Aim.HORIZONTAL:
+	if ix != 0 and aim != Aim.UP:
 		p.facing = ix
+	swing_mode = aim == Aim.SWING
 	tip = rope_origin(p)
 	travelled = 0.0
 	target_enemy = null
@@ -175,22 +192,22 @@ func _step_fly(delta: float, p: Player) -> void:
 	var from := tip
 	var r: float = g.hook_radius
 
-	# Terrain: physics ray on the world and one-way layers only.
-	var terrain_d := INF
-	var query := PhysicsRayQueryParameters2D.create(from, from + dir * dist, TERRAIN_MASK, [p.get_rid()])
-	query.hit_from_inside = true
-	var hit := get_world_2d().direct_space_state.intersect_ray(query)
-	if not hit.is_empty():
-		terrain_d = from.distance_to(hit.position)
+	# Terrain: three parallel rays on the world and one-way layers.
+	var terrain := _cast_terrain(from, dist, r, p)
+	var terrain_d: float = terrain.distance
 	for wall in combat.game.hidden_pockets:
 		if not wall.discovered:
-			terrain_d = minf(terrain_d, Geom.box_cast_distance(from, Vector2.ZERO, dir, wall.get_rect()))
+			var d := Geom.box_cast_distance(from, Vector2(r, r), dir, wall.get_rect())
+			if d < terrain_d:
+				terrain_d = d
+				terrain.point = from + dir * d
 
-	# Hazards: their areas, along the path.
+	# Hazards: their areas, along the path, with a thin tip.
 	var hazard_d := INF
-	var path := Rect2(from, Vector2.ZERO).expand(from + dir * dist).grow(r)
+	var hr: float = g.hazard_radius
+	var path := Rect2(from, Vector2.ZERO).expand(from + dir * dist).grow(hr)
 	for h in combat.get_room().hazards_in(path):
-		hazard_d = minf(hazard_d, Geom.box_cast_distance(from, Vector2(r, r), dir, h))
+		hazard_d = minf(hazard_d, Geom.box_cast_distance(from, Vector2(hr, hr), dir, h))
 
 	# Enemies: the first living hitbox along the path.
 	var enemy: Enemy = null
@@ -216,7 +233,31 @@ func _step_fly(delta: float, p: Player) -> void:
 	elif enemy and enemy_d <= first:
 		_hook_enemy(enemy, p)
 	else:
+		tip = terrain.point # The surface point (a side ray may have caught it).
 		_hook_terrain(p)
+
+
+## The nearest terrain hit of three parallel rays: the path itself and one
+## ray `r` to each side. Returns {distance (along the path), point}.
+## A side ray that starts inside solid (the player hugging a wall) is skipped,
+## so it never latches on the wall the player stands against.
+func _cast_terrain(from: Vector2, dist: float, r: float, p: Player) -> Dictionary:
+	var best := {"distance": INF, "point": from}
+	var space := get_world_2d().direct_space_state
+	var side := dir.orthogonal() * r
+	for offset in [Vector2.ZERO, side, -side]:
+		var start: Vector2 = from + offset
+		if offset != Vector2.ZERO and combat.get_room().is_solid_at(start):
+			continue
+		var query := PhysicsRayQueryParameters2D.create(start, start + dir * dist, TERRAIN_MASK, [p.get_rid()])
+		query.hit_from_inside = offset == Vector2.ZERO
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			continue
+		var d: float = (hit.position - start).dot(dir)
+		if d < best.distance:
+			best = {"distance": d, "point": hit.position}
+	return best
 
 
 ## The hook touched a hazard: no latch, it bounces off and comes back.
@@ -239,35 +280,45 @@ func _hook_terrain(p: Player) -> void:
 	anchor_one_way = room.is_one_way_at(inside)
 	if anchor_one_way:
 		platform_top = room.cell_rect_at(inside).position.y
-	_start_pull(false)
+	_latch(false)
 
 
-## Standard attack damage (with the player's damage modifiers), then a pull
-## that stops short of the enemy's contact hitbox and ends in a rebound.
-## A killed enemy means no pull.
+## No damage yet: the player is pulled toward the enemy first. The hit lands
+## when the pull arrives and the player rebounds (strike_enemy).
 func _hook_enemy(enemy: Enemy, p: Player) -> void:
-	var c = Config.combat
 	anchor = tip
-	combat.apply_damage(enemy, {
-		"damage": c.attack_damage * p.stat("damage_mul"),
-		"direction": Vector2(dir.x if dir.x != 0.0 else signf(enemy.get_center().x - p.get_center().x), dir.y * 0.5),
-		"knockback": c.enemy_knockback * Config.grapple.enemy_knockback_mul,
-		"source": "grapple",
-		"strength": 0.8,
-		"position": anchor,
-	})
-	if not enemy.hitbox_active() or not p.fsm.is_in("grapple"):
+	if not p.fsm.is_in("grapple"):
 		release()
 		return
 	target_enemy = enemy
 	_enemy_offset = anchor - enemy.global_position
-	_start_pull(true)
+	swing_mode = false # Enemies are never swing anchors.
+	_latch(true)
 
 
-func _start_pull(on_enemy_hit: bool) -> void:
-	phase = "pull"
+func _latch(on_enemy_hit: bool) -> void:
+	phase = "swing" if swing_mode else "pull"
 	_play("latch")
 	Events.grapple_latched.emit(anchor, on_enemy_hit)
+
+
+## The delayed enemy hit, called by GrappleState when the pull arrives and
+## the player rebounds: the standard attack damage (with the player's damage
+## modifiers). Returns the damage dealt (0 when the enemy is gone).
+func strike_enemy(p: Player) -> float:
+	var enemy := target_enemy
+	if not is_instance_valid(enemy) or not enemy.hitbox_active():
+		return 0.0
+	var c = Config.combat
+	var away := signf(enemy.get_center().x - p.get_center().x)
+	return combat.apply_damage(enemy, {
+		"damage": c.attack_damage * p.stat("damage_mul"),
+		"direction": Vector2(away if away != 0.0 else float(p.facing), 0.0),
+		"knockback": c.enemy_knockback * Config.grapple.enemy_knockback_mul,
+		"source": "grapple",
+		"strength": 0.8,
+		"position": enemy.get_center(),
+	})
 
 
 ## Lets go: the tip flies back to the player.
@@ -282,7 +333,7 @@ func release() -> void:
 
 ## Called by GrappleState.exit(): however the state ended, the hook comes back.
 func on_state_ended() -> void:
-	if phase == "fly" or phase == "pull":
+	if phase == "fly" or is_latched():
 		release()
 
 
@@ -298,9 +349,9 @@ func _step_retract(delta: float, p: Player) -> void:
 	tip += to.normalized() * dist
 
 
-# ---------- Pull targets (read by GrappleState) ----------
+# ---------- Targets and rope checks (read by GrappleState) ----------
 
-## Where the player's CENTER should stop:
+## Where the player's CENTER should stop in a pull:
 ##   wall / ceiling   where the player's box first touches the anchor
 ##   one-way platform standing on the platform, above the anchor
 ##   enemy            where the box touches the enemy's contact hitbox grown
@@ -333,6 +384,28 @@ func on_enemy() -> bool:
 	return target_enemy != null
 
 
+## True when the hooked enemy can still be struck.
+func enemy_alive() -> bool:
+	return is_instance_valid(target_enemy) and target_enemy.hitbox_active()
+
+
+## True when the rope from `from` to `to` crosses a living enemy or a hazard.
+## A swing lets go at once when it does.
+func rope_obstructed(from: Vector2, to: Vector2) -> bool:
+	var seg := to - from
+	var length := seg.length()
+	if length < 0.001:
+		return false
+	var d := seg / length
+	for e in combat.get_enemies():
+		if e.hitbox_active() and Geom.box_cast_distance(from, Vector2.ZERO, d, e.get_rect()) <= length:
+			return true
+	for h in combat.get_room().hazards_in(Rect2(from, Vector2.ZERO).expand(to).grow(1.0)):
+		if Geom.box_cast_distance(from, Vector2.ZERO, d, h) <= length:
+			return true
+	return false
+
+
 ## False when the anchor touches a hazard (spikes): the hook does not hold
 ## there, so it never drags the player into one.
 func anchor_is_safe(point: Vector2) -> bool:
@@ -355,7 +428,7 @@ func _update_visual() -> void:
 	if not visible or combat == null:
 		return
 	var from := rope_origin(combat.get_player())
-	var at := anchor if phase == "pull" else tip
+	var at := anchor if is_latched() else tip
 	rope.points = PackedVector2Array([to_local(from), to_local(at)])
 	tip_node.position = to_local(at)
 	var along := at - from

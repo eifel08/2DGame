@@ -1,30 +1,43 @@
 class_name GrappleState
 extends PlayerState
-## The grappling hook (combat/grapple_hook.gd) is out. Two parts:
+## The grappling hook (combat/grapple_hook.gd) is out. Three parts:
 ##
-##   hold  while the hook flies: the player hangs still in the air (no
-##         gravity, horizontal speed fades), so they never drop and snag on a
-##         wall before the pull. On the ground they simply stand. A miss or a
-##         deflection off a hazard ends the hold.
-##   pull  once the hook latches: gravity stays off, the speed eases up to
-##         Config.grapple.pull_speed, and each step is clamped so the player
-##         never passes the hook's stop point. On an enemy that point keeps a
-##         safety gap to its contact hitbox; arriving there rebounds the
-##         player upward and a little away, like a pogo.
+##   hold   while the hook flies: the player hangs still in the air (no
+##          gravity, horizontal speed fades), so they never drop and snag on
+##          a wall first. On the ground they simply stand. A miss or a
+##          deflection off a hazard ends the hold.
+##   pull   the hook latched in pull mode: gravity stays off, the speed eases
+##          up to Config.grapple.pull_speed, and each step is clamped so the
+##          player never passes the hook's stop point. On an enemy that point
+##          keeps a safety gap to its contact hitbox; arriving there rebounds
+##          the player upward (nearly a pogo) and only then strikes the enemy.
+##   swing  the hook latched in swing mode (Down in the air): a pendulum.
+##          The rope keeps its length from the latch; gravity alone drives the
+##          arc (no damping). It lets go at once on: jump (a fresh jump that
+##          keeps the swing's speed), grapple, dash, damage (any state change),
+##          touching terrain, or the rope crossing an enemy or a hazard.
+##          Letting go keeps the swing's momentum.
 ##
-## Back to "normal" when the stop point is reached, the path is blocked, the
-## hooked enemy is gone, the time runs out, or the player cancels: grapple
-## again (lets go), dash, or jump (a fresh jump during a pull).
-## A latched pull refreshes the double jump when it ends, however it ends.
+## Back to "normal" afterwards. A pull ends when the stop point is reached,
+## the path is blocked, the hooked enemy is gone, the time runs out, or the
+## player cancels: grapple again (lets go), dash, or jump (a fresh jump).
+## Any latched hook refreshes the double jump when it ends, however it ends.
 ## Not invulnerable: a hit switches to "hurt" like in any other state.
 
 const STALL_FRAMES := 3 ## Steps in a row with almost no progress = blocked.
+const MIN_ROPE := 8.0 ## Shortest swing rope.
 
 var hook: GrappleHook
-var latched := false ## The hook held, so the pull has started.
+var latched := false ## The hook held, so the pull or swing has started.
 var speed := 0.0
 var time := 0.0
 var stall := 0
+# Pendulum: angle from straight down (positive = right of the anchor),
+# angular speed, and rope length (anchor to the player's center).
+var angle := 0.0
+var omega := 0.0
+var rope_length := 0.0
+var swing_end_reason := "" ## Why the last swing let go (tests, debug).
 
 
 func enter(params: Dictionary) -> void:
@@ -43,6 +56,10 @@ func step(delta: float) -> void:
 		if not latched:
 			_begin_pull()
 		_step_pull(delta)
+	elif hook.is_swinging():
+		if not latched:
+			_begin_swing()
+		_step_swing(delta)
 	elif hook.is_flying():
 		_step_hold(delta)
 	else:
@@ -66,7 +83,7 @@ func _step_hold(delta: float) -> void:
 	p.move(delta)
 
 
-# ---------- Pull (hook latched) ----------
+# ---------- Pull (hook latched, pull mode) ----------
 
 func _begin_pull() -> void:
 	latched = true
@@ -83,8 +100,7 @@ func _step_pull(delta: float) -> void:
 		return
 	if p.jump_buffer_timer > 0.0:
 		_settle()
-		p.fsm.change("normal") # exit() refreshes the double jump ...
-		p.jump(Config.movement.jump_velocity, "grapple") # ... so this jump is a free one.
+		_jump_off()
 		return
 	if not hook.is_pulling() or time >= g.pull_max_time:
 		_finish(false)
@@ -107,6 +123,97 @@ func _step_pull(delta: float) -> void:
 		_finish(false)
 
 
+## Back to normal movement. `arrived`: the pull reached its stop point.
+func _finish(arrived: bool) -> void:
+	var g = Config.grapple
+	if hook.on_enemy():
+		_settle()
+		if arrived and hook.enemy_alive():
+			_rebound()
+			hook.strike_enemy(p) # The delayed hit: only now, after the bounce.
+	elif arrived:
+		if hook.anchor_one_way:
+			p.velocity = Vector2.ZERO # Standing on the platform: land right away.
+		else:
+			p.velocity = p.velocity.normalized() * speed * g.exit_speed_mul
+	p.fsm.change("normal")
+
+
+## Reached the enemy's safe distance: bounce up (nearly a full pogo) and a
+## little away from it.
+func _rebound() -> void:
+	var g = Config.grapple
+	var enemy := hook.target_enemy
+	var away := -signf(enemy.get_center().x - p.get_center().x)
+	if away == 0.0:
+		away = -p.facing
+	p.velocity = Vector2(away * g.enemy_bounce_recoil, -Config.combat.pogo_velocity * g.enemy_bounce_mul)
+	p.grounded = false
+	p.is_jumping = false # Fixed height, like the pogo.
+	Events.grapple_bounced.emit(p.global_position + Vector2(0, -Player.HEIGHT))
+
+
+## A pull toward an enemy never leaves momentum toward it, so the player
+## does not drift into its contact hitbox after the pull.
+func _settle() -> void:
+	if latched and hook.on_enemy():
+		p.velocity = Vector2.ZERO
+
+
+# ---------- Swing (hook latched, swing mode) ----------
+
+func _begin_swing() -> void:
+	latched = true
+	var offset := p.get_center() - hook.anchor
+	rope_length = maxf(offset.length(), MIN_ROPE)
+	angle = atan2(offset.x, offset.y)
+	omega = p.velocity.dot(_tangent()) / rope_length
+	swing_end_reason = ""
+
+
+## Direction of motion for a positive angular speed.
+func _tangent() -> Vector2:
+	return Vector2(cos(angle), -sin(angle))
+
+
+func _step_swing(delta: float) -> void:
+	if p.input.was_pressed(&"grapple") or p.input.was_pressed(&"dash") or p.jump_buffer_timer > 0.0:
+		_release_swing("input")
+		return
+	# Pendulum: gravity is the only force (no air resistance).
+	omega += -(Config.movement.gravity / rope_length) * sin(angle) * delta
+	angle += omega * delta
+	var target := hook.anchor + Vector2(sin(angle), cos(angle)) * rope_length
+	p.velocity = (target - p.get_center()) / delta
+	if absf(p.velocity.x) > 1.0:
+		p.facing = int(signf(p.velocity.x))
+	p.move(delta)
+	if p.get_slide_collision_count() > 0:
+		_release_swing("terrain")
+	elif hook.rope_obstructed(hook.rope_origin(p), hook.anchor):
+		_release_swing("obstructed")
+
+
+## Lets go of the swing, keeping its momentum. Jump: a fresh jump on top.
+## Grapple lets go; dash lets go into a dash.
+func _release_swing(reason: String) -> void:
+	swing_end_reason = reason
+	Events.grapple_swing_ended.emit(reason)
+	p.velocity = _tangent() * omega * rope_length
+	if reason == "input":
+		if p.input.was_pressed(&"grapple"):
+			p.input.consume(&"grapple") # Lets go; does not fire a new hook this step.
+		elif p.jump_buffer_timer > 0.0:
+			_jump_off()
+			return
+		elif Config.upgrades.dash and p.input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
+			p.fsm.change("dash")
+			return
+	p.fsm.change("normal")
+
+
+# ---------- Shared ----------
+
 ## Grapple again (lets go) or dash. Returns true when the state was left.
 func _cancelled() -> bool:
 	if p.input.was_pressed(&"grapple"):
@@ -121,44 +228,17 @@ func _cancelled() -> bool:
 	return false
 
 
-## Back to normal movement. `arrived`: the pull reached its stop point.
-func _finish(arrived: bool) -> void:
-	var g = Config.grapple
-	if hook.on_enemy():
-		_settle()
-		if arrived:
-			_rebound()
-	elif arrived:
-		if hook.anchor_one_way:
-			p.velocity = Vector2.ZERO # Standing on the platform: land right away.
-		else:
-			p.velocity = p.velocity.normalized() * speed * g.exit_speed_mul
+## Leaves a latched hook with a fresh jump. exit() refreshes the double jump
+## first, so this jump is a free one.
+func _jump_off() -> void:
 	p.fsm.change("normal")
-
-
-## Reached the enemy's safe distance: bounce up and a little away, like a pogo.
-func _rebound() -> void:
-	var g = Config.grapple
-	var enemy := hook.target_enemy
-	var away := -1.0
-	if is_instance_valid(enemy):
-		away = -signf(enemy.get_center().x - p.get_center().x)
-	if away == 0.0:
-		away = -p.facing
-	p.velocity = Vector2(away * g.enemy_bounce_recoil, -g.enemy_bounce_velocity)
-	p.grounded = false
-	p.is_jumping = false # Fixed height, like the pogo.
-	Events.grapple_bounced.emit(p.global_position + Vector2(0, -Player.HEIGHT))
-
-
-## A pull toward an enemy never leaves momentum toward it, so the player
-## does not drift into its contact hitbox after the pull.
-func _settle() -> void:
-	if latched and hook.on_enemy():
-		p.velocity = Vector2.ZERO
+	p.jump(Config.movement.jump_velocity, "grapple")
 
 
 func exit() -> void:
+	if hook and hook.is_swinging() and swing_end_reason == "":
+		swing_end_reason = "interrupted" # Damage, a hazard, a reset: any other state change.
+		Events.grapple_swing_ended.emit(swing_end_reason)
 	if latched:
 		p.air_jumps_used = 0 # Using the hook refreshes the double jump.
 	var finished := hook

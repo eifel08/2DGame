@@ -23,6 +23,8 @@ signal grapple_released(position: Vector2) ## The hook lets go (missed, refused 
 signal grapple_deflected(position: Vector2) ## The hook touched a hazard: it never latches there.
 @warning_ignore("unused_signal")
 signal grapple_bounced(position: Vector2) ## An enemy pull ended in the upward rebound.
+@warning_ignore("unused_signal")
+signal grapple_swing_ended(reason: String) ## "input", "terrain", "obstructed" or "interrupted" (damage, hazard, reset).
 
 # Player
 @warning_ignore("unused_signal")

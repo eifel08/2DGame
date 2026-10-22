@@ -75,7 +75,12 @@ class Grapple:
 	var max_range := 256.0 ## How far the hook flies before it comes back (8 tiles: short and precise).
 	var hook_speed := 1500.0 ## Flight speed of the hook tip.
 	var retract_speed := 2400.0 ## Speed of the tip coming back after a miss or a pull.
-	var hook_radius := 5.0 ## Size of the tip when it checks for enemies.
+	## Forgiving tip: it catches surfaces and enemies this far beside its
+	## path (three parallel rays for terrain, a box this wide for enemies).
+	var hook_radius := 12.0
+	## Hazards are checked with a thin tip, so the forgiving radius never
+	## makes a hazard easier to hit.
+	var hazard_radius := 3.0
 	var pull_speed := 880.0 ## Top speed while being pulled.
 	var pull_accel := 5200.0 ## Ease-in toward pull_speed, so the pull starts smoothly.
 	var pull_max_time := 0.9 ## Safety net: a pull never lasts longer.
@@ -85,8 +90,9 @@ class Grapple:
 	## a pull, so a hooked enemy is never touched (no contact damage).
 	var enemy_safe_margin := 18.0
 	var enemy_knockback_mul := 0.5 ## Knockback on a hooked enemy, relative to melee.
-	## Rebound at the end of an enemy pull, like a pogo: up, and a little away.
-	var enemy_bounce_velocity := 560.0
+	## Rebound at the end of an enemy pull: nearly a full pogo bounce
+	## (share of Config.combat.pogo_velocity), and a little away.
+	var enemy_bounce_mul := 0.95
 	var enemy_bounce_recoil := 120.0
 	var cooldown := 0.3 ## After the hook is back, before it can fire again.
 	var buffer_time := 0.1 ## A press slightly before the hook is ready still fires.
