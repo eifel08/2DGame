@@ -8,6 +8,7 @@ class Upgrades:
 	var double_jump := true
 	var dash := true
 	var wall_jump := true
+	var grapple := true
 	var god_mode := false
 
 
@@ -69,6 +70,25 @@ class Combat:
 	var hazard_to_safe_ground := true
 
 
+## Grappling hook (combat/grapple_hook.gd, player/states/grapple_state.gd).
+class Grapple:
+	var max_range := 384.0 ## How far the hook flies before it comes back.
+	var hook_speed := 1500.0 ## Flight speed of the hook tip.
+	var retract_speed := 2400.0 ## Speed of the tip coming back after a miss or a pull.
+	var hook_radius := 5.0 ## Size of the tip when it checks for enemies.
+	var pull_speed := 880.0 ## Top speed while being pulled.
+	var pull_accel := 5200.0 ## Ease-in toward pull_speed, so the pull starts smoothly.
+	var pull_max_time := 0.9 ## Safety net: a pull never lasts longer.
+	var arrive_distance := 4.0 ## Closer than this to the stop point ends the pull.
+	var exit_speed_mul := 0.35 ## Share of the pull speed kept after a pull to terrain.
+	## Gap kept between the player and an enemy's contact hitbox at the end of
+	## a pull, so a hooked enemy is never touched (no contact damage).
+	var enemy_safe_margin := 18.0
+	var enemy_knockback_mul := 0.5 ## Knockback on a hooked enemy, relative to melee.
+	var cooldown := 0.3 ## After the hook is back, before it can fire again.
+	var buffer_time := 0.1 ## A press slightly before the hook is ready still fires.
+
+
 class Vitals:
 	var max_health := 100.0
 	var max_energy := 100.0
@@ -103,6 +123,7 @@ class DebugFlags:
 var upgrades: Upgrades
 var movement: Movement
 var combat: Combat
+var grapple: Grapple
 var vitals: Vitals
 var debug: DebugFlags
 var camera: CameraCfg
@@ -118,6 +139,7 @@ func restore_defaults() -> void:
 	upgrades = Upgrades.new()
 	movement = Movement.new()
 	combat = Combat.new()
+	grapple = Grapple.new()
 	vitals = Vitals.new()
 	debug = DebugFlags.new()
 	camera = CameraCfg.new()

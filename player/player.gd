@@ -9,6 +9,7 @@ extends CharacterBody2D
 ##   ability - movement handed to an ability (e.g. Comet Dash)
 ##   hurt    - short knockback stun after taking damage
 ##   eject   - carried up out of a floor gap after an upward room transition
+##   grapple - pulled toward the grappling hook's anchor (combat/grapple_hook.gd)
 ##
 ## The node origin is at the feet (bottom-center). Game calls step() from
 ## its own fixed-step loop, so hitstop can freeze everything in one place.
@@ -66,6 +67,7 @@ func _ready() -> void:
 	fsm.add("trance", TranceState.new(self))
 	fsm.add("dying", DyingState.new(self))
 	fsm.add("eject", EjectState.new(self))
+	fsm.add("grapple", GrappleState.new(self))
 	health.energy_gain_source = func() -> float: return stat("energy_gain_mul")
 	animator.setup(self)
 

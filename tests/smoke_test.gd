@@ -253,6 +253,9 @@ func _run() -> void:
 	# --- Meteor Slam ground hop, Stasis cost, camera look up / down ---
 	await _test_slam_hop_and_look()
 
+	# --- Grappling hook: aiming, terrain pull, enemy damage + safe stop, cancels ---
+	await _test_grapple()
+
 	# --- Secret walls: Type 1 hidden pockets (incl. camera limits), Type 2 secret doorways ---
 	await _test_secret_walls()
 
@@ -2038,6 +2041,207 @@ func _test_damage_sources(pit_left: float) -> void:
 
 
 ## Puts an ability in slot 1 (ignoring the checkpoint rule) and presses its key.
+func _test_grapple() -> void:
+	var p: Player = game.player
+	var hook: GrappleHook = game.combat.grapple
+	var g = Config.grapple
+	var aim := func(ax: int, ay: int, facing: int) -> Vector2:
+		return GrappleHook.aim_vector(GrappleHook.resolve_aim(ax, ay), ax, facing)
+	_check("grapple: no direction fires 45 degrees up toward the facing side",
+		aim.call(0, 0, 1).is_equal_approx(Vector2(1, -1).normalized()) and aim.call(0, 0, -1).is_equal_approx(Vector2(-1, -1).normalized()))
+	_check("grapple: Left / Right fire straight out to that side",
+		aim.call(1, 0, -1) == Vector2.RIGHT and aim.call(-1, 0, 1) == Vector2.LEFT)
+	_check("grapple: Up fires straight up (also with Left / Right held)", aim.call(0, -1, 1) == Vector2.UP and aim.call(1, -1, 1) == Vector2.UP)
+	_check("grapple: Down is reserved (fires the default for now)", aim.call(0, 1, 1).is_equal_approx(Vector2(1, -1).normalized()))
+	var god: bool = Config.upgrades.god_mode
+	Config.upgrades.god_mode = false
+
+	# Horizontal: hook the shaft's left wall and get pulled to it.
+	await _reset()
+	p.global_position = Vector2(150, 420)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	var latches := [0]
+	var on_latch := func(_a: Vector2, _e: bool) -> void: latches[0] += 1
+	Events.grapple_latched.connect(on_latch)
+	Input.action_press(&"move_left")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_left")
+	_check("grapple: Left held fires the hook left and turns the player", hook.dir == Vector2.LEFT and p.facing == -1, [hook.dir, p.facing])
+	var pulled := false
+	var min_x := p.global_position.x
+	for i in 45:
+		await _frames(1)
+		pulled = pulled or p.state_name() == "grapple"
+		min_x = minf(min_x, p.global_position.x)
+	_check("grapple: the hook latches on a wall and pulls the player", pulled and latches[0] == 1, [pulled, latches[0]])
+	_check("grapple: the pull reaches the wall", min_x <= 32.0 + Player.WIDTH / 2.0 + g.arrive_distance + 1.0, min_x)
+	_check("grapple: normal movement resumes after the pull", p.state_name() == "normal", p.state_name())
+	await _frames(15)
+	_check("grapple: the hook comes back and cools down", hook.is_idle(), hook.phase)
+
+	# Up: straight up through a one-way platform to the ceiling.
+	await _reset()
+	p.global_position = Vector2(100, 380)
+	p.velocity = Vector2.ZERO
+	Input.action_press(&"move_up")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_up")
+	_check("grapple: Up held fires straight up", hook.dir == Vector2.UP, hook.dir)
+	var min_top := p.get_rect().position.y
+	for i in 75: # The player falls while the hook flies, so this pull is long.
+		await _frames(1)
+		min_top = minf(min_top, p.get_rect().position.y)
+	_check("grapple: passes one-way platforms and pulls up to the ceiling", min_top <= 32.0 + g.arrive_distance + 1.0, min_top)
+
+	# Default: 45 degrees up toward the facing side, onto the pillar.
+	await _reset()
+	p.global_position = Vector2(100, 420)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	var start := p.global_position
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	_check("grapple: no direction fires diagonally up toward the facing side", hook.dir.is_equal_approx(Vector2(1, -1).normalized()), hook.dir)
+	var max_x := start.x
+	var min_y := start.y
+	for i in 45:
+		await _frames(1)
+		max_x = maxf(max_x, p.global_position.x)
+		min_y = minf(min_y, p.global_position.y)
+	_check("grapple: the diagonal pull moves up and forward", max_x > start.x + 60.0 and min_y < start.y - 60.0, [max_x, min_y])
+
+	# Cancels: jump (the jump happens), a hit (hurt state), a reset (room load).
+	await _reset()
+	p.global_position = Vector2(180, 420)
+	p.velocity = Vector2.ZERO
+	Input.action_press(&"move_left")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_left")
+	for i in 20:
+		if p.state_name() == "grapple":
+			break
+		await _frames(1)
+	await _frames(2)
+	_check("grapple: pulling (cancel setup)", p.state_name() == "grapple", p.state_name())
+	Input.action_press(&"jump")
+	await _frames(3)
+	Input.action_release(&"jump")
+	_check("grapple: jump cancels the pull and jumps", p.state_name() == "normal" and p.velocity.y < -300.0 and not hook.is_pulling(), [p.state_name(), p.velocity])
+	await _reset()
+	p.global_position = Vector2(180, 420)
+	p.velocity = Vector2.ZERO
+	Input.action_press(&"move_left")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_left")
+	for i in 20:
+		if p.state_name() == "grapple":
+			break
+		await _frames(1)
+	p.receive_hit(5.0, p.global_position.x + 10.0)
+	_check("grapple: a hit ends the pull (not invulnerable)", p.state_name() == "hurt" and not hook.is_pulling(), [p.state_name(), hook.phase])
+	await _reset()
+	p.global_position = Vector2(180, 420)
+	Input.action_press(&"move_left")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_left")
+	for i in 20:
+		if p.state_name() == "grapple":
+			break
+		await _frames(1)
+	game.combat.reset()
+	_check("grapple: a reset (room load) drops the hook at once", p.state_name() == "normal" and hook.is_idle(), [p.state_name(), hook.phase])
+
+	# Out of range: the hook flies back, no pull.
+	await _reset()
+	p.global_position = Vector2(600, 100)
+	p.velocity = Vector2.ZERO
+	latches[0] = 0
+	Input.action_press(&"move_right")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_right")
+	var far := 0.0
+	var any_pull := false
+	for i in 30:
+		far = maxf(far, hook.tip.distance_to(hook.rope_origin(p)))
+		any_pull = any_pull or p.state_name() == "grapple"
+		await _frames(1)
+	_check("grapple: a miss flies back at max range, without a pull", not any_pull and latches[0] == 0 and far <= g.max_range + 40.0 and hook.is_idle(),
+		[any_pull, latches[0], far, hook.phase])
+
+	# Hazards: an anchor touching spikes is refused; plain floor is fine.
+	_check("grapple: anchors next to spikes are refused", not hook.anchor_is_safe(Vector2(640, 736)) and hook.anchor_is_safe(Vector2(400, 704)))
+
+	# Hidden pocket (Type 1): the hook never reaches into an undiscovered pocket.
+	var west: HiddenPocketWall = null
+	for wall in game.hidden_pockets:
+		if wall.secret_id == "halls_west_alcove":
+			west = wall
+	if west and not west.discovered:
+		p.global_position = Vector2(150, 703)
+		p.velocity = Vector2.ZERO
+		await _frames(5)
+		Input.action_press(&"move_left")
+		Input.action_press(&"grapple")
+		await _frames(2)
+		Input.action_release(&"grapple")
+		Input.action_release(&"move_left")
+		var lowest_x := INF
+		for i in 30:
+			if hook.phase == "fly" or hook.phase == "pull":
+				lowest_x = minf(lowest_x, hook.tip.x)
+			await _frames(1)
+		_check("grapple: an undiscovered hidden pocket wall stops the hook like terrain", lowest_x >= west.get_rect().end.x - 1.0, lowest_x)
+	Events.grapple_latched.disconnect(on_latch)
+
+	# Enemy: standard attack damage, then a pull that stops short of contact.
+	await _reset()
+	var dummy: DummyEnemy = _first_enemy(false)
+	dummy.patrol = false
+	await _frames(20)
+	p.global_position = dummy.global_position + Vector2(-170, 0)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	await _frames(5)
+	var hp := dummy.health
+	var my_hp := p.health.health
+	var sources := []
+	var on_hit := func(info: Dictionary) -> void: sources.append(info.source)
+	Events.hit_landed.connect(on_hit)
+	Input.action_press(&"move_right")
+	Input.action_press(&"grapple")
+	await _frames(2)
+	Input.action_release(&"grapple")
+	Input.action_release(&"move_right")
+	var enemy_pull := false
+	var min_gap := INF
+	for i in 50:
+		await _frames(1)
+		enemy_pull = enemy_pull or (p.state_name() == "grapple" and hook.on_enemy())
+		min_gap = minf(min_gap, dummy.get_rect().position.x - p.get_rect().end.x)
+	Events.hit_landed.disconnect(on_hit)
+	_check("grapple: a hooked enemy takes the standard attack damage",
+		is_equal_approx(hp - dummy.health, Config.combat.attack_damage) and sources == ["grapple"], [hp - dummy.health, sources])
+	_check("grapple: the player is pulled toward the hooked enemy", enemy_pull)
+	_check("grapple: the pull stops short of the enemy's contact hitbox", min_gap >= g.enemy_safe_margin - 1.0, min_gap)
+	_check("grapple: no contact damage from the hooked enemy", is_equal_approx(p.health.health, my_hp) and p.state_name() == "normal",
+		[p.health.health, my_hp, p.state_name()])
+	Config.upgrades.god_mode = god
+
+
 func _cast_slot0(ability_id: String) -> void:
 	game.ultimates.equip(0, ability_id, true)
 	Input.action_press(&"ult_1")

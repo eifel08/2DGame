@@ -13,6 +13,12 @@ signal pogo_bounced(position: Vector2, on_hazard: bool)
 signal attack_swung(direction: String)
 @warning_ignore("unused_signal")
 signal enemy_killed(enemy: Node)
+@warning_ignore("unused_signal")
+signal grapple_fired(origin: Vector2, direction: Vector2)
+@warning_ignore("unused_signal")
+signal grapple_latched(anchor: Vector2, on_enemy: bool) ## The hook holds; the pull starts.
+@warning_ignore("unused_signal")
+signal grapple_released(position: Vector2) ## The hook lets go (missed, refused or pull over) and flies back.
 
 # Player
 @warning_ignore("unused_signal")

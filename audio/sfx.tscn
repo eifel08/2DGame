@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://autoload/sfx.gd" id="script"]
 [ext_resource type="AudioStream" path="res://audio/sfx/hit.wav" id="s1"]
@@ -13,6 +13,8 @@
 [ext_resource type="AudioStream" path="res://audio/sfx/boss_roar.wav" id="s10"]
 [ext_resource type="AudioStream" path="res://audio/sfx/ui_move.wav" id="s11"]
 [ext_resource type="AudioStream" path="res://audio/sfx/ui_confirm.wav" id="s12"]
+[ext_resource type="AudioStream" path="res://audio/sfx/grapple_fire.wav" id="s13"]
+[ext_resource type="AudioStream" path="res://audio/sfx/grapple_latch.wav" id="s14"]
 
 [node name="Sfx" type="Node"]
 script = ExtResource("script")
@@ -74,5 +76,15 @@ bus = &"SFX"
 
 [node name="ui_confirm" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("s12")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="grapple_fire" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s13")
+max_polyphony = 4
+bus = &"SFX"
+
+[node name="grapple_latch" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("s14")
 max_polyphony = 4
 bus = &"SFX"

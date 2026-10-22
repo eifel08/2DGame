@@ -301,6 +301,7 @@ const PLAYER_ANIMS := {
 	"fall": {"frames": 2, "fps": 8, "loop": true, "color": "#9fe0ff", "sx": 0.92, "sy": 1.06, "bob": 1.0},
 	"wall_slide": {"frames": 2, "fps": 6, "loop": true, "color": "#6fb8e0", "sx": 0.9, "sy": 1.04, "lean": -0.1},
 	"dash": {"frames": 3, "fps": 20, "loop": false, "color": "#ffffff", "sx": 1.45, "sy": 0.72, "lean": 0.25},
+	"grapple": {"frames": 2, "fps": 10, "loop": true, "color": "#e8dcb8", "sx": 0.9, "sy": 1.1, "lean": 0.15, "arm": [-1.2, -1.4]},
 	"attack_side": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 1.12, "sy": 0.94, "lean": 0.18, "arm": [-1.6, 0.9], "events": {1: "swing"}},
 	"attack_up": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 0.88, "sy": 1.12, "arm": [-0.3, -2.8], "events": {1: "swing"}},
 	"attack_down": {"frames": 4, "fps": 18, "loop": false, "color": "#ffe08a", "sx": 1.08, "sy": 0.9, "arm": [0.3, 2.8], "events": {1: "swing"}},
@@ -388,6 +389,7 @@ const FX := {
 	"volley_muzzle": [{"amount": 3, "color": "#ffffff", "speed": 120.0, "gravity": 0.0, "life": 0.2, "size": 3.0}],
 	"ascendant_ring": [{"ring": 120.0, "color": "#ffffff", "width": 8.0, "life": 0.5}],
 	"ascendant_spark": [{"amount": 1, "color": "#ffffff", "speed": 90.0, "angle": -90.0, "spread": 15.0, "gravity": -250.0, "life": 0.45, "size": 3.0}],
+	"grapple_latch": [{"amount": 6, "color": "#e8dcb8", "speed": 160.0, "gravity": 300.0, "life": 0.25, "size": 3.0}],
 	"comet_impact": [{"ring": 100.0, "color": "#ffffff", "width": 6.0, "life": 0.3},
 		{"amount": 22, "color": "#ffffff", "speed": 360.0, "gravity": 200.0, "life": 0.35, "size": 4.0}],
 }
@@ -410,6 +412,8 @@ const SOUNDS := {
 	"boss_roar": [[170, 42, 1.5, "saw", 0.6, 0.55]],
 	"ui_move": [[880, 880, 0.03, "sine", 0.12, 0.0]],
 	"ui_confirm": [[660, 990, 0.07, "sine", 0.22, 0.0]],
+	"grapple_fire": [[700, 1400, 0.06, "saw", 0.18, 0.2]], # Placeholder: a quick zip.
+	"grapple_latch": [[260, 200, 0.07, "square", 0.25, 0.5]], # Placeholder: a dull clank.
 }
 const SFX_SCENE := "res://audio/sfx.tscn"
 const SFX_DIR := "res://audio/sfx/"
@@ -625,6 +629,7 @@ func _build_input_map() -> void:
 		"attack": [_key(KEY_J), _key(KEY_X), _joy_button(JOY_BUTTON_X)],
 		"dash": [_key(KEY_K), _key(KEY_C), _key(KEY_SHIFT), _joy_button(JOY_BUTTON_RIGHT_SHOULDER)],
 		"heal": [_key(KEY_L), _key(KEY_V), _joy_button(JOY_BUTTON_LEFT_SHOULDER)],
+		"grapple": [_key(KEY_H), _key(KEY_B), _joy_button(JOY_BUTTON_LEFT_STICK)],
 		"ult_1": [_key(KEY_1), _joy_button(JOY_BUTTON_Y)],
 		"ult_2": [_key(KEY_2), _joy_axis(JOY_AXIS_TRIGGER_RIGHT, 1.0)],
 		"ult_3": [_key(KEY_3), _joy_axis(JOY_AXIS_TRIGGER_LEFT, 1.0)],

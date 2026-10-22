@@ -2,6 +2,7 @@ class_name CombatManager
 extends Node2D
 ## Owns every damage interaction:
 ##   - player melee: input, directional hitboxes, pogo, recoil
+##   - the grappling hook (GrappleHook, child node "Grapple")
 ##   - a generic damage API used by ultimates and projectiles
 ##   - enemy contact damage and hazard damage to the player
 ##     (the three damage sources and their i-frame rules: combat/damage.gd)
@@ -9,6 +10,7 @@ extends Node2D
 ## Also draws the placeholder slash and the debug hitboxes / animation labels.
 
 @onready var projectiles: ProjectileSystem = $Projectiles
+@onready var grapple: GrappleHook = $Grapple
 
 var game: Node ## Composition root; provides player, room and enemies.
 var attack := {} ## {dir, t, hit_set, pogoed} while a swing is active.
@@ -19,6 +21,7 @@ var attack_buffer := 0.0
 func setup(p_game: Node) -> void:
 	game = p_game
 	projectiles.setup(self)
+	grapple.setup(self)
 	reset()
 
 
@@ -27,6 +30,8 @@ func reset() -> void:
 	cooldown = 0.0
 	attack_buffer = 0.0
 	projectiles.clear()
+	if grapple.combat:
+		grapple.reset()
 
 
 func get_player() -> Player:
@@ -54,6 +59,7 @@ func step(delta: float) -> void:
 	if not attack.is_empty():
 		_step_attack(delta)
 
+	grapple.step(delta)
 	projectiles.step(delta)
 	_resolve_contact_damage()
 	_resolve_hazards()

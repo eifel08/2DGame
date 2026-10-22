@@ -22,6 +22,7 @@ func setup(p: Player) -> void:
 		["cast", func() -> bool: return p.state_name() == "cast"],
 		["heal", func() -> bool: return p.state_name() == "heal"],
 		["dash", func() -> bool: return p.state_name() == "dash" or p.state_name() == "ability"],
+		["grapple", func() -> bool: return p.state_name() == "grapple"],
 		["attack_up", func() -> bool: return p.attack_dir == "up"],
 		["attack_down", func() -> bool: return p.attack_dir == "down"],
 		["attack_side", func() -> bool: return p.attack_dir == "left" or p.attack_dir == "right"],

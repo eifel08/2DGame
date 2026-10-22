@@ -17,6 +17,8 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	effects = p_effects
 	Events.hit_landed.connect(_on_hit)
 	Events.pogo_bounced.connect(_on_pogo)
+	Events.grapple_fired.connect(func(_origin: Vector2, _dir: Vector2) -> void: Sfx.play("grapple_fire"))
+	Events.grapple_latched.connect(_on_grapple_latched)
 	Events.player_hurt.connect(_on_player_hurt)
 	Events.player_hazard_respawn.connect(_on_hazard_respawn)
 	Events.player_jumped.connect(_on_player_jumped)
@@ -91,6 +93,13 @@ func _on_pogo(pos: Vector2, on_hazard: bool) -> void:
 	if on_hazard:
 		freeze(Config.combat.hitstop_on_hit * 0.6)
 		camera.add_trauma(Config.combat.shake_on_hit * 0.5)
+
+
+## The enemy-hit side of a hook is already covered by hit_landed.
+func _on_grapple_latched(anchor: Vector2, on_enemy: bool) -> void:
+	Sfx.play("grapple_latch")
+	if not on_enemy:
+		effects.play("grapple_latch", anchor)
 
 
 func _on_player_hurt(player: Node, _damage: float) -> void:
