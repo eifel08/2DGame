@@ -9,21 +9,24 @@ extends RefCounted
 ## doors.
 ##
 ## Spatial anomaly (resolve_anomalies). A room can be linked on BOTH its left
-## and right sides in a way a flat map cannot show: e.g. the Hidden Vault
-## lies west of the Upper Galleries (secret doorway on its east side), yet its
-## west door leads to the Ember Crossing, which lies EAST of the Galleries.
-## For such a room, every side exit whose neighbour does not touch it on the
-## map is a conflict. The secret exit (or the room's intended_entrance) is
-## kept; every other conflicting exit is suppressed on both ends: the map
-## draws no connector for it, and with Config.map.seal_anomaly_entrances the
-## game seals that doorway with wall tiles in both rooms (Game._seal_door),
-## so it can't be used either. Only the intended (or secret) way in remains.
+## and right sides in a way a flat map cannot show. The case in this world
+## was the Hidden Vault: west of the Upper Galleries (secret doorway on its
+## east side), yet its west door led to the Ember Crossing, EAST of the
+## Galleries. That doorway is now walled up in both layouts
+## (tools/build_assets.gd), so only the secret entrance remains.
+## The resolver stays as a check and a safety net. For such a room, every
+## side exit whose neighbour does not touch it on the map is a conflict. The
+## secret exit (or the room's intended_entrance) is kept; every other
+## conflicting exit is suppressed on both ends: the map draws no connector
+## for it, and with Config.map.seal_anomaly_entrances the game seals that
+## doorway with wall tiles at load time (Game.seal_door). The smoke test
+## fails while the default world has any suppressed exit, so a new anomaly
+## gets walled up in its layout as well.
 
 ## The default world: two zones.
 const WORLD := {
 	"halls": {
 		"name": "Testing Halls",
-		"map_pickup": {"room": "test_room", "position": Vector2(1456, 704)}, # Floor, right of the middle block.
 		"rooms": {
 			"test_room": {"name": "Testing Halls", "rect": [0, 0, 5, 2], "exits": [
 				{"door": "east", "side": "right", "at": 1, "to": "boss_room", "to_door": "west"},
@@ -49,22 +52,20 @@ const WORLD := {
 	},
 	"reaches": {
 		"name": "Upper Reaches",
-		"map_pickup": {"room": "upper_room", "position": Vector2(592, 512)}, # Floor, right of the altar.
 		"rooms": {
 			"upper_room": {"name": "Upper Galleries", "rect": [2, 1, 3, 1], "exits": [
 				{"door": "floor", "side": "bottom", "at": 0, "to": "test_room", "to_door": "ceiling"},
 				{"door": "west", "side": "left", "to": "hidden_vault", "to_door": "east", "secret": true},
 				{"door": "east", "side": "right", "to": "lava_room", "to_door": "west"},
 			]},
-			# The spatial anomaly: linked left (Ember Crossing) and right (Upper
-			# Galleries). The secret doorway is its intended entrance.
+			# Was a spatial anomaly (linked to the Ember Crossing on its west
+			# side too); that doorway is walled up in both layouts. The secret
+			# doorway is its only entrance.
 			"hidden_vault": {"name": "Hidden Vault", "rect": [0, 1, 2, 1], "hidden": true, "exits": [
 				{"door": "east", "side": "right", "to": "upper_room", "to_door": "west", "secret": true},
-				{"door": "west", "side": "left", "to": "lava_room", "to_door": "east"},
 			]},
 			"lava_room": {"name": "Ember Crossing", "rect": [5, 1, 4, 1], "exits": [
 				{"door": "west", "side": "left", "to": "upper_room", "to_door": "east"},
-				{"door": "east", "side": "right", "to": "hidden_vault", "to_door": "west"},
 			]},
 		},
 	},

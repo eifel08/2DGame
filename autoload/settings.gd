@@ -30,6 +30,13 @@ var music_volume := 0.8
 var sfx_volume := 0.9
 var screen_shake := true
 var fullscreen := false
+## Defaults for rebindable actions that may be missing from an older Input
+## Map (e.g. a project.godot saved by an editor that had not reloaded it).
+## Without them the action would not exist and the Settings list would skip
+## it. Normally the project Input Map has them (tools/build_assets.gd).
+const FALLBACK_DEFAULTS := {
+	"map": [KEY_TAB, JOY_BUTTON_RIGHT_STICK],
+}
 ## Fixed actions that are live during play: their keys cannot be rebound to.
 const RESERVED: Array[String] = ["toggle_debug", "debug_navigate", "reset_room"]
 
@@ -42,6 +49,7 @@ var _reserved_keys: Array[Key] = []
 
 
 func _ready() -> void:
+	_add_missing_actions()
 	for action in REBINDABLE:
 		if InputMap.has_action(action):
 			_default_events[action] = InputMap.action_get_events(action)
@@ -61,6 +69,20 @@ func _ready() -> void:
 	buttons = _default_buttons.duplicate()
 	load_settings()
 	apply()
+
+
+func _add_missing_actions() -> void:
+	for action in FALLBACK_DEFAULTS:
+		if InputMap.has_action(action):
+			continue
+		push_warning("Settings: '%s' is missing from the Input Map; using its default key and button" % action)
+		InputMap.add_action(action, 0.5)
+		var key := InputEventKey.new()
+		key.physical_keycode = FALLBACK_DEFAULTS[action][0]
+		InputMap.action_add_event(action, key)
+		var button := InputEventJoypadButton.new()
+		button.button_index = FALLBACK_DEFAULTS[action][1]
+		InputMap.action_add_event(action, button)
 
 
 func apply() -> void:

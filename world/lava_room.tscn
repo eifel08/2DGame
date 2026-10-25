@@ -1,48 +1,48 @@
 [gd_scene load_steps=23 format=4]
 
-[ext_resource type="Script" path="res://world/room.gd" id="1_y2734"]
-[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_i6ofo"]
-[ext_resource type="PackedScene" path="res://world/objects/grapple_peg_breakable.tscn" id="3_v11lu"]
-[ext_resource type="Script" path="res://world/objects/grapple_peg.gd" id="4_miw0w"]
-[ext_resource type="PackedScene" path="res://world/objects/platform_breakable.tscn" id="5_sgi11"]
-[ext_resource type="Script" path="res://world/objects/platform.gd" id="6_o2rjs"]
-[ext_resource type="PackedScene" path="res://world/objects/grapple_peg.tscn" id="7_1ioag"]
-[ext_resource type="PackedScene" path="res://world/objects/grapple_peg_moving.tscn" id="8_38am1"]
-[ext_resource type="PackedScene" path="res://world/objects/platform_moving.tscn" id="9_6tvlo"]
-[ext_resource type="PackedScene" path="res://world/objects/platform.tscn" id="10_bjub8"]
-[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="11_acsl1"]
-[ext_resource type="Script" path="res://world/objects/door.gd" id="12_ihw48"]
-[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="13_505op"]
-[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="14_4d6d2"]
-[ext_resource type="PackedScene" path="res://world/objects/spell_scroll.tscn" id="15_xoys5"]
-[ext_resource type="Script" path="res://world/objects/spell_scroll.gd" id="16_4ovtf"]
-[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="17_ah5ac"]
-[ext_resource type="Script" path="res://world/objects/coin.gd" id="18_jvo3s"]
-[ext_resource type="PackedScene" path="res://world/objects/relic.tscn" id="19_4wk6l"]
-[ext_resource type="Script" path="res://world/objects/relic.gd" id="20_ffiti"]
-[ext_resource type="PackedScene" path="res://world/objects/lava.tscn" id="21_24dpk"]
-[ext_resource type="Script" path="res://world/objects/lava.gd" id="22_tkeso"]
+[ext_resource type="Script" path="res://world/room.gd" id="1_eh5qt"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_g8xod"]
+[ext_resource type="PackedScene" path="res://world/objects/grapple_peg_breakable.tscn" id="3_jwqxj"]
+[ext_resource type="Script" path="res://world/objects/grapple_peg.gd" id="4_jovkh"]
+[ext_resource type="PackedScene" path="res://world/objects/platform_breakable.tscn" id="5_gepgk"]
+[ext_resource type="Script" path="res://world/objects/platform.gd" id="6_ixsf4"]
+[ext_resource type="PackedScene" path="res://world/objects/grapple_peg.tscn" id="7_xxdmt"]
+[ext_resource type="PackedScene" path="res://world/objects/grapple_peg_moving.tscn" id="8_y3qib"]
+[ext_resource type="PackedScene" path="res://world/objects/platform_moving.tscn" id="9_yhn7q"]
+[ext_resource type="PackedScene" path="res://world/objects/platform.tscn" id="10_ta3eo"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="11_6my6n"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="12_jbj41"]
+[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="13_x5adh"]
+[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="14_eg0gv"]
+[ext_resource type="PackedScene" path="res://world/objects/spell_scroll.tscn" id="15_8ny6y"]
+[ext_resource type="Script" path="res://world/objects/spell_scroll.gd" id="16_cdyeo"]
+[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="17_80w4w"]
+[ext_resource type="Script" path="res://world/objects/coin.gd" id="18_tyrc5"]
+[ext_resource type="PackedScene" path="res://world/objects/relic.tscn" id="19_pcms0"]
+[ext_resource type="Script" path="res://world/objects/relic.gd" id="20_elih4"]
+[ext_resource type="PackedScene" path="res://world/objects/lava.tscn" id="21_uk2i3"]
+[ext_resource type="Script" path="res://world/objects/lava.gd" id="22_l1t4t"]
 
 [node name="LavaRoom" type="Node2D"]
-script = ExtResource("1_y2734")
+script = ExtResource("1_eh5qt")
 room_id = "lava_room"
 main_rect = Rect2(0, 0, 0, 0)
 
 [node name="Tiles" type="TileMapLayer" parent="."]
-tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAEAAAAAAAgAAAAAAAEAAAAAAAhAAAAAAAEAAAAAAAiAAAAAAAEAAAAAAAjAAAAAAAEAAAAAAAkAAAAAAAEAAAAAAAlAAAAAAAEAAAAAAAmAAAAAAAEAAAAAAAnAAAAAAAEAAAAAAAoAAAAAAAEAAAAAAApAAAAAAAEAAAAAAAqAAAAAAAEAAAAAAArAAAAAAAEAAAAAAAsAAAAAAAEAAAAAAAtAAAAAAAEAAAAAAAuAAAAAAAEAAAAAAAvAAAAAAAEAAAAAAAwAAAAAAAEAAAAAAAxAAAAAAAEAAAAAAAyAAAAAAAEAAAAAAAzAAAAAAAEAAAAAAA0AAAAAAAEAAAAAAA1AAAAAAAEAAAAAAA2AAAAAAAEAAAAAAA3AAAAAAAEAAAAAAA4AAAAAAAEAAAAAAA5AAAAAAAEAAAAAAA6AAAAAAAEAAAAAAA7AAAAAAAEAAAAAAA8AAAAAAAEAAAAAAA9AAAAAAAEAAAAAAA+AAAAAAAEAAAAAAA/AAAAAAAAAAAAAAAAAAEAAAACAAAAAAA/AAEAAAAIAAAAAAAAAAIAAAACAAAAAAA/AAIAAAAIAAAAAAAAAAMAAAACAAAAAAA/AAMAAAAIAAAAAAAAAAQAAAACAAAAAAA/AAQAAAAIAAAAAAAAAAUAAAACAAAAAAA/AAUAAAAIAAAAAAAAAAYAAAACAAAAAAA/AAYAAAAIAAAAAAAAAAcAAAACAAAAAAA/AAcAAAAIAAAAAAAAAAgAAAACAAAAAAA/AAgAAAAIAAAAAAAAAAkAAAACAAAAAAA/AAkAAAAIAAAAAAAAAAoAAAACAAAAAAA/AAoAAAAIAAAAAAAAAAsAAAACAAAAAAA/AAsAAAAIAAAAAAAAAAwAAAACAAAAAAA/AAwAAAAIAAAAAAAAAA0AAAACAAAAAAA/AA0AAAAIAAAAAAAAAA4AAAAGAAAAAAA/AA4AAAAMAAAAAAAAABIAAAABAAAAAAABABIAAAABAAAAAAACABIAAAABAAAAAAADABIAAAABAAAAAAAEABIAAAADAAAAAAA7ABIAAAAJAAAAAAA8ABIAAAABAAAAAAA9ABIAAAABAAAAAAA+ABIAAAABAAAAAAA/ABIAAAABAAAAAAAAABMAAAAAAAAAAAABABMAAAAAAAAAAAACABMAAAAAAAAAAAADABMAAAAAAAAAAAAEABMAAAAAAAAAAAAFABMAAAABAAAAAAAGABMAAAABAAAAAAAHABMAAAABAAAAAAAIABMAAAABAAAAAAAJABMAAAABAAAAAAAKABMAAAABAAAAAAALABMAAAABAAAAAAAMABMAAAABAAAAAAANABMAAAABAAAAAAAOABMAAAABAAAAAAAPABMAAAABAAAAAAAQABMAAAABAAAAAAARABMAAAABAAAAAAASABMAAAABAAAAAAATABMAAAABAAAAAAAUABMAAAABAAAAAAAVABMAAAABAAAAAAAWABMAAAABAAAAAAAXABMAAAABAAAAAAAYABMAAAABAAAAAAAZABMAAAABAAAAAAAaABMAAAABAAAAAAAbABMAAAABAAAAAAAcABMAAAABAAAAAAAdABMAAAABAAAAAAAeABMAAAABAAAAAAAfABMAAAABAAAAAAAgABMAAAABAAAAAAAhABMAAAABAAAAAAAiABMAAAABAAAAAAAjABMAAAABAAAAAAAkABMAAAABAAAAAAAlABMAAAABAAAAAAAmABMAAAABAAAAAAAnABMAAAABAAAAAAAoABMAAAABAAAAAAApABMAAAABAAAAAAAqABMAAAABAAAAAAArABMAAAABAAAAAAAsABMAAAABAAAAAAAtABMAAAABAAAAAAAuABMAAAABAAAAAAAvABMAAAABAAAAAAAwABMAAAABAAAAAAAxABMAAAABAAAAAAAyABMAAAABAAAAAAAzABMAAAABAAAAAAA0ABMAAAABAAAAAAA1ABMAAAABAAAAAAA2ABMAAAABAAAAAAA3ABMAAAABAAAAAAA4ABMAAAABAAAAAAA5ABMAAAABAAAAAAA6ABMAAAABAAAAAAA7ABMAAAAAAAAAAAA8ABMAAAAAAAAAAAA9ABMAAAAAAAAAAAA+ABMAAAAAAAAAAAA/ABMAAAAAAAAAAAA=")
-tile_set = ExtResource("2_i6ofo")
+tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAEAAAAAAAgAAAAAAAEAAAAAAAhAAAAAAAEAAAAAAAiAAAAAAAEAAAAAAAjAAAAAAAEAAAAAAAkAAAAAAAEAAAAAAAlAAAAAAAEAAAAAAAmAAAAAAAEAAAAAAAnAAAAAAAEAAAAAAAoAAAAAAAEAAAAAAApAAAAAAAEAAAAAAAqAAAAAAAEAAAAAAArAAAAAAAEAAAAAAAsAAAAAAAEAAAAAAAtAAAAAAAEAAAAAAAuAAAAAAAEAAAAAAAvAAAAAAAEAAAAAAAwAAAAAAAEAAAAAAAxAAAAAAAEAAAAAAAyAAAAAAAEAAAAAAAzAAAAAAAEAAAAAAA0AAAAAAAEAAAAAAA1AAAAAAAEAAAAAAA2AAAAAAAEAAAAAAA3AAAAAAAEAAAAAAA4AAAAAAAEAAAAAAA5AAAAAAAEAAAAAAA6AAAAAAAEAAAAAAA7AAAAAAAEAAAAAAA8AAAAAAAEAAAAAAA9AAAAAAAEAAAAAAA+AAAAAAAEAAAAAAA/AAAAAAAAAAAAAAAAAAEAAAACAAAAAAA/AAEAAAAIAAAAAAAAAAIAAAACAAAAAAA/AAIAAAAIAAAAAAAAAAMAAAACAAAAAAA/AAMAAAAIAAAAAAAAAAQAAAACAAAAAAA/AAQAAAAIAAAAAAAAAAUAAAACAAAAAAA/AAUAAAAIAAAAAAAAAAYAAAACAAAAAAA/AAYAAAAIAAAAAAAAAAcAAAACAAAAAAA/AAcAAAAIAAAAAAAAAAgAAAACAAAAAAA/AAgAAAAIAAAAAAAAAAkAAAACAAAAAAA/AAkAAAAIAAAAAAAAAAoAAAACAAAAAAA/AAoAAAAIAAAAAAAAAAsAAAACAAAAAAA/AAsAAAAIAAAAAAAAAAwAAAACAAAAAAA/AAwAAAAIAAAAAAAAAA0AAAACAAAAAAA/AA0AAAAIAAAAAAAAAA4AAAAGAAAAAAA/AA4AAAAIAAAAAAA/AA8AAAAIAAAAAAA/ABAAAAAIAAAAAAA/ABEAAAAIAAAAAAAAABIAAAABAAAAAAABABIAAAABAAAAAAACABIAAAABAAAAAAADABIAAAABAAAAAAAEABIAAAADAAAAAAA7ABIAAAAJAAAAAAA8ABIAAAABAAAAAAA9ABIAAAABAAAAAAA+ABIAAAABAAAAAAA/ABIAAAAAAAAAAAAAABMAAAAAAAAAAAABABMAAAAAAAAAAAACABMAAAAAAAAAAAADABMAAAAAAAAAAAAEABMAAAAAAAAAAAAFABMAAAABAAAAAAAGABMAAAABAAAAAAAHABMAAAABAAAAAAAIABMAAAABAAAAAAAJABMAAAABAAAAAAAKABMAAAABAAAAAAALABMAAAABAAAAAAAMABMAAAABAAAAAAANABMAAAABAAAAAAAOABMAAAABAAAAAAAPABMAAAABAAAAAAAQABMAAAABAAAAAAARABMAAAABAAAAAAASABMAAAABAAAAAAATABMAAAABAAAAAAAUABMAAAABAAAAAAAVABMAAAABAAAAAAAWABMAAAABAAAAAAAXABMAAAABAAAAAAAYABMAAAABAAAAAAAZABMAAAABAAAAAAAaABMAAAABAAAAAAAbABMAAAABAAAAAAAcABMAAAABAAAAAAAdABMAAAABAAAAAAAeABMAAAABAAAAAAAfABMAAAABAAAAAAAgABMAAAABAAAAAAAhABMAAAABAAAAAAAiABMAAAABAAAAAAAjABMAAAABAAAAAAAkABMAAAABAAAAAAAlABMAAAABAAAAAAAmABMAAAABAAAAAAAnABMAAAABAAAAAAAoABMAAAABAAAAAAApABMAAAABAAAAAAAqABMAAAABAAAAAAArABMAAAABAAAAAAAsABMAAAABAAAAAAAtABMAAAABAAAAAAAuABMAAAABAAAAAAAvABMAAAABAAAAAAAwABMAAAABAAAAAAAxABMAAAABAAAAAAAyABMAAAABAAAAAAAzABMAAAABAAAAAAA0ABMAAAABAAAAAAA1ABMAAAABAAAAAAA2ABMAAAABAAAAAAA3ABMAAAABAAAAAAA4ABMAAAABAAAAAAA5ABMAAAABAAAAAAA6ABMAAAABAAAAAAA7ABMAAAAAAAAAAAA8ABMAAAAAAAAAAAA9ABMAAAAAAAAAAAA+ABMAAAAAAAAAAAA/ABMAAAAAAAAAAAA=")
+tile_set = ExtResource("2_g8xod")
 
 [node name="EnemySpawns" type="Node2D" parent="."]
 
 [node name="Objects" type="Node2D" parent="."]
 
-[node name="GrapplePeg1" type="Area2D" parent="Objects" instance=ExtResource("3_v11lu")]
+[node name="GrapplePeg1" type="Area2D" parent="Objects" instance=ExtResource("3_jwqxj")]
 z_index = 1
 position = Vector2(1648, 336)
 collision_layer = 64
 collision_mask = 0
 monitoring = false
-script = ExtResource("4_miw0w")
+script = ExtResource("4_jovkh")
 kind = "breakable"
 travel = Vector2(0, 0)
 period = 4.0
@@ -51,13 +51,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="Platform1" type="AnimatableBody2D" parent="Objects" instance=ExtResource("5_sgi11")]
+[node name="Platform1" type="AnimatableBody2D" parent="Objects" instance=ExtResource("5_gepgk")]
 z_index = 1
 position = Vector2(1376, 352)
 collision_layer = 4
 collision_mask = 0
 sync_to_physics = false
-script = ExtResource("6_o2rjs")
+script = ExtResource("6_ixsf4")
 kind = "breakable"
 size = Vector2(128, 12)
 travel = Vector2(0, 0)
@@ -67,13 +67,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="GrapplePeg2" type="Area2D" parent="Objects" instance=ExtResource("7_1ioag")]
+[node name="GrapplePeg2" type="Area2D" parent="Objects" instance=ExtResource("7_xxdmt")]
 z_index = 1
 position = Vector2(784, 464)
 collision_layer = 64
 collision_mask = 0
 monitoring = false
-script = ExtResource("4_miw0w")
+script = ExtResource("4_jovkh")
 kind = "standard"
 travel = Vector2(0, 0)
 period = 4.0
@@ -82,13 +82,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="GrapplePeg3" type="Area2D" parent="Objects" instance=ExtResource("8_38am1")]
+[node name="GrapplePeg3" type="Area2D" parent="Objects" instance=ExtResource("8_y3qib")]
 z_index = 1
 position = Vector2(1232, 464)
 collision_layer = 64
 collision_mask = 0
 monitoring = false
-script = ExtResource("4_miw0w")
+script = ExtResource("4_jovkh")
 kind = "moving"
 travel = Vector2(0, -128)
 period = 4.0
@@ -97,13 +97,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="Platform2" type="AnimatableBody2D" parent="Objects" instance=ExtResource("9_6tvlo")]
+[node name="Platform2" type="AnimatableBody2D" parent="Objects" instance=ExtResource("9_yhn7q")]
 z_index = 1
 position = Vector2(1744, 448)
 collision_layer = 4
 collision_mask = 0
 sync_to_physics = false
-script = ExtResource("6_o2rjs")
+script = ExtResource("6_ixsf4")
 kind = "moving"
 size = Vector2(96, 12)
 travel = Vector2(96, 0)
@@ -113,13 +113,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="Platform3" type="AnimatableBody2D" parent="Objects" instance=ExtResource("9_6tvlo")]
+[node name="Platform3" type="AnimatableBody2D" parent="Objects" instance=ExtResource("9_yhn7q")]
 z_index = 1
 position = Vector2(432, 480)
 collision_layer = 4
 collision_mask = 0
 sync_to_physics = false
-script = ExtResource("6_o2rjs")
+script = ExtResource("6_ixsf4")
 kind = "moving"
 size = Vector2(96, 12)
 travel = Vector2(128, 0)
@@ -129,13 +129,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="Platform4" type="AnimatableBody2D" parent="Objects" instance=ExtResource("10_bjub8")]
+[node name="Platform4" type="AnimatableBody2D" parent="Objects" instance=ExtResource("10_ta3eo")]
 z_index = 1
 position = Vector2(960, 480)
 collision_layer = 4
 collision_mask = 0
 sync_to_physics = false
-script = ExtResource("6_o2rjs")
+script = ExtResource("6_ixsf4")
 kind = "standard"
 size = Vector2(128, 12)
 travel = Vector2(0, 0)
@@ -145,13 +145,13 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="Platform5" type="AnimatableBody2D" parent="Objects" instance=ExtResource("10_bjub8")]
+[node name="Platform5" type="AnimatableBody2D" parent="Objects" instance=ExtResource("10_ta3eo")]
 z_index = 1
 position = Vector2(272, 512)
 collision_layer = 4
 collision_mask = 0
 sync_to_physics = false
-script = ExtResource("6_o2rjs")
+script = ExtResource("6_ixsf4")
 kind = "standard"
 size = Vector2(96, 12)
 travel = Vector2(0, 0)
@@ -161,9 +161,9 @@ crumble_delay = 1.0
 respawn_time = 3.0
 draw_markings = true
 
-[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("11_acsl1")]
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("11_6my6n")]
 position = Vector2(16, 576)
-script = ExtResource("12_ihw48")
+script = ExtResource("12_jbj41")
 door_id = "west"
 target_room = "upper_room"
 target_door = "east"
@@ -172,54 +172,43 @@ vertical = 0
 trigger_size = Vector2(24, 96)
 secret = false
 
-[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("13_505op")]
+[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("13_x5adh")]
 z_index = 1
 position = Vector2(80, 576)
-script = ExtResource("14_4d6d2")
+script = ExtResource("14_eg0gv")
 is_start = false
 prompt = "Save"
 interact_size = Vector2(56, 64)
 
-[node name="SpellScroll1" type="Node2D" parent="Objects" instance=ExtResource("15_xoys5")]
+[node name="SpellScroll1" type="Node2D" parent="Objects" instance=ExtResource("15_8ny6y")]
 z_index = 2
 position = Vector2(1904, 576)
-script = ExtResource("16_4ovtf")
+script = ExtResource("16_cdyeo")
 spell_id = "comet_dash"
 
-[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("17_ah5ac")]
+[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("17_80w4w")]
 z_index = 2
 position = Vector2(1936, 576)
-script = ExtResource("18_jvo3s")
+script = ExtResource("18_tyrc5")
 value = 5
 
-[node name="Relic1" type="Node2D" parent="Objects" instance=ExtResource("19_4wk6l")]
+[node name="Relic1" type="Node2D" parent="Objects" instance=ExtResource("19_pcms0")]
 z_index = 2
 position = Vector2(1968, 576)
-script = ExtResource("20_ffiti")
+script = ExtResource("20_elih4")
 relic_id = "ember_heart"
 stat = "max_energy"
 amount = 20.0
 
-[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("17_ah5ac")]
+[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("17_80w4w")]
 z_index = 2
 position = Vector2(2000, 576)
-script = ExtResource("18_jvo3s")
+script = ExtResource("18_tyrc5")
 value = 5
 
-[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("11_acsl1")]
-position = Vector2(2032, 576)
-script = ExtResource("12_ihw48")
-door_id = "east"
-target_room = "hidden_vault"
-target_door = "west"
-inward = -1
-vertical = 0
-trigger_size = Vector2(24, 96)
-secret = false
-
-[node name="Lava1" type="Node2D" parent="Objects" instance=ExtResource("21_24dpk")]
+[node name="Lava1" type="Node2D" parent="Objects" instance=ExtResource("21_uk2i3")]
 z_index = 1
 position = Vector2(160, 576)
-script = ExtResource("22_tkeso")
+script = ExtResource("22_l1t4t")
 size = Vector2(1728, 32)
 draw_bubbles = true

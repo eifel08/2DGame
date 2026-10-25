@@ -6,22 +6,18 @@ extends Resource
 ## is how the map switches zones as the player travels.
 ##
 ## A zone can be authored as a .tres resource in the editor, or as plain data
-## (MapZone.from_dict, used by MapAtlas.create_default).
+## (MapZone.from_dict, used by MapAtlas.create_default). The zone's map lies
+## in the world as a MapPickup (layout letter 'M' in tools/build_assets.gd).
 
 @export var zone_id := ""
 @export var display_name := ""
 @export var rooms: Array[MapRoom] = []
-## Where this zone's map can be found: {"room": room_id, "position": Vector2}
-## (feet position). Game places a MapPickup there until it is taken.
-## Empty: the zone has no placed map (debug, vendors, story events).
-@export var map_pickup := {}
 
 
 static func from_dict(id: String, data: Dictionary) -> MapZone:
 	var z := MapZone.new()
 	z.zone_id = id
 	z.display_name = data.get("name", id)
-	z.map_pickup = data.get("map_pickup", {})
 	var room_defs: Dictionary = data.get("rooms", {})
 	for room_id in room_defs:
 		z.rooms.append(MapRoom.from_dict(room_id, room_defs[room_id]))

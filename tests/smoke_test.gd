@@ -3042,9 +3042,9 @@ func _test_lava_room() -> void:
 	_check("lava room: lava lies only on solid floor (floor-only hazard)", on_floor)
 	_check("lava room: a high, open ceiling over the course", bounds.size.y >= 18 * 32 and not room.is_solid_at(Vector2(1000, 3 * 32)), bounds)
 	var doors: Array = room.get_doors()
-	_check("lava room: entrance west (Upper Galleries), exit east (Hidden Vault)",
-		doors.size() == 2 and _door("west") != null and _door("west").target_room == "upper_room"
-		and _door("east") != null and _door("east").target_room == "hidden_vault", doors.size())
+	_check("lava room: one way in and out, west (Upper Galleries); the east end is walled up (former anomaly)",
+		doors.size() == 1 and _door("west") != null and _door("west").target_room == "upper_room"
+		and room.is_solid_at(Vector2(bounds.end.x - 16, floor_y - 48)), doors.size())
 	var kinds := {}
 	for node in _objects_of(Platform):
 		kinds["platform " + node.kind] = kinds.get("platform " + node.kind, 0) + 1
@@ -4865,16 +4865,14 @@ func _test_map() -> void:
 
 	# --- Spatial anomaly: the Hidden Vault is linked left AND right ---
 	var vault := atlas.get_room("hidden_vault")
-	_check("map: the Hidden Vault is detected as a spatial anomaly", atlas.is_anomaly_room(vault))
 	var suppressed := []
 	for zone in atlas.zones:
 		for r in zone.rooms:
 			for e in r.exits:
 				if e.suppressed:
 					suppressed.append("%s.%s" % [r.room_id, e.door_id])
-	suppressed.sort()
-	_check("map: only the vault's non-secret entrance is suppressed (both ends), the secret doorway stays",
-		suppressed == ["hidden_vault.west", "lava_room.east"] and not vault.get_exit("east").suppressed, suppressed)
+	_check("map: the world has no unresolved spatial anomaly (the vault's extra doorway is walled up)",
+		suppressed.is_empty() and not atlas.is_anomaly_room(vault) and vault.exits.size() == 1 and vault.get_exit("east").secret, suppressed)
 	# A made-up zone: a room linked to the same neighbour on both sides.
 	var test_zone := MapZone.from_dict("anomaly_test", {"rooms": {
 		"a": {"rect": [0, 0, 1, 1], "exits": [
@@ -4907,7 +4905,19 @@ func _test_map() -> void:
 	await _reset()
 	_check("map: a new map owns no zone map; only the room you stand in is filled",
 		state.acquired.is_empty() and state.is_filled("test_room") and state.reveal_of("boss_room") == reveal.UNKNOWN, state.to_dict())
+	var placed := {}
+	for rid in game.ROOM_SCENES:
+		var scene: Room = game.ROOM_SCENES[rid].instantiate()
+		for node in scene.get_objects():
+			if node is MapPickup:
+				placed[node.zone_id] = placed.get(node.zone_id, []) + [rid]
+		scene.free()
+	_check("map: each zone's map lies in its own zone, once, in the room scenes",
+		placed.size() == atlas.zones.size() and placed.get("halls", []) == ["test_room"] and placed.get("reaches", []) == ["upper_room"], placed)
 	var pickups: Array = game.map_pickups
+	_check("map: the Testing Halls map lies on the floor right of the start flame, walkable from the start",
+		pickups.size() == 1 and absf(pickups[0].global_position.y - game.room.get_player_spawn().y) < 1.0
+		and absf(pickups[0].global_position.x - game.room.get_player_spawn().x) <= 96.0, pickups.size())
 	_check("map: the Testing Halls map lies in the Testing Halls, on the floor",
 		pickups.size() == 1 and pickups[0].zone_id == "halls" and game.room.is_solid_at(pickups[0].global_position + Vector2(0, 16))
 		and not game.room.is_solid_at(pickups[0].global_position + Vector2(0, -16)), pickups.size())
@@ -4921,7 +4931,8 @@ func _test_map() -> void:
 	_check("map: the other zone's rooms stay unknown", state.reveal_of("upper_room") == reveal.UNKNOWN and not state.has_map("reaches"))
 	game.load_room("test_room", "east")
 	await _frames(2)
-	_check("map: a taken map does not come back", game.map_pickups.is_empty())
+	_check("map: a taken map does not come back", game.map_pickups.size() == 1
+		and game.map_pickups.all(func(m: MapPickup) -> bool: return m.collected and not m.visible))
 	game.load_room("boss_room", "west")
 	await _frames(2)
 	_check("map: entering an outlined room fills it in", state.is_filled("boss_room"))
@@ -4951,30 +4962,42 @@ func _test_map() -> void:
 	old.from_dict({})
 	_check("map: a save from before the map system loads with an empty map", old.acquired.is_empty() and old.rooms.is_empty())
 
-	# --- The anomaly in the world: the vault's west doorway is sealed ---
+	# --- The anomaly in the scenes: the vault's west doorway is walled up ---
 	game.load_room("hidden_vault", "east")
 	await _frames(2)
-	var west := _door("west")
-	var gap_solid := true
-	for y in range(int(west.get_trigger_rect().position.y) + 8, int(west.get_trigger_rect().end.y), 16):
-		gap_solid = gap_solid and game.room.is_solid_at(Vector2(west.global_position.x, y))
-	_check("map anomaly: the vault's west doorway is sealed with wall", west.sealed and west.locked and gap_solid)
-	_check("map anomaly: the vault's secret doorway (its intended entrance) still works", not _door("east").sealed)
-	p.global_position = west.global_position + Vector2(60, 0)
+	var vault_bounds: Rect2 = game.room.get_bounds()
+	var west_solid := true
+	for y in range(int(vault_bounds.end.y) - 5 * 32 + 16, int(vault_bounds.end.y) - 64, 32):
+		west_solid = west_solid and game.room.is_solid_at(Vector2(16, y))
+	_check("map anomaly: the vault scene has no west doorway, only solid wall", west_solid and game.doors.size() == 1 and _door("east") != null,
+		game.doors.size())
+	_check("map anomaly: the vault's secret doorway (its intended entrance) still works", not _door("east").sealed and not _door("east").locked)
+	p.global_position = Vector2(100, vault_bounds.end.y - 64)
 	p.velocity = Vector2.ZERO
 	await _frames(5)
 	Input.action_press(&"move_left")
 	await _frames(50)
 	Input.action_release(&"move_left")
-	_check("map anomaly: walking into the sealed doorway goes nowhere", game.room_id == "hidden_vault" and p.global_position.x > west.global_position.x, [game.room_id, p.global_position])
-	game.load_room("lava_room", "west")
+	_check("map anomaly: walking into the vault's west wall goes nowhere", game.room_id == "hidden_vault" and p.global_position.x > 32.0, [game.room_id, p.global_position])
+	# The safety net for a future anomaly: sealing a doorway at load time.
+	game.load_room("boss_room", "west")
 	await _frames(2)
-	_check("map anomaly: the Ember Crossing's end of it is sealed too", _door("east").sealed and not _door("west").sealed)
-	Config.map.seal_anomaly_entrances = false
-	game.load_room("hidden_vault", "east")
+	var boss_west := _door("west")
+	game.seal_door(boss_west)
+	var gap_solid := true
+	for y in range(int(boss_west.get_trigger_rect().position.y) + 8, int(boss_west.get_trigger_rect().end.y), 16):
+		gap_solid = gap_solid and game.room.is_solid_at(Vector2(boss_west.global_position.x, y))
+	p.global_position = boss_west.global_position + Vector2(60, 0)
+	p.velocity = Vector2.ZERO
+	await _frames(3)
+	Input.action_press(&"move_left")
+	await _frames(40)
+	Input.action_release(&"move_left")
+	_check("map anomaly: Game.seal_door fills a doorway with wall and it goes nowhere",
+		boss_west.sealed and boss_west.locked and gap_solid and game.room_id == "boss_room", [gap_solid, game.room_id])
+	game.load_room("boss_room", "west")
 	await _frames(2)
-	_check("map anomaly: with sealing off, the doorway stays open (the map still hides it)", not _door("west").sealed and atlas.get_room("hidden_vault").get_exit("west").suppressed)
-	Config.map.seal_anomaly_entrances = true
+	_check("map anomaly: a runtime seal lasts only while the room is loaded", not _door("west").sealed)
 	_check("map: the Upper Reaches show on the map once a room of them is known", state.known_zones().size() == 2, state.known_zones())
 
 	# --- Quick view: hold the Map key ---
@@ -4982,6 +5005,19 @@ func _test_map() -> void:
 	_check("map key: Map is rebindable, Tab by default (gamepad R3)",
 		Settings.REBINDABLE.has("map") and Settings.key_name("map") == "Tab" and Settings.button_name("map") == "R3" and _actions_for(KEY_TAB) == ["map"],
 		[Settings.key_name("map"), Settings.button_name("map"), _actions_for(KEY_TAB)])
+	var settings := SettingsPanel.new()
+	add_child(settings)
+	settings.refresh()
+	var map_row: Button = settings.get("_key_buttons").get("map")
+	_check("settings: the Controls list has a Map (hold) row showing Tab and R3",
+		map_row != null and map_row.text.contains("Tab") and map_row.text.contains("R3"), map_row.text if map_row else "missing")
+	settings.queue_free()
+	var debug_texts := []
+	for c in game.debug_overlay.find_children("*", "BaseButton", true, false):
+		debug_texts.append(c.text)
+	_check("debug overlay: a Map section grants maps and toggles auto-reveal and the player marker",
+		debug_texts.has("Grant Map (This Zone)") and debug_texts.has("Grant All Maps")
+		and debug_texts.has("Auto-Reveal Rooms") and debug_texts.has("Player Marker"), debug_texts)
 	var overlay: MapOverlay = game.map_overlay
 	var closed := []
 	var on_closed := func(reason: String) -> void: closed.append(reason)

@@ -51,7 +51,6 @@ const ENEMY_SCENES := {
 	"spearman": preload("res://enemies/bestiary/spearman.tscn"),
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
-const MAP_PICKUP_SCENE := preload("res://world/objects/map_pickup.tscn")
 const RESPAWN_FADE_TIME := 0.45
 ## Progression: a new game starts LOW. Max health and energy are small
 ## (HealthEnergy.STARTING_MAX_*), NO equippable spell is known and the Up /
@@ -106,7 +105,7 @@ var relics: Array[Relic] = [] ## Relics and potions (Potion extends Relic).
 var scrolls: Array[SpellScroll] = []
 var altars: Array[MeditationAltar] = []
 var ability_pickups: Array[AbilityPickup] = []
-var map_pickups: Array[MapPickup] = [] ## Zone maps lying in this room (placed from MapZone.map_pickup).
+var map_pickups: Array[MapPickup] = [] ## Zone maps lying in this room (layout letter 'M').
 var sealed_doors: Array[Door] = [] ## Doorways sealed in this room (spatial anomalies, MapAtlas).
 var map_overlay: MapOverlay ## The quick view (hold the Map key).
 ## Full-screen tutorial popups (created in _ready). Set tutorials_enabled
@@ -348,6 +347,10 @@ func _load_room_scene(id: String) -> void:
 			scrolls.append(node)
 			if player_data.is_unlocked(node.spell_id):
 				node.collect() # Its spell is known: the scroll is gone.
+		if node is MapPickup:
+			map_pickups.append(node)
+			if map_state.has_map(node.zone_id):
+				node.collect() # The map is owned: it is gone.
 		if node is AbilityPickup:
 			ability_pickups.append(node)
 			if player_data.has_movement(node.ability):
@@ -359,7 +362,6 @@ func _load_room_scene(id: String) -> void:
 			coins.append(node)
 			if world.is_coin_collected(id, node.name):
 				node.collect()
-	_place_map_pickups()
 	_apply_map_anomalies()
 	_spawn_room_enemies()
 	arena_director.setup(self, room.get_arena())
@@ -817,26 +819,11 @@ func acquire_map(zone_id: String) -> void:
 	write_save()
 
 
-## Places the MapPickup of every zone whose map lies in this room and is not
-## owned yet (MapZone.map_pickup).
-func _place_map_pickups() -> void:
-	var objects := room.get_node_or_null("Objects")
-	if objects == null:
-		return
-	for zone in atlas.zones:
-		if zone.map_pickup.get("room", "") != room_id or map_state.has_map(zone.zone_id):
-			continue
-		var pickup: MapPickup = MAP_PICKUP_SCENE.instantiate()
-		pickup.name = "MapPickup_%s" % zone.zone_id
-		pickup.zone_id = zone.zone_id
-		pickup.position = zone.map_pickup.position
-		objects.add_child(pickup)
-		map_pickups.append(pickup)
-
-
-## Spatial anomalies (MapAtlas.resolve_anomalies): the suppressed doorways of
-## this room are sealed with wall, so only the intended (or secret) entrance
-## works. With Config.map.seal_anomaly_entrances off, only the map hides them.
+## Spatial anomalies (MapAtlas.resolve_anomalies): a safety net. The world's
+## one anomaly (the Hidden Vault) is walled up in its layouts; should a new
+## layout create another, its suppressed doorways are sealed here at load
+## time, so only the intended (or secret) entrance works. The smoke test
+## fails on any unresolved anomaly, so it gets fixed in the layout too.
 func _apply_map_anomalies() -> void:
 	if not Config.map.seal_anomaly_entrances:
 		return

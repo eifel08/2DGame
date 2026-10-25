@@ -1,8 +1,9 @@
 class_name DebugOverlay
 extends CanvasLayer
 ## Debug panel, toggled with F1 or ` (backquote).
-## Fully data-driven: add a row to TOGGLES, SLIDERS or the actions list and it
-## appears. Controls edit Config live, so changes apply on the next frame.
+## Fully data-driven: add a row to TOGGLES, MAP_TOGGLES, SLIDERS or an actions
+## list and it appears. The Map section (grant maps, fog of war, player
+## marker) is at the top. Controls edit Config live, so changes apply on the next frame.
 ## The Spells section lists every registered ability: tick which ones the
 ## player knows (Mana Discharge is fixed and always known).
 ## Controls never steal gameplay keys. For keyboard-only use press F2 while
@@ -20,9 +21,14 @@ const TOGGLES := [
 	["debug.screen_shake", "Screen Shake"],
 	["debug.paused", "Pause"],
 	["combat.hazard_to_safe_ground", "Spikes → Safe Ground"],
-	["map.auto_mark_rooms", "Map: Auto-Mark Rooms"],
-	["map.show_player_marker", "Map: Player Marker"],
-	["map.precise_player_marker", "Map: Precise Marker"],
+]
+
+## The Map section, at the top of the panel (Config.map).
+const MAP_TOGGLES := [
+	["map.auto_mark_rooms", "Auto-Reveal Rooms"],
+	["map.show_player_marker", "Player Marker"],
+	["map.precise_player_marker", "Precise Marker"],
+	["map.quick_view_needs_ground", "Quick View: Ground Only"],
 ]
 
 const SLIDERS := [
@@ -119,22 +125,32 @@ func _actions() -> Array:
 				game.player_data.learn_movement(ability_id)
 			Events.loadout_changed.emit()],
 		["Reset Tutorials", func() -> void: game.player_data.seen_tutorials.clear()],
-		["Map: Acquire This Zone", func() -> void:
+		["Reset Player", func() -> void: game.reset_player()],
+		["Reset Room", func() -> void: game.reset_room()],
+		["Restore Defaults", func() -> void: game.restore_defaults()],
+	]
+
+
+## Buttons of the Map section.
+func _map_actions() -> Array:
+	return [
+		["Grant Map (This Zone)", func() -> void:
 			var zone: MapZone = game.map_state.current_zone()
 			if zone:
 				game.acquire_map(zone.zone_id)],
-		["Map: Mark Pending Rooms", func() -> void: game.map_state.mark_pending()],
-		["Map: Reveal All Zones", func() -> void:
+		["Grant All Maps", func() -> void:
+			for zone in game.atlas.zones:
+				game.acquire_map(zone.zone_id)],
+		["Reveal Everything", func() -> void:
 			for zone in game.atlas.zones:
 				game.acquire_map(zone.zone_id)
 				for r in zone.rooms:
 					game.map_state.mark_room(r.room_id)],
-		["Map: Forget Map", func() -> void:
+		["Mark Pending Rooms", func() -> void: game.map_state.mark_pending()],
+		["Forget Map", func() -> void:
 			game.map_state.new_game()
-			game.map_state.enter_room(game.room_id)],
-		["Reset Player", func() -> void: game.reset_player()],
-		["Reset Room", func() -> void: game.reset_room()],
-		["Restore Defaults", func() -> void: game.restore_defaults()],
+			game.map_state.enter_room(game.room_id)
+			game.load_room(game.room_id)], # Reload: the room's map pickup is back.
 	]
 
 
@@ -176,37 +192,18 @@ func _build() -> void:
 	title.add_theme_color_override("font_color", Color("#ffd43b"))
 	box.add_child(title)
 
+	# Map: grant maps, fog of war and player marker switches
+	box.add_child(_header("Map"))
+	box.add_child(_toggle_grid(MAP_TOGGLES))
+	box.add_child(_button_grid(_map_actions()))
+
 	# Upgrades & toggles
 	box.add_child(_header("Upgrades & Toggles"))
-	var grid := GridContainer.new()
-	grid.columns = 2
-	box.add_child(grid)
-	for t in TOGGLES:
-		var check := CheckBox.new()
-		check.text = t[1]
-		check.focus_mode = Control.FOCUS_NONE
-		_focusables.append(check)
-		var path: String = t[0]
-		check.toggled.connect(func(on: bool) -> void: Config.set_value(path, on))
-		grid.add_child(check)
-		_bindings.append({"path": path, "control": check})
+	box.add_child(_toggle_grid(TOGGLES))
 
 	# Quick actions
 	box.add_child(_header("Quick Actions"))
-	var buttons := GridContainer.new()
-	buttons.columns = 2
-	box.add_child(buttons)
-	for a in _actions():
-		var btn := Button.new()
-		btn.text = a[0]
-		btn.focus_mode = Control.FOCUS_NONE
-		_focusables.append(btn)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		var action: Callable = a[1]
-		btn.pressed.connect(func() -> void:
-			action.call()
-			refresh())
-		buttons.add_child(btn)
+	box.add_child(_button_grid(_actions()))
 
 	# Spells: known pool, quick loadout tools
 	box.add_child(_build_spells())
@@ -301,6 +298,40 @@ func set_navigating(on: bool) -> void:
 		_focusables[0].grab_focus()
 	elif get_viewport():
 		get_viewport().gui_release_focus()
+
+
+## Two columns of checkboxes bound to Config paths: [[path, label], ...].
+func _toggle_grid(rows: Array) -> GridContainer:
+	var grid := GridContainer.new()
+	grid.columns = 2
+	for t in rows:
+		var check := CheckBox.new()
+		check.text = t[1]
+		check.focus_mode = Control.FOCUS_NONE
+		_focusables.append(check)
+		var path: String = t[0]
+		check.toggled.connect(func(on: bool) -> void: Config.set_value(path, on))
+		grid.add_child(check)
+		_bindings.append({"path": path, "control": check})
+	return grid
+
+
+## Two columns of buttons: [[label, Callable], ...].
+func _button_grid(rows: Array) -> GridContainer:
+	var buttons := GridContainer.new()
+	buttons.columns = 2
+	for a in rows:
+		var btn := Button.new()
+		btn.text = a[0]
+		btn.focus_mode = Control.FOCUS_NONE
+		_focusables.append(btn)
+		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var action: Callable = a[1]
+		btn.pressed.connect(func() -> void:
+			action.call()
+			refresh())
+		buttons.add_child(btn)
+	return buttons
 
 
 func _header(text: String) -> Label:

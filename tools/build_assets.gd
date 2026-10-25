@@ -34,6 +34,8 @@ const TS := 32
 ## keyed by the "col,row" of the cell.
 ## Movement items (AbilityPickup): 'j' Double Jump, 'd' Dash, 'c' Wall Climb,
 ## 'g' Grappling Hook. A new game has none of them.
+## 'M' a zone's map (MapPickup): the room's "maps" entry ("col,row": zone_id)
+## names the zone. Taking it outlines that zone's base map.
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. Wall spikes ('<', right part of the room,
 ## rows 10-12) and ceiling spikes ('V', under the block in row 13) are there to
@@ -66,7 +68,7 @@ const ROOM_LAYOUT := [
 	"########.....##..=====..........................?K....+..........##...#",
 	"##.....#.....##................................####....................",
 	"##.....I.......................................####....................",
-	"##.*.*.I..W.c.T..S..?.N........A..U..$$.E..j..C####..........E..d..C..D",
+	"##.*.*.I..W.c.T..S.M?.N........A..U..$$.E..j..C####..........E..d..C..D",
 	"#########################^^^^######==################^^^^^^^###########",
 	"###################################Y.##################################",
 ]
@@ -161,7 +163,7 @@ const UPPER_LAYOUT := [
 	"#...............................########",
 	"x...............................I......#",
 	"x...............................I......#",
-	"X..$.......AE..........G..g...E.I..*E*.#",
+	"X..$.......AE......M...G..g...E.I..*E*.#",
 	"####....################################",
 	"####O...################################",
 ]
@@ -169,7 +171,9 @@ const UPPER_LAYOUT := [
 ## Hidden Vault: a secret room behind the Upper Galleries' west wall (at
 ## least one screen in size, like every room, so the camera stays inside).
 ## Its east doorway is the exit side of the secret doorway: it looks like wall.
-## Its west doorway ('D') is the goal exit of the Ember Crossing.
+## Its west wall is solid: the doorway to the Ember Crossing was walled up
+## (a spatial anomaly, see map/map_atlas.gd). The secret doorway is the only
+## way in.
 const VAULT_LAYOUT := [
 	"################################",
 	"#..............................#",
@@ -184,23 +188,23 @@ const VAULT_LAYOUT := [
 	"#.......e.$..........$.........#",
 	"#.......=====......=====.......#",
 	"#..............................#",
-	"...............................x",
-	"...............................x",
-	"D....$......$.....$......$.....X",
+	"#..............................x",
+	"#..............................x",
+	"#....$......$.....$......$.....X",
 	"################################",
 	"################################",
 ]
 
-## Ember Crossing: a lava gauntlet between the Upper Galleries (west) and the
-## Hidden Vault (east). The whole floor is lava ('L') except the two ledges at
+## Ember Crossing: a lava gauntlet east of the Upper Galleries, a dead end. The whole floor is lava ('L') except the two ledges at
 ## the doorways. High ceiling. The way across, left to right:
 ##   A standard platform -> B moving platform (ride it right) -> throw at peg P1
 ##   (hold) -> jump to standard platform C -> throw at moving peg P2 when it is
 ##   low (hold, it lifts you) -> jump to breakable platform D (it crumbles 1 s
 ##   after you land) -> throw at breakable peg P3 (it crumbles 1 s after the
 ##   hook latches) -> jump right: moving platform E or the east ledge.
-## Goal: the east ledge holds a relic and shards; its doorway leads on to the
-## Hidden Vault. A checkpoint sits on the west ledge.
+## Goal: the east ledge holds a relic and shards. Its east wall is solid: the
+## doorway to the Hidden Vault was walled up (a spatial anomaly, see
+## map/map_atlas.gd). A checkpoint sits on the west ledge.
 const LAVA_LAYOUT := [
 	"################################################################",
 	"#..............................................................#",
@@ -217,9 +221,9 @@ const LAVA_LAYOUT := [
 	"#..............................................................#",
 	"#..............................................................#",
 	"#.......................+.............m..............~~~.......#",
-	"............~~~.............____................................",
-	".......___......................................................",
-	"D.C........................................................?$R$H",
+	"............~~~.............____...............................#",
+	".......___.....................................................#",
+	"D.C........................................................?$R$#",
 	"#####LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL#####",
 	"################################################################",
 ]
@@ -295,7 +299,7 @@ const BESTIARY_LAYOUT := [
 ##     never renames the room's other shards, which saves refer to by name).
 ## World map:  Test Room <-> Boss Room <-> Proving Grounds <-(breakable wall)-> Hidden Shrine
 ##             Test Room <-(ceiling gap)-> Upper Galleries <-(secret doorway)-> Hidden Vault
-##             Upper Galleries <-> Ember Crossing (lava) <-> Hidden Vault
+##             Upper Galleries <-> Ember Crossing (lava, dead end)
 const ROOMS := {
 	"test_room": {
 		"name": "TestRoom", "layout": ROOM_LAYOUT, "path": "res://world/test_room.tscn", "origin_x": -7,
@@ -308,6 +312,7 @@ const ROOMS := {
 		"hidden_pocket": {"secret_id": "halls_west_alcove", "pass_dir": -1},
 		# Right after the start: a scroll and the altar of the Up slot.
 		"scrolls": {"20,21": "nova_burst", "27,14": "radiant_lance", "48,18": "meteor_slam"},
+		"maps": {"19,21": "halls"}, # The zone map, right of the start flame.
 		"altars": {"31,21": "up"},
 	},
 	"boss_room": {
@@ -346,12 +351,12 @@ const ROOMS := {
 		"hidden_pocket": {"secret_id": "galleries_alcove", "pass_dir": 1},
 		"scrolls": {"35,5": "spirit_volley"},
 		"altars": {"11,15": "side"},
+		"maps": {"19,15": "reaches"}, # The zone map, on the floor right of the altar.
 	},
 	"hidden_vault": {
 		"name": "HiddenVault", "layout": VAULT_LAYOUT, "path": "res://world/hidden_vault.tscn",
 		"doors": {
 			"X": {"door_id": "east", "target_room": "upper_room", "target_door": "west", "inward": -1, "secret_doorway": "exit"},
-			"D": {"door_id": "west", "target_room": "lava_room", "target_door": "east", "inward": 1},
 		},
 		"scrolls": {"14,6": "repulse_aegis"},
 	},
@@ -359,7 +364,6 @@ const ROOMS := {
 		"name": "LavaRoom", "layout": LAVA_LAYOUT, "path": "res://world/lava_room.tscn",
 		"doors": {
 			"D": {"door_id": "west", "target_room": "upper_room", "target_door": "east", "inward": 1},
-			"H": {"door_id": "east", "target_room": "hidden_vault", "target_door": "west", "inward": -1},
 		},
 		"relic": {"relic_id": "ember_heart", "stat": "max_energy", "amount": 20.0},
 		"scrolls": {"59,17": "comet_dash"},
@@ -474,6 +478,7 @@ const POTION_SCENES := {
 const SCROLL_SCENE := "res://world/objects/spell_scroll.tscn"
 const ALTAR_SCENE := "res://world/objects/meditation_altar.tscn"
 const ABILITY_PICKUP_SCENE := "res://world/objects/ability_pickup.tscn"
+const MAP_PICKUP_SCENE := "res://world/objects/map_pickup.tscn"
 const ABILITY_LETTERS := {"j": "double_jump", "d": "dash", "c": "wall_climb", "g": "grapple"}
 const SIGN_SCENE := "res://world/objects/chamber_sign.tscn"
 ## Ceiling / floor gap letters. 'O' is the usual one; 'Y' is a second gap in
@@ -1266,6 +1271,9 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 				"?":
 					_add_object(root, objects, counts, SCROLL_SCENE, "SpellScroll", feet,
 						{"spell_id": def.scrolls["%d,%d" % [x, y]]})
+				"M": # A zone's map (MapPickup); the zone id is in the room's "maps" entry.
+					_add_object(root, objects, counts, MAP_PICKUP_SCENE, "MapPickup", feet,
+						{"zone_id": def.maps["%d,%d" % [x, y]]})
 				"j", "d", "c", "g":
 					_add_object(root, objects, counts, ABILITY_PICKUP_SCENE, "AbilityPickup", feet,
 						{"ability": ABILITY_LETTERS[ch]})

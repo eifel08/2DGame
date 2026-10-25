@@ -168,8 +168,8 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 
 - Every room scene is on exactly one zone map (`map/map_atlas.gd`, `WORLD`), with a rect in map cells and **one exit per door** (same `door_id`, target room and target door, and `secret` for a breakable wall or a secret doorway). The smoke test fails otherwise.
 - A secret room is `hidden`: never on a base map. A room the base map should not show is `"base": false`.
-- **Spatial anomaly.** If a room is linked on both its left and right sides and one of those links cannot touch its neighbour on the map, only the intended way in stays: the secret exit, or `intended_entrance`. The other connection is suppressed on both ends: the map hides it and `Game.seal_door()` fills its gap with wall (Rule D holds). Prefer a layout that needs no anomaly; when you do build one, decide the intended entrance on purpose.
-- A zone map lying in the world (`map_pickup`) sits on standable floor, like every progression object, and never over a hazard.
+- **Spatial anomaly.** If a room is linked on both its left and right sides and one of those links cannot touch its neighbour on the map, only the intended way in stays: the secret exit, or `intended_entrance`. Remove the other doorway from **both** layouts (wall `#` in the gap, delete its `doors` entry and its map exit). The Hidden Vault's west doorway to the Ember Crossing was removed this way. `MapAtlas.resolve_anomalies()` only catches what is left: the map hides it, `Game.seal_door()` fills its gap with wall at load time (Rule D holds), and the smoke test fails until the layout is fixed.
+- A zone map lying in the world (layout letter `M`, `"maps"` entry) sits on standable floor, like every progression object, and never over a hazard.
 - Taking a map is not a celebration (Rule F): a soft pickup sound and a small puff.
 
 ## Checklist for a new room or exit
@@ -183,7 +183,7 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 7. A way back out of a secret room looks like an ordinary open doorway (**Rule E**).
 8. No celebration when anything in the room is won or found (**Rule F**).
 9. Lava? Floor only, ledges at the doorways (see "Lava" above).
-10. Progression objects? Potions (`h`, `e`), scrolls (`?`), altars (`A`) and movement items (`j`, `d`, `c`, `g`) sit on standable floor or a platform. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell and one item per movement ability in the whole world, and make sure each is reachable with what the player can have found before it.
+10. Progression objects? Potions (`h`, `e`), scrolls (`?`), altars (`A`) and movement items (`j`, `d`, `c`, `g`) and zone maps (`M`) sit on standable floor or a platform. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell and one item per movement ability in the whole world, and make sure each is reachable with what the player can have found before it.
 11. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
 12. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
 13. Map: add the room to its zone in `map/map_atlas.gd`, with one exit per door (see "Map" above).

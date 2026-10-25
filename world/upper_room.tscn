@@ -1,32 +1,34 @@
-[gd_scene load_steps=19 format=4]
+[gd_scene load_steps=21 format=4]
 
-[ext_resource type="Script" path="res://world/room.gd" id="1_hg2ma"]
-[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_2os74"]
-[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="3_6v6ad"]
-[ext_resource type="Script" path="res://world/objects/coin.gd" id="4_e48x2"]
-[ext_resource type="PackedScene" path="res://world/objects/health_potion.tscn" id="5_rnvna"]
-[ext_resource type="Script" path="res://world/objects/potion.gd" id="6_j23f4"]
-[ext_resource type="PackedScene" path="res://world/objects/spell_scroll.tscn" id="7_j2k75"]
-[ext_resource type="Script" path="res://world/objects/spell_scroll.gd" id="8_um1qq"]
-[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="9_j0des"]
-[ext_resource type="Script" path="res://world/objects/door.gd" id="10_fs0c0"]
-[ext_resource type="PackedScene" path="res://world/objects/secret_doorway.tscn" id="11_dyp7k"]
-[ext_resource type="Script" path="res://world/objects/secret_doorway.gd" id="12_eij8i"]
-[ext_resource type="PackedScene" path="res://world/objects/meditation_altar.tscn" id="13_comgt"]
-[ext_resource type="Script" path="res://world/objects/meditation_altar.gd" id="14_y6fu8"]
-[ext_resource type="PackedScene" path="res://world/objects/ability_pickup.tscn" id="15_gkxef"]
-[ext_resource type="Script" path="res://world/objects/ability_pickup.gd" id="16_8hnyr"]
-[ext_resource type="PackedScene" path="res://world/objects/hidden_pocket_wall.tscn" id="17_2s1vh"]
-[ext_resource type="Script" path="res://world/objects/hidden_pocket_wall.gd" id="18_kq8on"]
+[ext_resource type="Script" path="res://world/room.gd" id="1_45ew4"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_6aqx5"]
+[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="3_o320e"]
+[ext_resource type="Script" path="res://world/objects/coin.gd" id="4_8rmk5"]
+[ext_resource type="PackedScene" path="res://world/objects/health_potion.tscn" id="5_7ltmg"]
+[ext_resource type="Script" path="res://world/objects/potion.gd" id="6_qoh0s"]
+[ext_resource type="PackedScene" path="res://world/objects/spell_scroll.tscn" id="7_5qcff"]
+[ext_resource type="Script" path="res://world/objects/spell_scroll.gd" id="8_plc7x"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="9_q8yoh"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="10_u82ea"]
+[ext_resource type="PackedScene" path="res://world/objects/secret_doorway.tscn" id="11_bbowv"]
+[ext_resource type="Script" path="res://world/objects/secret_doorway.gd" id="12_6dbip"]
+[ext_resource type="PackedScene" path="res://world/objects/meditation_altar.tscn" id="13_fpspr"]
+[ext_resource type="Script" path="res://world/objects/meditation_altar.gd" id="14_dk338"]
+[ext_resource type="PackedScene" path="res://world/objects/map_pickup.tscn" id="15_n6oh8"]
+[ext_resource type="Script" path="res://world/objects/map_pickup.gd" id="16_fbgxp"]
+[ext_resource type="PackedScene" path="res://world/objects/ability_pickup.tscn" id="17_6h0yt"]
+[ext_resource type="Script" path="res://world/objects/ability_pickup.gd" id="18_h1owg"]
+[ext_resource type="PackedScene" path="res://world/objects/hidden_pocket_wall.tscn" id="19_wvxgr"]
+[ext_resource type="Script" path="res://world/objects/hidden_pocket_wall.gd" id="20_qmn61"]
 
 [node name="UpperRoom" type="Node2D"]
-script = ExtResource("1_hg2ma")
+script = ExtResource("1_45ew4")
 room_id = "upper_room"
 main_rect = Rect2(0, 0, 0, 0)
 
 [node name="Tiles" type="TileMapLayer" parent="."]
 tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAEAAAAAAAgAAAAAAAEAAAAAAAhAAAAAAAEAAAAAAAiAAAAAAAEAAAAAAAjAAAAAAAEAAAAAAAkAAAAAAAEAAAAAAAlAAAAAAAEAAAAAAAmAAAAAAAEAAAAAAAnAAAAAAAAAAAAAAAAAAEAAAACAAAAAAAnAAEAAAAIAAAAAAAAAAIAAAACAAAAAAAnAAIAAAAIAAAAAAAAAAMAAAACAAAAAAAnAAMAAAAIAAAAAAAAAAQAAAACAAAAAAAnAAQAAAAIAAAAAAAAAAUAAAACAAAAAAAnAAUAAAAIAAAAAAAAAAYAAAACAAAAAAAKAAYAAAAQAAAAAAALAAYAAAAQAAAAAAAMAAYAAAAQAAAAAAANAAYAAAAQAAAAAAAOAAYAAAAQAAAAAAAVAAYAAAAQAAAAAAAWAAYAAAAQAAAAAAAXAAYAAAAQAAAAAAAYAAYAAAAQAAAAAAAZAAYAAAAQAAAAAAAgAAYAAAAQAAAAAAAhAAYAAAAQAAAAAAAiAAYAAAAQAAAAAAAjAAYAAAAQAAAAAAAkAAYAAAAQAAAAAAAnAAYAAAAIAAAAAAAAAAcAAAACAAAAAAAnAAcAAAAMAAAAAAAAAAgAAAACAAAAAAAAAAkAAAACAAAAAAAAAAoAAAACAAAAAAAAAAsAAAACAAAAAAAPAAsAAAAQAAAAAAAQAAsAAAAQAAAAAAARAAsAAAAQAAAAAAASAAsAAAAQAAAAAAATAAsAAAAQAAAAAAAUAAsAAAAQAAAAAAAgAAsAAAAJAAAAAAAhAAsAAAABAAAAAAAiAAsAAAABAAAAAAAjAAsAAAABAAAAAAAkAAsAAAABAAAAAAAlAAsAAAABAAAAAAAmAAsAAAABAAAAAAAnAAsAAAABAAAAAAAAAAwAAAACAAAAAAAgAAwAAAAIAAAAAAAhAAwAAAAEAAAAAAAiAAwAAAAEAAAAAAAjAAwAAAAEAAAAAAAkAAwAAAAEAAAAAAAlAAwAAAAEAAAAAAAmAAwAAAAEAAAAAAAnAAwAAAAAAAAAAAAnAA0AAAAIAAAAAAAnAA4AAAAIAAAAAAAnAA8AAAAIAAAAAAAAABAAAAAAAAAAAAABABAAAAABAAAAAAACABAAAAABAAAAAAADABAAAAADAAAAAAAIABAAAAAJAAAAAAAJABAAAAABAAAAAAAKABAAAAABAAAAAAALABAAAAABAAAAAAAMABAAAAABAAAAAAANABAAAAABAAAAAAAOABAAAAABAAAAAAAPABAAAAABAAAAAAAQABAAAAABAAAAAAARABAAAAABAAAAAAASABAAAAABAAAAAAATABAAAAABAAAAAAAUABAAAAABAAAAAAAVABAAAAABAAAAAAAWABAAAAABAAAAAAAXABAAAAABAAAAAAAYABAAAAABAAAAAAAZABAAAAABAAAAAAAaABAAAAABAAAAAAAbABAAAAABAAAAAAAcABAAAAABAAAAAAAdABAAAAABAAAAAAAeABAAAAABAAAAAAAfABAAAAABAAAAAAAgABAAAAAAAAAAAAAhABAAAAABAAAAAAAiABAAAAABAAAAAAAjABAAAAABAAAAAAAkABAAAAABAAAAAAAlABAAAAABAAAAAAAmABAAAAABAAAAAAAnABAAAAAAAAAAAAAAABEAAAAAAAAAAAABABEAAAAAAAAAAAACABEAAAAAAAAAAAADABEAAAACAAAAAAAIABEAAAAIAAAAAAAJABEAAAAAAAAAAAAKABEAAAAAAAAAAAALABEAAAAAAAAAAAAMABEAAAAAAAAAAAANABEAAAAAAAAAAAAOABEAAAAAAAAAAAAPABEAAAAAAAAAAAAQABEAAAAAAAAAAAARABEAAAAAAAAAAAASABEAAAAAAAAAAAATABEAAAAAAAAAAAAUABEAAAAAAAAAAAAVABEAAAAAAAAAAAAWABEAAAAAAAAAAAAXABEAAAAAAAAAAAAYABEAAAAAAAAAAAAZABEAAAAAAAAAAAAaABEAAAAAAAAAAAAbABEAAAAAAAAAAAAcABEAAAAAAAAAAAAdABEAAAAAAAAAAAAeABEAAAAAAAAAAAAfABEAAAAAAAAAAAAgABEAAAAAAAAAAAAhABEAAAAAAAAAAAAiABEAAAAAAAAAAAAjABEAAAAAAAAAAAAkABEAAAAAAAAAAAAlABEAAAAAAAAAAAAmABEAAAAAAAAAAAAnABEAAAAAAAAAAAA=")
-tile_set = ExtResource("2_2os74")
+tile_set = ExtResource("2_6aqx5")
 
 [node name="EnemySpawns" type="Node2D" parent="."]
 
@@ -67,47 +69,47 @@ metadata/flying = false
 
 [node name="Objects" type="Node2D" parent="."]
 
-[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(368, 192)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="HealthPotion1" type="Node2D" parent="Objects" instance=ExtResource("5_rnvna")]
+[node name="HealthPotion1" type="Node2D" parent="Objects" instance=ExtResource("5_7ltmg")]
 z_index = 2
 position = Vector2(432, 192)
-script = ExtResource("6_j23f4")
+script = ExtResource("6_qoh0s")
 relic_id = "upper_room_health_potion_13_5"
 stat = "max_health"
 amount = 0.0
 
-[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(752, 192)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="Coin3" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="Coin3" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(1072, 192)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="SpellScroll1" type="Node2D" parent="Objects" instance=ExtResource("7_j2k75")]
+[node name="SpellScroll1" type="Node2D" parent="Objects" instance=ExtResource("7_5qcff")]
 z_index = 2
 position = Vector2(1136, 192)
-script = ExtResource("8_um1qq")
+script = ExtResource("8_plc7x")
 spell_id = "spirit_volley"
 
-[node name="Coin4" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="Coin4" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(1136, 352)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("9_j0des")]
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("9_q8yoh")]
 position = Vector2(1264, 352)
-script = ExtResource("10_fs0c0")
+script = ExtResource("10_u82ea")
 door_id = "east"
 target_room = "lava_room"
 target_door = "west"
@@ -116,9 +118,9 @@ vertical = 0
 trigger_size = Vector2(24, 96)
 secret = false
 
-[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("9_j0des")]
+[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("9_q8yoh")]
 position = Vector2(16, 512)
-script = ExtResource("10_fs0c0")
+script = ExtResource("10_u82ea")
 door_id = "west"
 target_room = "hidden_vault"
 target_door = "east"
@@ -127,56 +129,62 @@ vertical = 0
 trigger_size = Vector2(24, 96)
 secret = false
 
-[node name="SecretDoorway1" type="Node2D" parent="Objects" instance=ExtResource("11_dyp7k")]
+[node name="SecretDoorway1" type="Node2D" parent="Objects" instance=ExtResource("11_bbowv")]
 position = Vector2(16, 512)
-script = ExtResource("12_eij8i")
+script = ExtResource("12_6dbip")
 side = "entry"
 inward = 1
 size = Vector2(32, 96)
 
-[node name="Coin5" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="Coin5" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(112, 512)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="MeditationAltar1" type="Node2D" parent="Objects" instance=ExtResource("13_comgt")]
+[node name="MeditationAltar1" type="Node2D" parent="Objects" instance=ExtResource("13_fpspr")]
 z_index = 1
 position = Vector2(368, 512)
-script = ExtResource("14_y6fu8")
+script = ExtResource("14_dk338")
 slot_name = "side"
 prompt = "Concentrate"
 interact_size = Vector2(64, 64)
 
-[node name="AbilityPickup1" type="Node2D" parent="Objects" instance=ExtResource("15_gkxef")]
+[node name="MapPickup1" type="Node2D" parent="Objects" instance=ExtResource("15_n6oh8")]
+z_index = 2
+position = Vector2(624, 512)
+script = ExtResource("16_fbgxp")
+zone_id = "reaches"
+
+[node name="AbilityPickup1" type="Node2D" parent="Objects" instance=ExtResource("17_6h0yt")]
 z_index = 2
 position = Vector2(848, 512)
-script = ExtResource("16_8hnyr")
+script = ExtResource("18_h1owg")
 ability = "grapple"
 
-[node name="HiddenPocketWall1" type="Node2D" parent="Objects" instance=ExtResource("17_2s1vh")]
+[node name="HiddenPocketWall1" type="Node2D" parent="Objects" instance=ExtResource("19_wvxgr")]
 position = Vector2(1040, 512)
-script = ExtResource("18_kq8on")
+script = ExtResource("20_qmn61")
 secret_id = "galleries_alcove"
 pass_dir = 1
 pocket_rect = Rect2(1056, 416, 192, 96)
 size = Vector2(32, 96)
 
-[node name="PocketCoin1" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="PocketCoin1" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(1136, 512)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="PocketCoin2" type="Node2D" parent="Objects" instance=ExtResource("3_6v6ad")]
+[node name="PocketCoin2" type="Node2D" parent="Objects" instance=ExtResource("3_o320e")]
 z_index = 2
 position = Vector2(1200, 512)
-script = ExtResource("4_e48x2")
+script = ExtResource("4_8rmk5")
 value = 5
 
-[node name="Door3" type="Node2D" parent="Objects" instance=ExtResource("9_j0des")]
+[node name="Door3" type="Node2D" parent="Objects" instance=ExtResource("9_q8yoh")]
 position = Vector2(192, 576)
-script = ExtResource("10_fs0c0")
+script = ExtResource("10_u82ea")
 door_id = "floor"
 target_room = "test_room"
 target_door = "ceiling"
