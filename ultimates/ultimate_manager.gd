@@ -7,7 +7,10 @@ extends Node2D
 ##   Down                the Down slot
 ##   Left / Right        the Side slot, cast toward that side (the player turns)
 ## Up wins over Down, and both win over Left / Right. An empty slot casts
-## nothing (it never falls back to the neutral spell).
+## nothing (it never falls back to the neutral spell). So does a LOCKED
+## slot: a new game starts with every directional slot locked and no
+## equippable spell known. Spell Scrolls teach spells (learn), Meditation
+## Altars open slots (open_slot).
 ## Checks the energy cost, starts the cast wind-up and updates running
 ## spells. Loadout changes are only allowed at a checkpoint.
 ## Also draws spell visuals in world space.
@@ -43,7 +46,7 @@ func slot_count() -> int:
 func get_slot(slot: int) -> UltimateAbility:
 	if slot == NEUTRAL:
 		return abilities.get(PlayerData.NEUTRAL_SPELL)
-	if slot < 0 or slot >= PlayerData.SLOT_COUNT:
+	if not data.is_slot_open(slot):
 		return null
 	return abilities.get(data.equipped[slot])
 
@@ -102,6 +105,31 @@ func equip(slot: int, ability_id: String, force := false) -> bool:
 	return true
 
 
+func is_slot_open(slot: int) -> bool:
+	return slot == NEUTRAL or data.is_slot_open(slot)
+
+
+## Opens a locked directional slot for good (Meditation Altars). Works
+## anywhere: it is progression, not a loadout change.
+func open_slot(slot: int) -> bool:
+	if not data.open_slot(slot):
+		return false
+	Events.spell_slot_opened.emit(slot)
+	Events.loadout_changed.emit()
+	return true
+
+
+## Teaches an equippable spell for good (Spell Scrolls). Returns false if it
+## was already known or cannot be learned (unknown id, the fixed spell).
+func learn(ability_id: String) -> bool:
+	if not abilities.has(ability_id) or abilities[ability_id].fixed or data.is_unlocked(ability_id):
+		return false
+	data.unlock(ability_id)
+	Events.spell_learned.emit(ability_id)
+	Events.loadout_changed.emit()
+	return true
+
+
 ## Empties a directional slot. Same checkpoint rule. The neutral slot
 ## (Mana Discharge) can never be emptied.
 func unequip(slot: int, force := false) -> bool:
@@ -128,12 +156,16 @@ func set_known(ability_id: String, known: bool) -> void:
 	Events.loadout_changed.emit()
 
 
-## Debug: fills the empty slots with known, unequipped spells.
+## Debug: fills the empty open slots with known, unequipped spells.
 func auto_equip() -> void:
 	for ability in unlocked_abilities():
 		if slot_of(ability.id) >= 0:
 			continue
-		var free := data.equipped.find("")
+		var free := -1
+		for slot in PlayerData.SLOT_COUNT:
+			if data.is_slot_open(slot) and data.equipped[slot] == "":
+				free = slot
+				break
 		if free == -1:
 			break
 		data.equip(free, ability.id)
@@ -158,7 +190,7 @@ func try_activate(slot: int) -> bool:
 	var ability := get_slot(slot)
 	var player := ctx.player
 	if ability == null:
-		Events.ultimate_denied.emit(null, "empty")
+		Events.ultimate_denied.emit(null, "empty" if is_slot_open(slot) else "locked")
 		return false
 	if not player.can_cast() or not ability.can_activate(ctx):
 		Events.ultimate_denied.emit(ability, "busy")

@@ -104,6 +104,20 @@ signal hidden_pocket_found(secret_id: String) ## A Type 1 hidden pocket was walk
 @warning_ignore("unused_signal")
 signal relic_collected(relic_id: String, position: Vector2)
 
+# Progression: potions, spell scrolls, meditation altars
+@warning_ignore("unused_signal")
+signal potion_collected(potion_id: String, stat: String, position: Vector2) ## A Health / Mana Potion raised a maximum.
+@warning_ignore("unused_signal")
+signal scroll_collected(spell_id: String, position: Vector2) ## A Spell Scroll was picked up.
+@warning_ignore("unused_signal")
+signal spell_learned(spell_id: String) ## An equippable spell joined the known pool.
+@warning_ignore("unused_signal")
+signal meditation_started(altar: Node)
+@warning_ignore("unused_signal")
+signal meditation_finished(altar: Node, slot: int) ## slot: PlayerData.SLOT_*, or -1 if interrupted.
+@warning_ignore("unused_signal")
+signal spell_slot_opened(slot: int) ## A directional slot (PlayerData.SLOT_*) was unlocked for good.
+
 # Animation (frame events from method tracks, e.g. "footstep", "swing")
 @warning_ignore("unused_signal")
 signal anim_event(owner: Node, event_name: String)

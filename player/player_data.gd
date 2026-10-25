@@ -11,6 +11,10 @@ extends RefCounted
 ##   SLOT_SIDE               Spell + Left / Right (one slot for both sides)
 ##   SLOT_DOWN               Spell + Down
 ## Each directional slot holds one spell id or "" (empty).
+##
+## Progression: a new game knows NO equippable spell and every directional
+## slot is LOCKED. Spell Scrolls teach spells (unlock), Meditation Altars
+## open slots (open_slot). A locked slot holds nothing and casts nothing.
 
 const SLOT_UP := 0
 const SLOT_SIDE := 1
@@ -22,6 +26,7 @@ const NEUTRAL_SPELL := "mana_discharge"
 var currency := 0
 var unlocked: Array[String] = [] ## Every equippable spell the player has discovered.
 var equipped: Array[String] = empty_slots() ## Spell id per directional slot ("" = empty).
+var open_slots: Array[bool] = locked_slots() ## Per directional slot: true once a Meditation Altar opened it.
 
 
 static func empty_slots() -> Array[String]:
@@ -29,6 +34,29 @@ static func empty_slots() -> Array[String]:
 	slots.resize(SLOT_COUNT)
 	slots.fill("")
 	return slots
+
+
+static func locked_slots() -> Array[bool]:
+	var slots: Array[bool] = []
+	slots.resize(SLOT_COUNT)
+	slots.fill(false)
+	return slots
+
+
+func is_slot_open(slot: int) -> bool:
+	return slot >= 0 and slot < SLOT_COUNT and open_slots[slot]
+
+
+## Opens a directional slot for good. Returns false if it was already open.
+func open_slot(slot: int) -> bool:
+	if slot < 0 or slot >= SLOT_COUNT or open_slots[slot]:
+		return false
+	open_slots[slot] = true
+	return true
+
+
+func open_slot_count() -> int:
+	return open_slots.count(true)
 
 
 func add_currency(amount: int) -> void:
@@ -70,9 +98,9 @@ func equipped_count() -> int:
 
 ## Puts a spell into a slot. If it is already in another slot, the two
 ## slots swap so a spell is never equipped twice. The neutral spell is
-## refused: it is fixed to the neutral input.
+## refused: it is fixed to the neutral input. A locked slot is refused too.
 func equip(slot: int, ability_id: String) -> bool:
-	if ability_id == NEUTRAL_SPELL or slot < 0 or slot >= SLOT_COUNT:
+	if ability_id == NEUTRAL_SPELL or not is_slot_open(slot):
 		return false
 	var other := equipped.find(ability_id)
 	if other != -1 and other != slot:

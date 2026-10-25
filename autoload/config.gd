@@ -113,6 +113,15 @@ class Vitals:
 	var heal_chunk_pause := 0.4 ## Safe window after a chunk before the next one starts.
 
 
+## Progression pickups and altars (Potion, SpellScroll, MeditationAltar).
+## Starting max health / energy are on the player's stats node
+## (HealthEnergy.base_max_health / base_max_energy).
+class Progression:
+	var health_potion_amount := 15.0 ## Max health added by one Health Potion.
+	var mana_potion_amount := 15.0 ## Max energy added by one Mana Potion.
+	var meditation_time := 1.6 ## Length of the meditation at an altar (s) before the slot opens.
+
+
 class CameraCfg:
 	## Look up / down: hold Up or Down while standing still to pan the view.
 	var look_delay := 0.3 ## Hold this long first, so quick taps (aimed attacks) never move the view.
@@ -134,6 +143,7 @@ var movement: Movement
 var combat: Combat
 var grapple: Grapple
 var vitals: Vitals
+var progression: Progression
 var debug: DebugFlags
 var camera: CameraCfg
 ## One block per ultimate, keyed by ability id. `cost` is fully configurable.
@@ -150,6 +160,7 @@ func restore_defaults() -> void:
 	combat = Combat.new()
 	grapple = Grapple.new()
 	vitals = Vitals.new()
+	progression = Progression.new()
 	debug = DebugFlags.new()
 	camera = CameraCfg.new()
 	ultimates = {

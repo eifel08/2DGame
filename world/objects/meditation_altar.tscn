@@ -1,0 +1,97 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://world/objects/meditation_altar.gd" id="1_altar"]
+
+[sub_resource type="Animation" id="Animation_idle"]
+resource_name = "idle"
+length = 2.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/Rune:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1, 2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Color(1, 1, 1, 1), Color(1, 1, 1, 0.55), Color(1, 1, 1, 1)]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("Visual/Rune:position")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 1, 2),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, -44), Vector2(0, -48), Vector2(0, -44)]
+}
+
+[sub_resource type="Animation" id="Animation_spent"]
+resource_name = "spent"
+length = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual/Rune:modulate")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [Color(0.45, 0.45, 0.55, 0.35)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_altar"]
+_data = {
+"idle": SubResource("Animation_idle"),
+"spent": SubResource("Animation_spent")
+}
+
+[node name="MeditationAltar" type="Node2D"]
+z_index = 1
+script = ExtResource("1_altar")
+prompt = "Concentrate"
+interact_size = Vector2(64, 64)
+
+[node name="Visual" type="Node2D" parent="."]
+
+[node name="Base" type="Polygon2D" parent="Visual"]
+color = Color(0.3529, 0.3804, 0.4706, 1)
+polygon = PackedVector2Array(-22, -8, 22, -8, 22, 0, -22, 0)
+
+[node name="Pillar" type="Polygon2D" parent="Visual"]
+color = Color(0.4353, 0.4706, 0.5804, 1)
+polygon = PackedVector2Array(-12, -8, 12, -8, 9, -24, -9, -24)
+
+[node name="Top" type="Polygon2D" parent="Visual"]
+color = Color(0.5451, 0.5843, 0.7059, 1)
+polygon = PackedVector2Array(-16, -28, 16, -28, 16, -24, -16, -24)
+
+[node name="Rune" type="Node2D" parent="Visual"]
+position = Vector2(0, -44)
+
+[node name="Glow" type="Polygon2D" parent="Visual/Rune"]
+color = Color(0.7255, 0.6588, 1, 0.2)
+polygon = PackedVector2Array(16, 0, 15.22, 4.94, 12.94, 9.4, 9.4, 12.94, 4.94, 15.22, 0, 16, -4.94, 15.22, -9.4, 12.94, -12.94, 9.4, -15.22, 4.94, -16, 0, -15.22, -4.94, -12.94, -9.4, -9.4, -12.94, -4.94, -15.22, -0, -16, 4.94, -15.22, 9.4, -12.94, 12.94, -9.4, 15.22, -4.94)
+
+[node name="Ring" type="Line2D" parent="Visual/Rune"]
+points = PackedVector2Array(8.5, 0, 8.08, 2.63, 6.88, 5, 5, 6.88, 2.63, 8.08, 0, 8.5, -2.63, 8.08, -5, 6.88, -6.88, 5, -8.08, 2.63, -8.5, 0, -8.08, -2.63, -6.88, -5, -5, -6.88, -2.63, -8.08, -0, -8.5, 2.63, -8.08, 5, -6.88, 6.88, -5, 8.08, -2.63)
+closed = true
+width = 3.0
+default_color = Color(0.7255, 0.6588, 1, 1)
+
+[node name="Core" type="Polygon2D" parent="Visual/Rune"]
+color = Color(0.9373, 0.9137, 1, 1)
+polygon = PackedVector2Array(0, -4, 4, 0, 0, 4, -4, 0)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_altar")
+}
+autoplay = "idle"

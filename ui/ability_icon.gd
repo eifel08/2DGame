@@ -74,6 +74,12 @@ static func draw_symbol(c: CanvasItem, symbol: String, center: Vector2, r: float
 				var d := Vector2.from_angle(TAU * i / 8.0)
 				c.draw_line(center + d * r * 0.45, center + d * r * (0.95 if i % 2 == 0 else 0.75), col, maxf(1.0, r * 0.1), true)
 			c.draw_arc(center, r * 0.6, 0.0, TAU, 24, Color(col, 0.45), maxf(1.0, r * 0.06), true)
+		"locked": # Locked slot (opened at a Meditation Altar): a padlock.
+			var w := maxf(1.5, r * 0.14)
+			c.draw_arc(center + Vector2(0, -r * 0.2), r * 0.38, PI, TAU, 16, col, w, true)
+			c.draw_line(center + Vector2(-r * 0.38, -r * 0.2), center + Vector2(-r * 0.38, r * 0.05), col, w, true)
+			c.draw_line(center + Vector2(r * 0.38, -r * 0.2), center + Vector2(r * 0.38, r * 0.05), col, w, true)
+			c.draw_rect(Rect2(center + Vector2(-r * 0.6, 0.0), Vector2(r * 1.2, r * 0.8)), col)
 		"empty": # Empty slot.
 			c.draw_arc(center, r * 0.7, 0.0, TAU, 24, Color(col, 0.45), 1.5, true)
 			c.draw_line(center + Vector2(-r * 0.45, r * 0.45), center + Vector2(r * 0.45, -r * 0.45), Color(col, 0.45), 1.5, true)

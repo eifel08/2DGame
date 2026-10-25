@@ -31,11 +31,16 @@ const ENEMY_SCENES := {
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
 const RESPAWN_FADE_TIME := 0.45
-## Spells the player starts with in the Up, Side and Down slots (PlayerData
-## SLOT_UP / SLOT_SIDE / SLOT_DOWN). The neutral spell, Mana Discharge, is
-## fixed and needs no entry. Every registered spell starts known (in the
-## pool); the debug overlay can forget or relearn them.
-const STARTING_LOADOUT: Array[String] = ["radiant_lance", "comet_dash", "meteor_slam"]
+## Progression: a new game starts LOW. Max health and energy are small
+## (HealthEnergy.STARTING_MAX_*), NO equippable spell is known and the Up /
+## Side / Down slots are locked. Only Mana Discharge (the fixed neutral spell)
+## is there from the start. Growth comes from the world:
+##   Health / Mana Potion  +max health / +max energy for good (collect_relic)
+##   Spell Scroll          learns a spell (collect_scroll)
+##   Meditation Altar      meditate to open a spell slot (meditate_at)
+## DEFAULT_LOADOUT (Up, Side, Down) is the full kit the debug overlay grants
+## and what a save from before progression loads with.
+const DEFAULT_LOADOUT: Array[String] = ["radiant_lance", "comet_dash", "meteor_slam"]
 
 @onready var room_root: Node2D = $RoomRoot
 @onready var enemies_root: Node2D = $Enemies
@@ -68,7 +73,9 @@ var coins: Array[Coin] = []
 var breakables: Array[BreakableWall] = []
 var hidden_pockets: Array[HiddenPocketWall] = [] ## Type 1 secret walls in this room.
 var secret_doorways: Array[SecretDoorway] = [] ## Type 2 secret walls in this room.
-var relics: Array[Relic] = []
+var relics: Array[Relic] = [] ## Relics and potions (Potion extends Relic).
+var scrolls: Array[SpellScroll] = []
+var altars: Array[MeditationAltar] = []
 var platforms: Array[Platform] = [] ## Platform objects (standard, moving, breakable) in this room.
 var grapple_pegs: Array[GrapplePeg] = []
 var playtime := 0.0
@@ -91,11 +98,7 @@ func _ready() -> void:
 	ultimates.setup(UltimateContext.new(player, combat, effects, input), player_data)
 	for ability in UltimateRegistry.create_default():
 		ultimates.register(ability)
-	for i in STARTING_LOADOUT.size():
-		player_data.unlock(STARTING_LOADOUT[i])
-		player_data.equip(i, STARTING_LOADOUT[i])
-	for ability_id in ultimates.abilities:
-		player_data.unlock(ability_id)
+	# New game: no equippable spell known, every directional slot locked.
 	feedback.setup(camera, effects)
 	hud.setup(player, ultimates, player_data)
 	hud.boss_provider = active_boss
@@ -118,6 +121,7 @@ func _ready() -> void:
 	fade.color.a = 0.0
 
 	Events.boss_defeated.connect(func(_b: Node) -> void: write_save())
+	Events.loadout_changed.connect(_refresh_progression_objects)
 	Events.arena_cleared.connect(func(_id: String) -> void: write_save())
 
 	_load_room_scene(START_ROOM)
@@ -237,6 +241,8 @@ func _load_room_scene(id: String) -> void:
 	hidden_pockets.clear()
 	secret_doorways.clear()
 	relics.clear()
+	scrolls.clear()
+	altars.clear()
 	platforms.clear()
 	grapple_pegs.clear()
 	current_checkpoint = null
@@ -281,6 +287,13 @@ func _load_room_scene(id: String) -> void:
 			relics.append(node)
 			if world.has_relic(node.relic_id):
 				node.collect()
+		if node is SpellScroll:
+			scrolls.append(node)
+			if player_data.is_unlocked(node.spell_id):
+				node.collect() # Its spell is known: the scroll is gone.
+		if node is MeditationAltar:
+			altars.append(node)
+			node.set_spent(player_data.is_slot_open(node.get_slot()))
 		if node is Coin:
 			coins.append(node)
 			if world.is_coin_collected(id, node.name):
@@ -659,18 +672,89 @@ func _update_pickups(delta: float) -> void:
 	for relic in relics:
 		if not relic.collected and relic.get_rect().intersects(pr):
 			collect_relic(relic)
+	for scroll in scrolls:
+		if not scroll.collected and scroll.get_rect().intersects(pr):
+			collect_scroll(scroll)
 
 
-## Permanent upgrade: raises max health or max energy for this save.
+## Permanent upgrade: raises max health or max energy for this save. Potions
+## (Health / Mana) work the same way; one with no amount uses the Config one.
 func collect_relic(relic: Relic) -> void:
 	relic.collect()
 	world.take_relic(relic.relic_id)
+	var amount := relic.amount
+	if relic is Potion and amount <= 0.0:
+		amount = Config.progression.mana_potion_amount if relic.stat == "max_energy" else Config.progression.health_potion_amount
 	if relic.stat == "max_energy":
-		player.health.max_energy_bonus += relic.amount
+		player.health.max_energy_bonus += amount
 	else:
-		player.health.max_health_bonus += relic.amount
+		player.health.max_health_bonus += amount
 		player.health.full_heal()
-	Events.relic_collected.emit(relic.relic_id, relic.global_position)
+	if relic is Potion:
+		Events.potion_collected.emit(relic.relic_id, relic.stat, relic.global_position)
+	else:
+		Events.relic_collected.emit(relic.relic_id, relic.global_position)
+	write_save()
+
+
+## A Spell Scroll: its spell is learned for good (it joins the known pool and
+## can be equipped on an open slot at the saved checkpoint).
+func collect_scroll(scroll: SpellScroll) -> void:
+	scroll.collect()
+	ultimates.learn(scroll.spell_id)
+	Events.scroll_collected.emit(scroll.spell_id, scroll.global_position)
+	write_save()
+
+
+# ---------- Meditation altars ----------
+
+## Interacting with an altar: the player kneels in a meditation; when it
+## completes, the altar's slot opens for good. A hit interrupts it.
+func meditate_at(altar: MeditationAltar) -> void:
+	if altar.spent or not player.grounded or not player.can_attack():
+		return
+	var slot := altar.get_slot()
+	altar.busy = true
+	Events.meditation_started.emit(altar)
+	player.begin_meditation(altar.get_meditation_position(), Config.progression.meditation_time,
+		func() -> void: _finish_meditation(altar, slot),
+		func() -> void:
+			if is_instance_valid(altar):
+				altar.busy = false
+			Events.meditation_finished.emit(altar, -1))
+
+
+## Scrolls of known spells and altars of open slots are gone. Called when
+## the known spells or the open slots change (debug tools, loading).
+func _refresh_progression_objects() -> void:
+	for scroll in scrolls:
+		if player_data.is_unlocked(scroll.spell_id) and not scroll.collected:
+			scroll.collect()
+		elif not player_data.is_unlocked(scroll.spell_id) and scroll.collected:
+			scroll.collected = false
+			scroll.visible = true
+	for altar in altars:
+		altar.set_spent(player_data.is_slot_open(altar.get_slot()))
+
+
+## Debug / tests: every spell known, every slot open, DEFAULT_LOADOUT equipped.
+## Max health and energy are not touched.
+func grant_full_kit() -> void:
+	for slot in PlayerData.SLOT_COUNT:
+		player_data.open_slot(slot)
+	for ability_id in ultimates.abilities:
+		player_data.unlock(ability_id)
+	for i in DEFAULT_LOADOUT.size():
+		player_data.equip(i, DEFAULT_LOADOUT[i])
+	Events.loadout_changed.emit()
+
+
+func _finish_meditation(altar: MeditationAltar, slot: int) -> void:
+	ultimates.open_slot(slot)
+	if is_instance_valid(altar):
+		altar.busy = false
+		altar.set_spent(true)
+	Events.meditation_finished.emit(altar, slot)
 	write_save()
 
 
@@ -807,6 +891,7 @@ func make_save_data() -> Dictionary:
 		"currency": player_data.currency,
 		"unlocked": player_data.unlocked.duplicate(),
 		"equipped": player_data.equipped.duplicate(), # [up, side, down]
+		"open_slots": player_data.open_slots.duplicate(), # [up, side, down], true = unlocked
 		"max_health_bonus": player.health.max_health_bonus,
 		"max_energy_bonus": player.health.max_energy_bonus,
 		"playtime": playtime,
@@ -825,18 +910,24 @@ func apply_save_data(data: Dictionary) -> void:
 	world.from_dict(data)
 	player_data.currency = int(data.get("currency", 0))
 	var unlocked: Array[String] = []
-	for id in data.get("unlocked", STARTING_LOADOUT):
+	for id in data.get("unlocked", []):
 		unlocked.append(String(id))
 	player_data.unlocked = unlocked
+	# Open slots. A save from before progression stores none: all are open.
+	var open_slots := PlayerData.locked_slots()
+	var saved_open: Array = data.get("open_slots", [])
+	for i in PlayerData.SLOT_COUNT:
+		open_slots[i] = bool(saved_open[i]) if saved_open.size() == PlayerData.SLOT_COUNT else data.has("unlocked")
+	player_data.open_slots = open_slots
 	var equipped := PlayerData.empty_slots()
 	var saved_equipped: Array = data.get("equipped", [])
 	if saved_equipped.size() == PlayerData.SLOT_COUNT:
 		for i in PlayerData.SLOT_COUNT:
 			var id := String(saved_equipped[i])
-			equipped[i] = id if id != PlayerData.NEUTRAL_SPELL else ""
-	else: # A save from the old numbered hotkeys: start from the default loadout.
+			equipped[i] = id if id != PlayerData.NEUTRAL_SPELL and open_slots[i] else ""
+	elif data.has("unlocked"): # A save from the old numbered hotkeys: start from the default loadout.
 		for i in PlayerData.SLOT_COUNT:
-			equipped[i] = STARTING_LOADOUT[i] if player_data.is_unlocked(STARTING_LOADOUT[i]) else ""
+			equipped[i] = DEFAULT_LOADOUT[i] if player_data.is_unlocked(DEFAULT_LOADOUT[i]) and open_slots[i] else ""
 	player_data.equipped = equipped
 	player.health.max_health_bonus = float(data.get("max_health_bonus", 0.0))
 	player.health.max_energy_bonus = float(data.get("max_energy_bonus", 0.0))

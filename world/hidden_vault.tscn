@@ -1,54 +1,72 @@
-[gd_scene load_steps=9 format=4]
+[gd_scene load_steps=13 format=4]
 
-[ext_resource type="Script" path="res://world/room.gd" id="1_r8vhu"]
-[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_pssr8"]
-[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="3_xpux4"]
-[ext_resource type="Script" path="res://world/objects/coin.gd" id="4_jxx4f"]
-[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="5_dijw5"]
-[ext_resource type="Script" path="res://world/objects/door.gd" id="6_5t6om"]
-[ext_resource type="PackedScene" path="res://world/objects/secret_doorway.tscn" id="7_p7gkq"]
-[ext_resource type="Script" path="res://world/objects/secret_doorway.gd" id="8_7auva"]
+[ext_resource type="Script" path="res://world/room.gd" id="1_ujv04"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_5ty05"]
+[ext_resource type="PackedScene" path="res://world/objects/spell_scroll.tscn" id="3_vhd5t"]
+[ext_resource type="Script" path="res://world/objects/spell_scroll.gd" id="4_ornra"]
+[ext_resource type="PackedScene" path="res://world/objects/coin.tscn" id="5_6xe56"]
+[ext_resource type="Script" path="res://world/objects/coin.gd" id="6_x8epj"]
+[ext_resource type="PackedScene" path="res://world/objects/mana_potion.tscn" id="7_18v11"]
+[ext_resource type="Script" path="res://world/objects/potion.gd" id="8_lk61i"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="9_3arhr"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="10_bom4j"]
+[ext_resource type="PackedScene" path="res://world/objects/secret_doorway.tscn" id="11_7iswf"]
+[ext_resource type="Script" path="res://world/objects/secret_doorway.gd" id="12_ptnfx"]
 
 [node name="HiddenVault" type="Node2D"]
-script = ExtResource("1_r8vhu")
+script = ExtResource("1_ujv04")
 room_id = "hidden_vault"
 main_rect = Rect2(0, 0, 0, 0)
 
 [node name="Tiles" type="TileMapLayer" parent="."]
 tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAAAAAAAAAAAAEAAAACAAAAAAAfAAEAAAAIAAAAAAAAAAIAAAACAAAAAAAfAAIAAAAIAAAAAAAAAAMAAAACAAAAAAAfAAMAAAAIAAAAAAAAAAQAAAACAAAAAAAfAAQAAAAIAAAAAAAAAAUAAAACAAAAAAAfAAUAAAAIAAAAAAAAAAYAAAACAAAAAAAfAAYAAAAIAAAAAAAAAAcAAAACAAAAAAANAAcAAAAQAAAAAAAOAAcAAAAQAAAAAAAPAAcAAAAQAAAAAAAQAAcAAAAQAAAAAAARAAcAAAAQAAAAAAASAAcAAAAQAAAAAAAfAAcAAAAIAAAAAAAAAAgAAAACAAAAAAAfAAgAAAAIAAAAAAAAAAkAAAACAAAAAAAfAAkAAAAIAAAAAAAAAAoAAAACAAAAAAAfAAoAAAAIAAAAAAAAAAsAAAACAAAAAAAIAAsAAAAQAAAAAAAJAAsAAAAQAAAAAAAKAAsAAAAQAAAAAAALAAsAAAAQAAAAAAAMAAsAAAAQAAAAAAATAAsAAAAQAAAAAAAUAAsAAAAQAAAAAAAVAAsAAAAQAAAAAAAWAAsAAAAQAAAAAAAXAAsAAAAQAAAAAAAfAAsAAAAIAAAAAAAAAAwAAAAGAAAAAAAfAAwAAAAIAAAAAAAAABAAAAABAAAAAAABABAAAAABAAAAAAACABAAAAABAAAAAAADABAAAAABAAAAAAAEABAAAAABAAAAAAAFABAAAAABAAAAAAAGABAAAAABAAAAAAAHABAAAAABAAAAAAAIABAAAAABAAAAAAAJABAAAAABAAAAAAAKABAAAAABAAAAAAALABAAAAABAAAAAAAMABAAAAABAAAAAAANABAAAAABAAAAAAAOABAAAAABAAAAAAAPABAAAAABAAAAAAAQABAAAAABAAAAAAARABAAAAABAAAAAAASABAAAAABAAAAAAATABAAAAABAAAAAAAUABAAAAABAAAAAAAVABAAAAABAAAAAAAWABAAAAABAAAAAAAXABAAAAABAAAAAAAYABAAAAABAAAAAAAZABAAAAABAAAAAAAaABAAAAABAAAAAAAbABAAAAABAAAAAAAcABAAAAABAAAAAAAdABAAAAABAAAAAAAeABAAAAABAAAAAAAfABAAAAAAAAAAAAAAABEAAAAAAAAAAAABABEAAAAAAAAAAAACABEAAAAAAAAAAAADABEAAAAAAAAAAAAEABEAAAAAAAAAAAAFABEAAAAAAAAAAAAGABEAAAAAAAAAAAAHABEAAAAAAAAAAAAIABEAAAAAAAAAAAAJABEAAAAAAAAAAAAKABEAAAAAAAAAAAALABEAAAAAAAAAAAAMABEAAAAAAAAAAAANABEAAAAAAAAAAAAOABEAAAAAAAAAAAAPABEAAAAAAAAAAAAQABEAAAAAAAAAAAARABEAAAAAAAAAAAASABEAAAAAAAAAAAATABEAAAAAAAAAAAAUABEAAAAAAAAAAAAVABEAAAAAAAAAAAAWABEAAAAAAAAAAAAXABEAAAAAAAAAAAAYABEAAAAAAAAAAAAZABEAAAAAAAAAAAAaABEAAAAAAAAAAAAbABEAAAAAAAAAAAAcABEAAAAAAAAAAAAdABEAAAAAAAAAAAAeABEAAAAAAAAAAAAfABEAAAAAAAAAAAA=")
-tile_set = ExtResource("2_pssr8")
+tile_set = ExtResource("2_5ty05")
 
 [node name="EnemySpawns" type="Node2D" parent="."]
 
 [node name="Objects" type="Node2D" parent="."]
 
-[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="SpellScroll1" type="Node2D" parent="Objects" instance=ExtResource("3_vhd5t")]
+z_index = 2
+position = Vector2(464, 224)
+script = ExtResource("4_ornra")
+spell_id = "repulse_aegis"
+
+[node name="Coin1" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(496, 224)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="Coin2" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(528, 224)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Coin3" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="ManaPotion1" type="Node2D" parent="Objects" instance=ExtResource("7_18v11")]
+z_index = 2
+position = Vector2(272, 352)
+script = ExtResource("8_lk61i")
+relic_id = "hidden_vault_mana_potion_8_10"
+stat = "max_energy"
+amount = 0.0
+
+[node name="Coin3" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(336, 352)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Coin4" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="Coin4" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(688, 352)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("5_dijw5")]
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("9_3arhr")]
 position = Vector2(16, 512)
-script = ExtResource("6_5t6om")
+script = ExtResource("10_bom4j")
 door_id = "west"
 target_room = "lava_room"
 target_door = "east"
@@ -57,33 +75,33 @@ vertical = 0
 trigger_size = Vector2(24, 96)
 secret = false
 
-[node name="Coin5" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="Coin5" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(176, 512)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Coin6" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="Coin6" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(400, 512)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Coin7" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="Coin7" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(592, 512)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Coin8" type="Node2D" parent="Objects" instance=ExtResource("3_xpux4")]
+[node name="Coin8" type="Node2D" parent="Objects" instance=ExtResource("5_6xe56")]
 z_index = 2
 position = Vector2(816, 512)
-script = ExtResource("4_jxx4f")
+script = ExtResource("6_x8epj")
 value = 5
 
-[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("5_dijw5")]
+[node name="Door2" type="Node2D" parent="Objects" instance=ExtResource("9_3arhr")]
 position = Vector2(1008, 512)
-script = ExtResource("6_5t6om")
+script = ExtResource("10_bom4j")
 door_id = "east"
 target_room = "upper_room"
 target_door = "west"
@@ -92,9 +110,9 @@ vertical = 0
 trigger_size = Vector2(24, 96)
 secret = false
 
-[node name="SecretDoorway1" type="Node2D" parent="Objects" instance=ExtResource("7_p7gkq")]
+[node name="SecretDoorway1" type="Node2D" parent="Objects" instance=ExtResource("11_7iswf")]
 position = Vector2(1008, 512)
-script = ExtResource("8_7auva")
+script = ExtResource("12_ptnfx")
 side = "exit"
 inward = -1
 size = Vector2(32, 96)

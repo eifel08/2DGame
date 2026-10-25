@@ -27,6 +27,11 @@ const TS := 32
 ## '_' platform  '~' moving platform  '%' breakable platform (Platform objects:
 ##     one node per horizontal run, one-way like '=')
 ## 'L' lava (Lava, one node per run): floor only, it must sit on a solid cell
+## Progression (see core/game.gd): 'h' Health Potion, 'e' Mana Potion (+max
+## health / +max energy, saved by id like relics), '?' Spell Scroll (the room's
+## "scrolls" entry gives its spell id), 'A' Meditation Altar (the room's
+## "altars" entry gives its slot: "up", "side" or "down"). Both entries are
+## keyed by the "col,row" of the cell.
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. Wall spikes ('<', right part of the room,
 ## rows 10-12) and ceiling spikes ('V', under the block in row 13) are there to
@@ -43,23 +48,23 @@ const ROOM_LAYOUT := [
 	"########..............................................................#",
 	"########..............................................................#",
 	"########..$..........................####.............................#",
-	"########=====..................#####.##.......................$.G.....#",
+	"########=====..................#####.##......................e$.G.....#",
 	"########.....##......................##....................########...#",
 	"########.....##......................##..........................##...#",
-	"########.....##.....$................##..............$...........##...#",
+	"########.....##.....$.h..............##..............$...........##...#",
 	"########.....##...======.............##............======........##...#",
 	"########.....##..................F...##.........................<##...#",
 	"########.....##................$.....##.........................<##...#",
 	"########.....##..............=====...##.....$...................<##...#",
 	"########.....##......................##...####...................##...#",
-	"########.....##..........$...........##...VVVV............+......##...#",
+	"########.....##..........$.?.........##...VVVV............+......##...#",
 	"########.....##........=====.........##..........................##...#",
 	"########.....##......................##..........................##...#",
 	"########.....##....$.................##.................F........##...#",
-	"########.....##..=====...........................K....+..........##...#",
+	"########.....##..=====..........................?K....+..........##...#",
 	"##.....#.....##................................####....................",
 	"##.....I.......................................####....................",
-	"##.*.*.I..W...T..S....N...........U..$$.E.....C####..........E.....C..D",
+	"##.*.*.I..W...T..S..?.N........A..U..$$.E.....C####..........E.....C..D",
 	"#########################^^^^########################^^^^^^^###########",
 	"#######################################################################",
 ]
@@ -98,11 +103,11 @@ const ARENA_LAYOUT := [
 	"#..................................#",
 	"#..................................#",
 	"#..................................#",
-	"#..................................#",
+	"#................?.................#",
 	"#..............=======.............#",
 	"#..................................#",
 	"#...............v........v.........#",
-	"#..................................#",
+	"#...........e......................#",
 	"#.........=====.......=====........#",
 	"...................................z",
 	"...................................z",
@@ -122,13 +127,13 @@ const SECRET_LAYOUT := [
 	"#..............................#",
 	"#..............................#",
 	"#..............................#",
-	"#.......$...............$......#",
+	"#.....h.$...............$?.....#",
 	"#.....=====...........=====....#",
 	"#..............................#",
 	"#..............................#",
 	"...............................#",
 	"................R..............#",
-	"D.........Q...#####..$.$.$.$...#",
+	"D....A....Q...#####..$.$.$.$...#",
 	"################################",
 	"################################",
 ]
@@ -144,7 +149,7 @@ const UPPER_LAYOUT := [
 	"#......................................#",
 	"#..............F...........F...........#",
 	"#......................................#",
-	"#..........$...........$.........$.....#",
+	"#..........$.h.........$.........$.?...#",
 	"#.........=====......=====......=====..#",
 	"#......................................#",
 	"#.......................................",
@@ -154,7 +159,7 @@ const UPPER_LAYOUT := [
 	"#...............................########",
 	"x...............................I......#",
 	"x...............................I......#",
-	"X..$........E..........G......E.I..*E*.#",
+	"X..$.......AE..........G......E.I..*E*.#",
 	"####....################################",
 	"####O...################################",
 ]
@@ -170,11 +175,11 @@ const VAULT_LAYOUT := [
 	"#..............................#",
 	"#..............................#",
 	"#..............................#",
-	"#..............$$..............#",
+	"#.............?$$..............#",
 	"#............======............#",
 	"#..............................#",
 	"#..............................#",
-	"#.........$..........$.........#",
+	"#.......e.$..........$.........#",
 	"#.......=====......=====.......#",
 	"#..............................#",
 	"...............................x",
@@ -212,7 +217,7 @@ const LAVA_LAYOUT := [
 	"#.......................+.............m..............~~~.......#",
 	"............~~~.............____................................",
 	".......___......................................................",
-	"D.C.........................................................$R$H",
+	"D.C........................................................?$R$H",
 	"#####LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL#####",
 	"################################################################",
 ]
@@ -268,6 +273,9 @@ const ROOMS := {
 		},
 		# Type 1: the west wall hides a pocket beyond the room's normal area.
 		"hidden_pocket": {"secret_id": "halls_west_alcove", "pass_dir": -1},
+		# Right after the start: a scroll and the altar of the Up slot.
+		"scrolls": {"20,21": "nova_burst", "27,14": "radiant_lance", "48,18": "meteor_slam"},
+		"altars": {"31,21": "up"},
 	},
 	"boss_room": {
 		"name": "BossRoom", "layout": BOSS_LAYOUT, "path": "res://world/boss_room.tscn",
@@ -285,11 +293,14 @@ const ROOMS := {
 		},
 		"arena": {"arena_id": "proving_grounds", "trigger_cols": [9, 32], "waves": [["w"], ["v", "u"], ["s"]]},
 		"secret_id": "proving_grounds_wall",
+		"scrolls": {"17,7": "ascendant_form"},
 	},
 	"secret_room": {
 		"name": "SecretRoom", "layout": SECRET_LAYOUT, "path": "res://world/secret_room.tscn",
 		"doors": {"D": {"door_id": "west", "target_room": "arena_room", "target_door": "east", "inward": 1}},
 		"relic": {"relic_id": "shrine_heart", "stat": "max_health", "amount": 25.0},
+		"scrolls": {"25,9": "stasis_field"},
+		"altars": {"5,15": "down"},
 	},
 	"upper_room": {
 		"name": "UpperRoom", "layout": UPPER_LAYOUT, "path": "res://world/upper_room.tscn",
@@ -300,6 +311,8 @@ const ROOMS := {
 		},
 		# Type 1: the alcove under the east block, entered from the left.
 		"hidden_pocket": {"secret_id": "galleries_alcove", "pass_dir": 1},
+		"scrolls": {"35,5": "spirit_volley"},
+		"altars": {"11,15": "side"},
 	},
 	"hidden_vault": {
 		"name": "HiddenVault", "layout": VAULT_LAYOUT, "path": "res://world/hidden_vault.tscn",
@@ -307,6 +320,7 @@ const ROOMS := {
 			"X": {"door_id": "east", "target_room": "upper_room", "target_door": "west", "inward": -1, "secret_doorway": "exit"},
 			"D": {"door_id": "west", "target_room": "lava_room", "target_door": "east", "inward": 1},
 		},
+		"scrolls": {"14,6": "repulse_aegis"},
 	},
 	"lava_room": {
 		"name": "LavaRoom", "layout": LAVA_LAYOUT, "path": "res://world/lava_room.tscn",
@@ -315,6 +329,7 @@ const ROOMS := {
 			"H": {"door_id": "east", "target_room": "hidden_vault", "target_door": "west", "inward": -1},
 		},
 		"relic": {"relic_id": "ember_heart", "stat": "max_energy", "amount": 20.0},
+		"scrolls": {"59,17": "comet_dash"},
 		# Moving platforms ('~') and pegs ('m'), keyed by "col,row" of their
 		# first cell: travel (offset of the far end), period (s), phase (0..1).
 		"movers": {
@@ -356,6 +371,12 @@ const PLATFORM_SCENES := {
 	"%": "res://world/objects/platform_breakable.tscn",
 }
 const LAVA_SCENE := "res://world/objects/lava.tscn"
+const POTION_SCENES := {
+	"h": "res://world/objects/health_potion.tscn",
+	"e": "res://world/objects/mana_potion.tscn",
+}
+const SCROLL_SCENE := "res://world/objects/spell_scroll.tscn"
+const ALTAR_SCENE := "res://world/objects/meditation_altar.tscn"
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -395,6 +416,8 @@ const PLAYER_ANIMS := {
 	"hurt": {"frames": 2, "fps": 12, "loop": false, "color": "#ff6b6b", "sx": 1.1, "sy": 0.9, "lean": -0.2},
 	"dying": {"frames": 6, "fps": 8, "loop": false, "color": "#ff4d5e", "sx": 1.35, "sy": 0.3, "lean": -0.35},
 	"trance": {"frames": 6, "fps": 4, "loop": true, "color": "#c9f2ff", "sx": 0.95, "sy": 1.02, "bob": 2.0, "float": 14.0},
+	# Meditation at an altar: kneel low (squashed), weapon away, a slow breath.
+	"meditate": {"frames": 8, "fps": 5, "loop": true, "color": "#b9a8ff", "sx": 1.12, "sy": 0.78, "bob": 2.5},
 }
 
 const DUMMY_ANIMS := {
@@ -460,6 +483,9 @@ const FX := {
 	"coin_fizzle": [{"amount": 6, "color": "#9aa7c7", "speed": 90.0, "gravity": -60.0, "life": 0.35, "size": 3.0}],
 	"checkpoint_light": [{"ring": 50.0, "color": "#ffb347", "width": 4.0, "life": 0.45}],
 	"save_glow": [{"amount": 20, "color": "#8dffb0", "speed": 120.0, "angle": -90.0, "spread": 40.0, "gravity": -150.0, "life": 0.7, "size": 3.0}],
+	"potion_pickup": [{"amount": 8, "color": "#ffffff", "speed": 80.0, "angle": -90.0, "spread": 60.0, "gravity": -80.0, "life": 0.35, "size": 3.0}], # Small puff, tinted per potion.
+	"scroll_pickup": [{"amount": 8, "color": "#e9d9a6", "speed": 80.0, "angle": -90.0, "spread": 60.0, "gravity": -80.0, "life": 0.35, "size": 3.0}],
+	"meditate_glow": [{"amount": 1, "color": "#b9a8ff", "speed": 40.0, "angle": -90.0, "spread": 40.0, "gravity": -120.0, "life": 0.6, "size": 3.0}],
 	"trance_break": [{"ring": 34.0, "color": "#c9f2ff", "width": 3.0, "life": 0.3}],
 	"player_death": [{"amount": 40, "color": "#ff6b6b", "speed": 400.0, "size": 5.0, "life": 0.45}],
 	"spawn_portal": [{"portal": 34.0, "color": "#ff4dd2", "life": 0.35}],
@@ -1123,6 +1149,16 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, BREAKABLE_SCENE, "BreakableWall", feet, {"secret_id": def.secret_id})
 				"R":
 					_add_object(root, objects, counts, RELIC_SCENE, "Relic", feet, def.relic)
+				"h", "e": # Potions: saved by id (WorldState.relics), so it names the room and cell.
+					var kind := "health_potion" if ch == "h" else "mana_potion"
+					_add_object(root, objects, counts, POTION_SCENES[ch], kind.to_pascal_case(), feet,
+						{"relic_id": "%s_%s_%d_%d" % [room_id, kind, x, y]})
+				"?":
+					_add_object(root, objects, counts, SCROLL_SCENE, "SpellScroll", feet,
+						{"spell_id": def.scrolls["%d,%d" % [x, y]]})
+				"A":
+					_add_object(root, objects, counts, ALTAR_SCENE, "MeditationAltar", feet,
+						{"slot_name": def.altars["%d,%d" % [x, y]]})
 				"I": # Type 1: one HiddenPocketWall per vertical run, at its bottom cell.
 					if y + 1 < layout.size() and x < (layout[y + 1] as String).length() and layout[y + 1][x] == "I":
 						continue

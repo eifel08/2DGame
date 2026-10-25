@@ -21,6 +21,8 @@ extends CanvasLayer
 ##     on the Center node                    nothing: Mana Discharge is fixed
 ##   Backspace / Delete               cancel the slot choice, or clear the focused node
 ## Loadout changes only work while standing at the saved checkpoint.
+## Locked slots (padlock) take no spell until a Meditation Altar opens them.
+## A new game knows no equippable spell: Spell Scrolls teach them.
 ## The game simulation is paused while the window is open.
 
 const STATUS_TAB := 0
@@ -108,6 +110,10 @@ func press_node(node_name: String) -> void:
 		_flash_notice() # Mana Discharge is fixed to the neutral Spell input.
 		refresh()
 		return
+	if not manager.is_slot_open(slot):
+		_flash_notice() # Locked: a Meditation Altar opens it.
+		_show_details(null, true)
+		return
 	if pending_ability_id != "":
 		# Assign the chosen ability here (an occupied slot is replaced).
 		if manager.equip(slot, pending_ability_id):
@@ -132,11 +138,22 @@ func press_pool(ability: UltimateAbility) -> void:
 		pending_ability_id = ""
 		refresh()
 		return
-	# Unequipped -> choose a node: focus the first empty slot (or Up).
+	# Unequipped -> choose a node: focus the first empty open slot (or the
+	# first open one). With every slot locked there is nothing to choose.
+	var target := -1
+	for slot_index in PlayerData.SLOT_COUNT:
+		if manager.is_slot_open(slot_index) and game.player_data.equipped[slot_index] == "":
+			target = slot_index
+			break
+	for slot_index in PlayerData.SLOT_COUNT:
+		if target == -1 and manager.is_slot_open(slot_index):
+			target = slot_index
+	if target == -1:
+		_flash_notice()
+		return
 	pending_ability_id = ability.id
 	refresh()
-	var target: int = game.player_data.equipped.find("")
-	cross.card(node_for_slot(target if target >= 0 else PlayerData.SLOT_UP)).grab_focus()
+	cross.card(node_for_slot(target)).grab_focus()
 
 
 ## The cross node that stands for a slot (the Side slot -> "Left").
@@ -186,7 +203,10 @@ func refresh() -> void:
 		card.show_ability(card.ability, max_energy, SLOT_TAGS[slot] if slot >= 0 else "")
 		card.button_pressed = card.ability.id == pending_ability_id
 
-	if not manager.can_change_loadout():
+	if game.player_data.unlocked.is_empty() or game.player_data.open_slot_count() == 0:
+		notice_label.text = "Spell Scrolls teach new spells. Meditate at an altar to open a spell slot. Mana Discharge (center) is always yours."
+		notice_label.add_theme_color_override("font_color", Color("#c9b8ff"))
+	elif not manager.can_change_loadout():
 		notice_label.text = "Abilities can only be changed at your saved checkpoint."
 		notice_label.add_theme_color_override("font_color", Color("#ffb3b3"))
 	elif pending_ability_id != "":
@@ -198,7 +218,7 @@ func refresh() -> void:
 		notice_label.add_theme_color_override("font_color", Color("#8dffb0"))
 	var focus := get_viewport().gui_get_focus_owner() if get_viewport() else null
 	if focus is AbilityCard:
-		_show_details(focus.ability)
+		_show_details(focus.ability, focus.locked)
 	elif pending_ability_id != "":
 		_show_details(manager.get_ability(pending_ability_id))
 	else:
@@ -206,7 +226,13 @@ func refresh() -> void:
 
 
 ## Name + description are only shown for the focused ability.
-func _show_details(ability: UltimateAbility) -> void:
+func _show_details(ability: UltimateAbility, locked := false) -> void:
+	if locked:
+		detail_icon.set_icon("locked", Color.WHITE)
+		detail_name.text = "Locked slot"
+		detail_desc.text = "Meditate at an altar to open this slot."
+		detail_gauge.visible = false
+		return
 	if ability == null:
 		detail_icon.set_icon("empty", Color.WHITE)
 		detail_name.text = "Free slot"
@@ -340,7 +366,7 @@ func _build_abilities_tab() -> Control:
 		card.pressed.connect(func() -> void: press_node(n))
 		card.focus_entered.connect(func() -> void:
 			if pending_ability_id == "":
-				_show_details(game.ultimates.get_slot(SpellCross.slot_of(n))))
+				_show_details(game.ultimates.get_slot(SpellCross.slot_of(n)), not game.ultimates.is_slot_open(SpellCross.slot_of(n))))
 
 	var right := VBoxContainer.new()
 	top.add_child(right)

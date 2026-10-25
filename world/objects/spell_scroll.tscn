@@ -1,0 +1,63 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://world/objects/spell_scroll.gd" id="1_scroll"]
+
+[sub_resource type="Animation" id="Animation_idle"]
+resource_name = "idle"
+length = 1.6
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Visual:position")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.8, 1.6),
+"transitions": PackedFloat32Array(1, 1, 1),
+"update": 0,
+"values": [Vector2(0, -18), Vector2(0, -22), Vector2(0, -18)]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_scroll"]
+_data = {
+"idle": SubResource("Animation_idle")
+}
+
+[node name="SpellScroll" type="Node2D"]
+z_index = 2
+script = ExtResource("1_scroll")
+spell_id = ""
+
+[node name="Visual" type="Node2D" parent="."]
+position = Vector2(0, -18)
+
+[node name="Glow" type="Polygon2D" parent="Visual"]
+color = Color(0.8392, 0.6588, 1, 0.18)
+polygon = PackedVector2Array(17, 0, 15.71, 6.51, 12.02, 12.02, 6.51, 15.71, 0, 17, -6.51, 15.71, -12.02, 12.02, -15.71, 6.51, -17, 0, -15.71, -6.51, -12.02, -12.02, -6.51, -15.71, -0, -17, 6.51, -15.71, 12.02, -12.02, 15.71, -6.51)
+
+[node name="Paper" type="Polygon2D" parent="Visual"]
+color = Color(0.9137, 0.851, 0.651, 1)
+polygon = PackedVector2Array(-8, -10, 8, -10, 8, 10, -8, 10)
+
+[node name="Lines" type="Polygon2D" parent="Visual"]
+color = Color(0.6275, 0.5412, 0.3529, 1)
+polygon = PackedVector2Array(-5, -5, 5, -5, 5, -4, -5, -4)
+
+[node name="RodTop" type="Polygon2D" parent="Visual"]
+color = Color(0.4784, 0.3216, 0.1882, 1)
+polygon = PackedVector2Array(-11, -13, 11, -13, 11, -10, -11, -10)
+
+[node name="RodBottom" type="Polygon2D" parent="Visual"]
+color = Color(0.4784, 0.3216, 0.1882, 1)
+polygon = PackedVector2Array(-11, 10, 11, 10, 11, 13, -11, 13)
+
+[node name="Seal" type="Polygon2D" parent="Visual"]
+color = Color(0.6627, 0.4196, 1, 1)
+polygon = PackedVector2Array(3.5, 4, 2.83, 6.06, 1.08, 7.33, -1.08, 7.33, -2.83, 6.06, -3.5, 4, -2.83, 1.94, -1.08, 0.67, 1.08, 0.67, 2.83, 1.94)
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+"": SubResource("AnimationLibrary_scroll")
+}
+autoplay = "idle"

@@ -48,6 +48,9 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.enemy_spawning.connect(_on_enemy_spawning)
 	Events.secret_found.connect(_on_secret_found)
 	Events.relic_collected.connect(_on_relic_collected)
+	Events.potion_collected.connect(_on_potion_collected)
+	Events.scroll_collected.connect(_on_scroll_collected)
+	Events.meditation_finished.connect(_on_meditation_finished)
 	Events.player_dying.connect(func(_p: Node) -> void: Sfx.play("death"))
 	Events.trance_broken.connect(func(p: Node) -> void: effects.play("trance_break", p.get_center()))
 	Events.health_healed.connect(func(_amount: float) -> void: _heal_sparkle = true)
@@ -79,6 +82,8 @@ func step(delta: float, player: Player) -> void:
 	if (_heal_sparkle or player.is_channeling_heal) and randf() < 0.5:
 		effects.play("heal_sparkle", player.global_position + Vector2(randf_range(-12, 12), 0))
 	_heal_sparkle = false
+	if player.state_name() == "meditate" and randf() < 0.25:
+		effects.play("meditate_glow", player.global_position + Vector2(randf_range(-14, 14), -4))
 
 
 # ---------- Event handlers ----------
@@ -196,6 +201,24 @@ func _on_secret_found(_secret_id: String, pos: Vector2) -> void:
 func _on_relic_collected(_relic_id: String, pos: Vector2) -> void:
 	Sfx.play("pickup")
 	effects.play("relic_pickup", pos + Vector2(0, -22))
+
+
+## Potions and scrolls: the same soft pickup as a relic (Rule F spirit: no
+## jingle or flare). The puff takes the potion's color.
+func _on_potion_collected(_potion_id: String, stat: String, pos: Vector2) -> void:
+	Sfx.play("pickup", 0.9)
+	effects.play("potion_pickup", pos + Vector2(0, -20), {"tint": Color("#4f8dff") if stat == "max_energy" else Color("#ff5e6c")})
+
+
+func _on_scroll_collected(_spell_id: String, pos: Vector2) -> void:
+	Sfx.play("pickup", 1.15)
+	effects.play("scroll_pickup", pos + Vector2(0, -18))
+
+
+## A meditation completed: one low, calm tone. Nothing on an interruption.
+func _on_meditation_finished(_altar: Node, slot: int) -> void:
+	if slot >= 0:
+		Sfx.play("save", 0.7)
 
 
 func _on_ultimate_impact(hitstop: float, shake: float) -> void:

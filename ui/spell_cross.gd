@@ -10,6 +10,7 @@ extends Control
 ##   Center       Mana Discharge, the neutral spell (fixed for good)
 ##   Up / Down    the Up and Down slots
 ##   Left, Right  BOTH show the one Side slot, so they always match
+## A locked slot (not yet opened at a Meditation Altar) shows a padlock.
 ##
 ## Children (one per node, named Up / Left / Center / Right / Down):
 ##   HUD        SpellNodeView: icon, tier-colored frame, bright when affordable
@@ -83,10 +84,11 @@ func node_name_of(c: Control) -> String:
 func refresh(max_energy: float, energy := -1.0) -> void:
 	for node_name in NODES:
 		var ability := ultimates.get_slot(slot_of(node_name))
+		var locked := not ultimates.is_slot_open(slot_of(node_name))
 		if interactive:
-			(nodes[node_name] as AbilityCard).show_ability(ability, max_energy)
+			(nodes[node_name] as AbilityCard).show_ability(ability, max_energy, "", false, locked)
 		else:
-			(nodes[node_name] as SpellNodeView).show_spell(ability, energy < 0.0 or (ability != null and energy >= ability.get_cost() - 0.0001))
+			(nodes[node_name] as SpellNodeView).show_spell(ability, energy < 0.0 or (ability != null and energy >= ability.get_cost() - 0.0001), locked)
 	if interactive:
 		_update_mirror()
 

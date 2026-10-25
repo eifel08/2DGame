@@ -249,6 +249,10 @@ func _build_spells() -> VBoxContainer:
 			for ability_id in game.ultimates.abilities:
 				game.ultimates.set_known(ability_id, false)], # Fixed spells stay.
 		["Auto-Equip Known", func() -> void: game.ultimates.auto_equip()],
+		["Open All Slots", func() -> void:
+			for slot in PlayerData.SLOT_COUNT:
+				game.ultimates.open_slot(slot)],
+		["Full Kit", func() -> void: game.grant_full_kit()],
 		["Clear Loadout", func() -> void:
 			for slot in PlayerData.SLOT_COUNT:
 				game.ultimates.unequip(slot, true)],
@@ -372,6 +376,7 @@ func _process(delta: float) -> void:
 		"modifiers    %s" % (", ".join(PackedStringArray(p.modifiers.keys())) if not p.modifiers.is_empty() else "-"),
 		"spells       %s" % " ".join(slots),
 		"known        %s" % ", ".join(PackedStringArray(game.player_data.unlocked)),
+		"open slots   %s" % str(game.player_data.open_slots),
 		"running      %s" % (", ".join(PackedStringArray(running)) if not running.is_empty() else "-"),
 		"shards       %d" % game.player_data.currency,
 		"checkpoint   %s  at checkpoint %s" % [cp.name if cp else "-", p.at_checkpoint],

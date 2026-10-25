@@ -10,6 +10,7 @@ extends CharacterBody2D
 ##   hurt    - short knockback stun after taking damage
 ##   eject   - carried up out of a floor gap after an upward room transition
 ##   grapple - pulled toward the grappling hook's anchor (combat/grapple_hook.gd)
+##   meditate - kneeling at a Meditation Altar until a spell slot opens
 ##
 ## The node origin is at the feet (bottom-center). Game calls step() from
 ## its own fixed-step loop, so hitstop can freeze everything in one place.
@@ -71,6 +72,7 @@ func _ready() -> void:
 	fsm.add("dying", DyingState.new(self))
 	fsm.add("eject", EjectState.new(self))
 	fsm.add("grapple", GrappleState.new(self))
+	fsm.add("meditate", MeditateState.new(self))
 	health.energy_gain_source = func() -> float: return stat("energy_gain_mul")
 	animator.setup(self)
 
@@ -288,6 +290,17 @@ func start_cast(duration: float, on_release: Callable) -> void:
 ## then arc onto the floor at `target` (feet position). See EjectState.
 func begin_ejection(target: Vector2) -> void:
 	fsm.change("eject", {"target": target})
+
+
+## Meditation at an altar: kneel at `at` (feet position) for `duration`
+## seconds, then `on_complete` runs. A hit interrupts it (`on_cancel`).
+func begin_meditation(at: Vector2, duration: float, on_complete: Callable, on_cancel: Callable) -> void:
+	global_position = Vector2(at.x, global_position.y)
+	fsm.change("meditate", {"duration": duration, "on_complete": on_complete, "on_cancel": on_cancel})
+
+
+func is_meditating() -> bool:
+	return fsm.is_in("meditate")
 
 
 ## Hands movement to `controller`, an object with

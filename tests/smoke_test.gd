@@ -36,6 +36,14 @@ func _run() -> void:
 	await _frames(30)
 	var p: Player = game.player
 
+	# --- A new game: low stats, no spells, locked slots, Mana Discharge only ---
+	await _test_starting_state()
+	_grant_test_kit() # The checks below use the full kit and 100 / 100.
+	await _frames(2)
+	_check("scrolls of known spells and altars of open slots are gone",
+		_objects_of(SpellScroll).all(func(s: SpellScroll) -> bool: return s.collected) and _objects_of(MeditationAltar).all(func(a: MeditationAltar) -> bool: return a.spent))
+	await _reset()
+
 	# --- Grounded and running ---
 	_check("starts grounded", p.grounded)
 	Input.action_press(&"move_right")
@@ -273,6 +281,9 @@ func _run() -> void:
 
 	# --- Secret walls: Type 1 hidden pockets (incl. camera limits), Type 2 secret doorways ---
 	await _test_secret_walls()
+
+	# --- Progression: potions, spell scrolls, meditation altars, saves ---
+	await _test_progression()
 
 	# --- Contact damage + i-frames ---
 	await _reset()
@@ -1185,7 +1196,7 @@ func _run() -> void:
 	await _frames(30)
 	_check("the hidden passage leads to the Hidden Shrine", game.room_id == "secret_room", game.room_id)
 	var base_max := p.health.get_max_health()
-	var relic: Relic = game.relics[0]
+	var relic: Relic = game.relics.filter(func(r: Relic) -> bool: return not r is Potion)[0]
 	p.global_position = relic.global_position
 	await _frames(5)
 	_check("the relic raises max health", relic.collected and is_equal_approx(p.health.get_max_health(), base_max + 25.0),
@@ -1195,7 +1206,7 @@ func _run() -> void:
 	_check("the broken wall stays open", not game.breakables[0].intact)
 	game.load_room("secret_room", "west")
 	await _frames(2)
-	_check("the relic stays collected", game.relics[0].collected)
+	_check("the relic stays collected", game.relics.filter(func(r: Relic) -> bool: return not r is Potion)[0].collected)
 	Config.upgrades.god_mode = false
 
 	# --- Save slots ---
@@ -1419,7 +1430,7 @@ func _test_new_spells() -> void:
 	var p: Player = game.player
 	var data: PlayerData = game.player_data
 	var loadout := data.equipped.duplicate()
-	_check("nine spells are registered; the eight equippable ones are known from the start",
+	_check("nine spells are registered; the eight equippable ones are known with the full kit",
 		game.ultimates.abilities.size() == 9 and data.unlocked.size() == 8 and not data.unlocked.has("mana_discharge"), data.unlocked)
 
 	# Repulse Aegis: a parry. Consumes all energy, a tiny window, enemy contact only.
@@ -1602,8 +1613,8 @@ func _test_spell_management() -> void:
 		pick.call(0, 0) == UltimateManager.NEUTRAL and pick.call(0, -1) == PlayerData.SLOT_UP and pick.call(0, 1) == PlayerData.SLOT_DOWN
 		and pick.call(1, 0) == PlayerData.SLOT_SIDE and pick.call(-1, 0) == PlayerData.SLOT_SIDE)
 	_check("Up wins over Left / Right, Down too", pick.call(1, -1) == PlayerData.SLOT_UP and pick.call(-1, 1) == PlayerData.SLOT_DOWN)
-	_check("the default loadout: Lance up, Comet Dash to the side, Meteor Slam down",
-		game.STARTING_LOADOUT == ["radiant_lance", "comet_dash", "meteor_slam"], game.STARTING_LOADOUT)
+	_check("the default (full kit) loadout: Lance up, Comet Dash to the side, Meteor Slam down",
+		game.DEFAULT_LOADOUT == ["radiant_lance", "comet_dash", "meteor_slam"], game.DEFAULT_LOADOUT)
 
 	# A Side spell goes toward the held side (the player turns).
 	p.facing = 1
@@ -3477,3 +3488,303 @@ func _check(label: String, ok: bool, detail: Variant = "") -> void:
 	else:
 		failures.append("%s (%s)" % [label, str(detail)])
 		print("  FAIL ", label, "  -> ", detail)
+
+
+# ---------- Progression: low start, potions, scrolls, meditation altars ----------
+
+## A brand-new game: low maximums, no equippable spell, every slot locked,
+## Mana Discharge alone on the neutral input (it works even at low energy).
+func _test_starting_state() -> void:
+	var p: Player = game.player
+	var h := p.health
+	var data: PlayerData = game.player_data
+	var manager: UltimateManager = game.ultimates
+	_check("a new game starts with low max health and max energy",
+		is_equal_approx(h.get_max_health(), HealthEnergy.STARTING_MAX_HEALTH) and is_equal_approx(h.get_max_energy(), HealthEnergy.STARTING_MAX_ENERGY)
+		and h.get_max_health() < 100.0 and h.get_max_energy() < 100.0 and is_equal_approx(h.health, h.get_max_health()),
+		[h.get_max_health(), h.get_max_energy(), h.health])
+	_check("a new game knows ZERO equippable spells", data.unlocked.is_empty() and manager.unlocked_abilities().is_empty(), data.unlocked)
+	var all_locked := true
+	for slot in PlayerData.SLOT_COUNT:
+		all_locked = all_locked and not data.is_slot_open(slot) and manager.get_slot(slot) == null
+	_check("every Up / Side / Down slot starts locked and empty", all_locked, data.open_slots)
+	manager.set_known("nova_burst", true)
+	_check("a locked slot refuses a spell, even from debug tools",
+		not manager.equip(PlayerData.SLOT_UP, "nova_burst", true) and data.equipped[PlayerData.SLOT_UP] == "", data.equipped)
+	manager.set_known("nova_burst", false)
+	_check("Mana Discharge is fixed to the neutral input from the start",
+		manager.neutral_spell() != null and manager.neutral_spell().id == PlayerData.NEUTRAL_SPELL and manager.neutral_spell().fixed)
+	var cross: SpellCross = game.hud.spell_cross
+	_check("the HUD cross shows padlocks on the locked slots and Mana Discharge in the center",
+		(cross.card("Up") as SpellNodeView).locked and (cross.card("Left") as SpellNodeView).locked
+		and (cross.card("Down") as SpellNodeView).locked and not (cross.card("Center") as SpellNodeView).locked)
+
+	# Spell + a direction on a locked slot casts nothing.
+	var denied := []
+	var on_denied := func(_a: RefCounted, reason: String) -> void: denied.append(reason)
+	Events.ultimate_denied.connect(on_denied)
+	h.set_energy(40.0)
+	Input.action_press(&"move_up")
+	Input.action_press(&"spell")
+	await _frames(2)
+	Input.action_release(&"spell")
+	Input.action_release(&"move_up")
+	Events.ultimate_denied.disconnect(on_denied)
+	_check("Spell + Up on a locked slot casts nothing", denied.has("locked") and is_equal_approx(h.energy, 40.0) and p.state_name() == "normal",
+		[denied, h.energy, p.state_name()])
+	await _frames(10)
+
+	# Mana Discharge at the low starting energy: a real wave, then a fizzle.
+	var md: ManaDischarge = manager.get_ability("mana_discharge")
+	h.set_energy(h.get_max_energy())
+	await _cast_neutral()
+	await _frames(20)
+	_check("Mana Discharge works with the low starting energy (wave sized by the small max)",
+		is_zero_approx(h.energy) and not md.failed and is_equal_approx(md.max_radius, Config.ultimates.mana_discharge.radius_per_energy * h.get_max_energy()),
+		[h.energy, md.failed, md.max_radius])
+	await _frames(30)
+	h.set_energy(5.0)
+	await _cast_neutral()
+	await _frames(5)
+	_check("Mana Discharge still casts at very low energy (drains and fizzles)", is_zero_approx(h.energy) and md.failed, [h.energy, md.failed])
+	await _frames(40)
+
+	var scrolls := _objects_of(SpellScroll)
+	var altar: MeditationAltar = _objects_of(MeditationAltar)[0] if not _objects_of(MeditationAltar).is_empty() else null
+	_check("the Testing Halls hold Spell Scrolls and a Meditation Altar, all unused",
+		scrolls.size() >= 2 and scrolls.all(func(s: SpellScroll) -> bool: return not s.collected and s.visible) and altar != null and not altar.spent,
+		[scrolls.size(), altar])
+
+
+## Gives the player everything the older checks expect: all spells known,
+## every slot open, the default loadout, and 100 / 100 maximums.
+func _grant_test_kit() -> void:
+	var h: HealthEnergy = game.player.health
+	game.grant_full_kit()
+	h.set_base_max_health(100.0)
+	h.set_base_max_energy(100.0)
+	h.full_heal()
+
+
+func _test_progression() -> void:
+	var p: Player = game.player
+	var h := p.health
+	var data: PlayerData = game.player_data
+	var manager: UltimateManager = game.ultimates
+	var saved_bonus := [h.max_health_bonus, h.max_energy_bonus]
+
+	# Back to a fresh start (same game instance).
+	game.new_game()
+	data.unlocked.clear()
+	data.equipped = PlayerData.empty_slots()
+	data.open_slots = PlayerData.locked_slots()
+	h.set_base_max_health(HealthEnergy.STARTING_MAX_HEALTH)
+	h.set_base_max_energy(HealthEnergy.STARTING_MAX_ENERGY)
+	h.max_health_bonus = 0.0
+	h.max_energy_bonus = 0.0
+	Events.loadout_changed.emit()
+	await _reset()
+
+	# --- Every room together: scrolls teach every spell once, altars open every slot ---
+	var scroll_spells := []
+	var altar_slots := []
+	var health_potions := 0
+	var mana_potions := 0
+	for rid in game.ROOM_SCENES:
+		var scene_root: Node = (game.ROOM_SCENES[rid] as PackedScene).instantiate()
+		for node in scene_root.get_node("Objects").get_children():
+			if node is SpellScroll:
+				scroll_spells.append(node.spell_id)
+			elif node is MeditationAltar:
+				altar_slots.append(node.slot_name)
+			elif node is Potion:
+				if node.stat == "max_energy":
+					mana_potions += 1
+				else:
+					health_potions += 1
+		scene_root.free()
+	var equippable := []
+	for id in manager.abilities:
+		if not manager.abilities[id].fixed:
+			equippable.append(id)
+	scroll_spells.sort()
+	equippable.sort()
+	_check("one Spell Scroll per equippable spell is scattered in the world", scroll_spells == equippable, scroll_spells)
+	altar_slots.sort()
+	_check("three Meditation Altars open the Down, Side and Up slots", altar_slots == ["down", "side", "up"], altar_slots)
+	_check("Health and Mana Potions are placed in the world", health_potions >= 2 and mana_potions >= 2, [health_potions, mana_potions])
+
+	# --- Potions: distinct looks, permanent growth ---
+	var hp_potion: Potion = null
+	var mp_potion: Potion = null
+	for relic in game.relics:
+		if relic is Potion:
+			if relic.stat == "max_health" and hp_potion == null:
+				hp_potion = relic
+			elif relic.stat == "max_energy" and mp_potion == null:
+				mp_potion = relic
+	_check("the Testing Halls hold a Health Potion and a Mana Potion", hp_potion != null and mp_potion != null)
+	var hp_body: Polygon2D = hp_potion.get_node("Visual/Body")
+	var mp_body: Polygon2D = mp_potion.get_node("Visual/Body")
+	var mc := mp_body.color
+	_check("the Mana Potion is blue", mc.b > 0.8 and mc.b > mc.r + 0.4 and mc.b > mc.g + 0.2, mc)
+	_check("the Health Potion is red", hp_body.color.r > hp_body.color.b + 0.4, hp_body.color)
+	var hp_box := _poly_bounds(hp_body.polygon)
+	var mp_box := _poly_bounds(mp_body.polygon)
+	_check("the two potions have different bottle shapes (the Mana Potion is a tall, narrow bottle)",
+		hp_body.polygon.size() != mp_body.polygon.size() and mp_box.size.y / mp_box.size.x > hp_box.size.y / hp_box.size.x + 0.2
+		and mp_potion.get_node_or_null("Visual/Lip") != null and hp_potion.get_node_or_null("Visual/Lip") == null, [hp_box, mp_box])
+
+	h.take_damage(20.0)
+	var max_hp := h.get_max_health()
+	p.global_position = hp_potion.global_position
+	await _frames(4)
+	_check("a Health Potion raises max health for good and heals fully",
+		hp_potion.collected and is_equal_approx(h.get_max_health(), max_hp + Config.progression.health_potion_amount)
+		and is_equal_approx(h.health, h.get_max_health()) and game.world.has_relic(hp_potion.relic_id), [h.get_max_health(), h.health])
+	var max_en := h.get_max_energy()
+	p.global_position = mp_potion.global_position
+	await _frames(4)
+	_check("a Mana Potion raises max energy for good",
+		mp_potion.collected and is_equal_approx(h.get_max_energy(), max_en + Config.progression.mana_potion_amount), h.get_max_energy())
+	var hp_id := hp_potion.relic_id
+	game.load_room("upper_room", "floor")
+	await _frames(2)
+	game.load_room("test_room", "east")
+	await _frames(2)
+	var still_gone := false
+	for relic in game.relics:
+		if relic is Potion and relic.relic_id == hp_id:
+			still_gone = relic.collected and not relic.visible
+	_check("a drunk potion never comes back", still_gone)
+	await _reset()
+
+	# --- Spell Scrolls ---
+	var scroll: SpellScroll = null
+	for s in _objects_of(SpellScroll):
+		if s.spell_id == "nova_burst":
+			scroll = s
+	_check("a Spell Scroll lies near the start", scroll != null)
+	var learned := []
+	var on_learned := func(id: String) -> void: learned.append(id)
+	Events.spell_learned.connect(on_learned)
+	p.global_position = scroll.global_position
+	await _frames(4)
+	Events.spell_learned.disconnect(on_learned)
+	_check("collecting a scroll teaches its spell for good",
+		scroll.collected and not scroll.visible and data.is_unlocked("nova_burst") and learned == ["nova_burst"]
+		and manager.unlocked_abilities().size() == 1, [learned, data.unlocked])
+	_check("a learned spell still needs an open slot", not manager.equip(PlayerData.SLOT_UP, "nova_burst", true))
+	game.load_room("upper_room", "floor")
+	await _frames(2)
+	game.load_room("test_room", "east")
+	await _frames(2)
+	var scroll_back := false
+	for s in _objects_of(SpellScroll):
+		if s.spell_id == "nova_burst":
+			scroll_back = not s.collected
+	_check("a collected scroll does not come back", not scroll_back)
+	await _reset()
+
+	# --- Meditation altar ---
+	var altar: MeditationAltar = _objects_of(MeditationAltar)[0]
+	_check("the first altar opens the Up slot", altar.get_slot() == PlayerData.SLOT_UP and altar.prompt == "Concentrate", [altar.slot_name, altar.prompt])
+	_check("the player has a meditation animation", p.animator.animation_player.has_animation("meditate"))
+	p.global_position = altar.global_position + Vector2(10, 0)
+	await _frames(3)
+	_check("standing at the altar offers to meditate", game.focused_interactable == altar)
+	await _hold(&"interact", 2)
+	await _frames(6)
+	_check("interacting starts the meditation (state and animation)",
+		p.state_name() == "meditate" and p.animator.current == "meditate" and is_equal_approx(p.global_position.x, altar.global_position.x),
+		[p.state_name(), p.animator.current, p.global_position.x])
+	_check("the slot is still locked during the meditation", not data.is_slot_open(PlayerData.SLOT_UP))
+	_check("no prompt shows while kneeling", not altar.highlighted and not altar.can_interact())
+	p.receive_hit(5.0, p.global_position.x - 10.0, false, true)
+	await _frames(2)
+	_check("a hit interrupts the meditation: nothing opens",
+		p.state_name() != "meditate" and not data.is_slot_open(PlayerData.SLOT_UP) and not altar.spent, [p.state_name(), data.open_slots])
+	await _frames(70)
+	h.full_heal()
+	p.global_position = altar.global_position
+	await _frames(3)
+	var finished := []
+	var on_finished := func(_a: Node, slot: int) -> void: finished.append(slot)
+	Events.meditation_finished.connect(on_finished)
+	await _hold(&"interact", 2)
+	var frames := int(Config.progression.meditation_time * 60.0) + 20
+	await _frames(frames)
+	Events.meditation_finished.disconnect(on_finished)
+	_check("a full meditation opens the Up slot for good",
+		data.is_slot_open(PlayerData.SLOT_UP) and finished == [PlayerData.SLOT_UP] and p.state_name() == "normal", [data.open_slots, finished, p.state_name()])
+	_check("a spent altar offers nothing more", altar.spent and not altar.can_interact() and game.focused_interactable != altar)
+	_check("the other slots stay locked", not data.is_slot_open(PlayerData.SLOT_SIDE) and not data.is_slot_open(PlayerData.SLOT_DOWN))
+	_check("the HUD cross unlocks the Up node", not (game.hud.spell_cross.card("Up") as SpellNodeView).locked)
+
+	# Equip the learned spell at the saved checkpoint and cast it.
+	await _reset()
+	p.at_checkpoint = true
+	_check("a learned spell goes on the opened slot at the checkpoint", manager.equip(PlayerData.SLOT_UP, "nova_burst"))
+	_check("a locked slot still refuses it", not manager.equip(PlayerData.SLOT_SIDE, "nova_burst"))
+	h.set_energy(h.get_max_energy())
+	var before := h.energy
+	Input.action_press(&"move_up")
+	Input.action_press(&"spell")
+	await _frames(2)
+	Input.action_release(&"spell")
+	Input.action_release(&"move_up")
+	_check("Spell + Up casts the equipped spell", is_equal_approx(h.energy, before - Config.ultimates.nova_burst.cost), h.energy)
+	await _frames(40)
+
+	# Inventory: a locked node cannot take a spell.
+	game.inventory.toggle()
+	await _frames(2)
+	game.inventory.switch_tab(1)
+	await _frames(1)
+	game.inventory.pending_ability_id = "nova_burst"
+	game.inventory.press_node("Down")
+	_check("the inventory refuses a locked slot", data.equipped[PlayerData.SLOT_DOWN] == "" and (game.inventory.cross.card("Down") as AbilityCard).locked)
+	game.inventory.pending_ability_id = ""
+	game.inventory.toggle()
+	await _frames(2)
+
+	# --- Saves keep the progression ---
+	var saved: Dictionary = game.make_save_data()
+	_check("a save stores the open slots", saved.get("open_slots", []) == [true, false, false], saved.get("open_slots"))
+	data.open_slots = PlayerData.locked_slots()
+	data.unlocked.clear()
+	data.equipped = PlayerData.empty_slots()
+	game.apply_save_data(saved)
+	await _frames(3)
+	p.fsm.change("normal")
+	_check("loading restores learned spells, open slots and the loadout",
+		data.is_unlocked("nova_burst") and data.open_slots == [true, false, false] and data.equipped[PlayerData.SLOT_UP] == "nova_burst",
+		[data.unlocked, data.open_slots, data.equipped])
+	_check("loading restores the potion growth",
+		is_equal_approx(h.max_health_bonus, Config.progression.health_potion_amount) and is_equal_approx(h.max_energy_bonus, Config.progression.mana_potion_amount))
+	var spent_after_load := false
+	for a in game.altars:
+		if a.get_slot() == PlayerData.SLOT_UP:
+			spent_after_load = a.spent
+	_check("after loading, the used altar stays spent", spent_after_load)
+	var old_save := saved.duplicate()
+	old_save.erase("open_slots")
+	game.apply_save_data(old_save)
+	await _frames(3)
+	p.fsm.change("normal")
+	_check("a save from before progression loads with every slot open", data.open_slots == [true, true, true], data.open_slots)
+
+	# Restore the kit for the remaining checks.
+	game.new_game()
+	_grant_test_kit()
+	h.max_health_bonus = saved_bonus[0]
+	h.max_energy_bonus = saved_bonus[1]
+	h.full_heal()
+	await _reset()
+
+
+func _poly_bounds(points: PackedVector2Array) -> Rect2:
+	var r := Rect2(points[0], Vector2.ZERO)
+	for pt in points:
+		r = r.expand(pt)
+	return r

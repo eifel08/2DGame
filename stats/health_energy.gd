@@ -6,17 +6,21 @@ extends Node
 
 ## Maximum stats. Set them in the Inspector (player.tscn > HealthEnergy)
 ## or in code; upgrades add on top through the bonus fields below.
+## The player starts LOW (STARTING_MAX_*): Health Potions, Mana Potions and
+## relics raise the maximums for good (max_health_bonus / max_energy_bonus).
+const STARTING_MAX_HEALTH := 50.0
+const STARTING_MAX_ENERGY := 50.0
 @export_group("Max stats")
-@export_range(1.0, 1000.0, 1.0) var base_max_health := 100.0
-@export_range(1.0, 1000.0, 1.0) var base_max_energy := 100.0
+@export_range(1.0, 1000.0, 1.0) var base_max_health := STARTING_MAX_HEALTH
+@export_range(1.0, 1000.0, 1.0) var base_max_energy := STARTING_MAX_ENERGY
 @export_group("")
 
-var health := 100.0
+var health := STARTING_MAX_HEALTH
 var energy := 0.0
 var iframe_timer := 0.0
 ## Named invulnerability sources, e.g. "dash", "cast", "ability".
 var invuln_flags := {}
-## Growth from upgrades (e.g. max-health relics). Added to the base values.
+## Growth from upgrades (potions, relics). Added to the base values and saved.
 var max_health_bonus := 0.0
 var max_energy_bonus := 0.0
 ## Extra multiplier for energy gain (wired to the owner's stat modifiers).

@@ -15,6 +15,7 @@ var icon_view: AbilityIcon
 var gauge: EnergyGauge
 var key_label: Label
 var mirror := false ## Dim "same slot" frame (see SpellCross).
+var locked := false ## A locked spell slot (padlock, see SpellCross).
 
 
 func _init() -> void:
@@ -51,9 +52,13 @@ func _init() -> void:
 
 
 ## `key`: a short label for the corner (e.g. "Up"), or "" for none.
-func show_ability(p_ability: UltimateAbility, max_energy: float, key := "", dim := false) -> void:
+func show_ability(p_ability: UltimateAbility, max_energy: float, key := "", dim := false, p_locked := false) -> void:
 	ability = p_ability
-	if ability:
+	locked = p_locked
+	if locked:
+		icon_view.set_icon("locked", Color.WHITE, true)
+		gauge.visible = false
+	elif ability:
 		icon_view.set_icon(ability.icon, ability.color, dim)
 		gauge.visible = true
 		gauge.set_requirement(ability.get_cost(), max_energy)
