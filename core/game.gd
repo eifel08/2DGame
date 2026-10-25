@@ -137,6 +137,7 @@ func _ready() -> void:
 	# New game: no equippable spell known, every directional slot locked,
 	# no movement ability (Player.can_use asks player_data).
 	player.data = player_data
+	player.map_available = map_state.has_current_map # The quick view needs this zone's map.
 	tutorial = TutorialPopup.new()
 	tutorial.name = "Tutorial"
 	add_child(tutorial)

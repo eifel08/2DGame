@@ -63,6 +63,9 @@ var is_jumping := false ## True while the jump can still be cut short.
 ## The Map key was pressed and is still held: the quick view opens as soon as
 ## the player may read (NormalState). A hit or releasing the key clears it.
 var map_request := false
+## Set by Game: true when the player owns the map of the zone they stand in.
+## Without it the Map key shows "No Map" instead of the quick view.
+var map_available: Callable = func() -> bool: return true
 
 
 func _ready() -> void:

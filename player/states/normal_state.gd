@@ -71,7 +71,10 @@ func step(delta: float) -> void:
 	if p.grounded and input.is_down(&"heal") and p.health.can_start_heal_chunk():
 		p.fsm.change("heal")
 		return
-	if p.map_request and input.is_down(&"map") and p.can_read_map():
+	if p.map_request and input.is_down(&"map") and not p.map_available.call():
+		p.map_request = false
+		Events.map_denied.emit() # No map of this zone: "No Map" instead of an empty map.
+	elif p.map_request and input.is_down(&"map") and p.can_read_map():
 		p.fsm.change("map_read") # Map quick view: held key, see MapReadState.
 		return
 

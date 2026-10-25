@@ -10,9 +10,13 @@ extends RefCounted
 ##   FILLED    drawn filled in: explored
 ##
 ## Rules:
+##   - Without a zone's map, NOTHING of that zone is shown (visible_reveal is
+##     UNKNOWN for every room), not even rooms already explored. Exploring is
+##     still recorded.
 ##   - Acquiring a zone's map (acquire_map) outlines every room of that zone
 ##     that is in its base map (MapRoom.outlined_by_base_map: no hidden rooms,
-##     and not necessarily every room).
+##     and not necessarily every room), and at once shows every room explored
+##     so far, filled in.
 ##   - Entering a room (enter_room) fills it in. An outlined room is filled; a
 ##     room that was not on the map at all is added and filled.
 ##   - Config.map.auto_mark_rooms = false switches to manual marking: entering
@@ -42,8 +46,24 @@ func new_game() -> void:
 
 # ---------- Queries ----------
 
+## What is recorded for the room (also without the zone's map).
 func reveal_of(room_id: String) -> Reveal:
 	return rooms.get(room_id, Reveal.UNKNOWN)
+
+
+## What the map shows: the recorded state, but only once the room's zone map
+## is owned. Map views draw this.
+func visible_reveal(room_id: String) -> Reveal:
+	var zone := atlas.zone_of(room_id)
+	if zone == null or not has_map(zone.zone_id):
+		return Reveal.UNKNOWN
+	return reveal_of(room_id)
+
+
+## True when the player owns the map of the zone they stand in.
+func has_current_map() -> bool:
+	var zone := current_zone()
+	return zone != null and has_map(zone.zone_id)
 
 
 func is_filled(room_id: String) -> bool:
@@ -59,19 +79,23 @@ func current_zone() -> MapZone:
 	return atlas.zone_of(current_room)
 
 
-## A zone the player can look at: its map is owned or a room of it is known.
+## A zone whose rooms the map shows: its map is owned.
 func is_zone_known(zone_id: String) -> bool:
-	if has_map(zone_id):
-		return true
+	return has_map(zone_id)
+
+
+## A zone the player has been in (a room of it is recorded), map or not. The
+## world view lists these (an unowned one as "No Map", without rooms).
+func is_zone_visited(zone_id: String) -> bool:
 	var zone := atlas.get_zone(zone_id)
 	if zone:
 		for r in zone.rooms:
-			if reveal_of(r.room_id) != Reveal.UNKNOWN:
+			if reveal_of(r.room_id) != Reveal.UNKNOWN or pending.has(r.room_id):
 				return true
 	return false
 
 
-## Every zone the map screen can switch to, in atlas order.
+## Every zone whose map is owned, in atlas order.
 func known_zones() -> Array[String]:
 	var ids: Array[String] = []
 	for zone_id in atlas.zone_ids():
@@ -88,7 +112,7 @@ func acquire_map(zone_id: String) -> int:
 	var zone := atlas.get_zone(zone_id)
 	if zone == null or has_map(zone_id):
 		return 0
-	acquired[zone_id] = true
+	acquired[zone_id] = true # From now on its explored rooms show, filled in.
 	var count := 0
 	for r in zone.rooms:
 		if r.outlined_by_base_map() and reveal_of(r.room_id) == Reveal.UNKNOWN:

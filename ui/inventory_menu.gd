@@ -4,9 +4,10 @@ extends CanvasLayer
 ##   Status    - shards (the only number), health and energy as bars
 ##   Abilities - the spell cross (left, a D-pad: SpellCross) and every
 ##               equippable spell the player knows (right)
-##   Map       - the zone map with its fog of war (MapView). Down from the
-##               tab row focuses it; Left / Right then switch between the
-##               zones the player knows. It opens on the player's zone.
+##   Map       - the world map with its fog of war (MapView). It opens
+##               zoomed out on the whole world. Down from the tab row focuses
+##               it; arrows select a zone (or pan to the next one once zoomed
+##               in), Enter zooms in / out, Backspace zooms out.
 ##
 ## The cross: Center = Mana Discharge (fixed: it cannot be moved or removed),
 ## Up / Down = their slots, Left AND Right = the one Side slot (both cards
@@ -72,7 +73,7 @@ func toggle() -> void:
 	pending_ability_id = ""
 	if panel.visible:
 		_rebuild_pool()
-		map_view.follow_player()
+		map_view.show_world(true) # The Map tab always starts on the whole world.
 		refresh()
 		tab_bar.grab_focus() # Left / Right switches tabs right away.
 	else:
@@ -104,6 +105,8 @@ func _on_tab_changed(tab: int) -> void:
 	pending_ability_id = ""
 	# Down from the tab row enters the tab's content.
 	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(map_view if tab == MAP_TAB else cross.card("Up"))
+	if tab == MAP_TAB:
+		map_view.show_world(true)
 	if is_open():
 		refresh()
 
@@ -426,12 +429,13 @@ func _build_map_tab() -> Control:
 	map_view = MapView.new()
 	map_view.name = "MapView"
 	map_view.focus_mode = Control.FOCUS_ALL
+	map_view.interactive = true
 	map_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	map_view.custom_minimum_size = Vector2(0, 340)
 	box.add_child(map_view)
 	map_view.setup(game)
 	var note := Label.new()
-	note.text = "Down  select the map    Left / Right  other zones    Up  back to the tabs"
+	note.text = "Down  select the map    Arrows  zones    Enter  zoom in / out    Backspace  world view"
 	note.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
 	note.add_theme_font_size_override("font_size", 11)
 	box.add_child(note)

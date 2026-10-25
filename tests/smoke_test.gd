@@ -4862,6 +4862,17 @@ func _test_map() -> void:
 				if back == null or back.target_room != r.room_id or back.target_door != e.door_id or back.secret != e.secret:
 					one_way.append("%s.%s" % [r.room_id, e.door_id])
 	_check("map: every connection is listed on both ends, with the same secret flag", one_way.is_empty(), one_way)
+	var apart := []
+	for zone in atlas.zones:
+		for r in zone.rooms:
+			for e in r.exits:
+				if not atlas.exit_is_adjacent(r, e):
+					apart.append("%s.%s" % [r.room_id, e.door_id])
+	_check("map: on the world grid every exit meets its room, also across zones (Halls ceiling = Galleries floor)", apart.is_empty(), apart)
+	var colors := {}
+	for zone in atlas.zones:
+		colors[zone.color.to_html()] = zone.zone_id
+	_check("map: every zone has its own colour", colors.size() == atlas.zones.size(), colors)
 
 	# --- Spatial anomaly: the Hidden Vault is linked left AND right ---
 	var vault := atlas.get_room("hidden_vault")
@@ -4921,11 +4932,33 @@ func _test_map() -> void:
 	_check("map: the Testing Halls map lies in the Testing Halls, on the floor",
 		pickups.size() == 1 and pickups[0].zone_id == "halls" and game.room.is_solid_at(pickups[0].global_position + Vector2(0, 16))
 		and not game.room.is_solid_at(pickups[0].global_position + Vector2(0, -16)), pickups.size())
+	# Explore without the map: it is recorded, but the map shows nothing.
+	game.load_room("boss_room", "west")
+	await _frames(2)
+	game.load_room("test_room", "east")
+	await _reset()
+	_check("map, no map owned: explored rooms are recorded but not a single room is shown",
+		state.is_filled("boss_room") and state.is_filled("test_room") and not state.has_current_map()
+		and atlas.get_zone("halls").rooms.all(func(r: MapRoom) -> bool: return state.visible_reveal(r.room_id) == reveal.UNKNOWN))
+	var overlay: MapOverlay = game.map_overlay
+	Input.action_press(&"map")
+	await _frames(3)
+	_check("map, no map owned: Tab shows \"No Map\" instead of opening an empty map",
+		p.state_name() == "normal" and not overlay.is_open() and overlay.is_notice_shown() and overlay.notice.text == "No Map", p.state_name())
+	Input.action_release(&"map")
+	await _frames(int(MapOverlay.NOTICE_TIME * 60.0) + 10)
+	_check("map, no map owned: the notice goes away by itself", not overlay.is_notice_shown())
+	var revealed_at := [] # Lambdas capture locals by value: collect into an array.
+	var on_acquired := func(_id: String) -> void: revealed_at.append(Engine.get_physics_frames())
+	Events.map_acquired.connect(on_acquired)
 	p.global_position = pickups[0].global_position
 	await _frames(3)
+	Events.map_acquired.disconnect(on_acquired)
 	_check("map: touching the map takes it (base map acquired)", pickups[0].collected and state.has_map("halls"))
-	_check("map: the base map outlines its rooms (not explored yet)",
-		state.reveal_of("boss_room") == reveal.OUTLINED and state.reveal_of("arena_room") == reveal.OUTLINED and state.is_filled("test_room"))
+	_check("map: taking the map at once shows every room explored before it, filled in",
+		state.visible_reveal("boss_room") == reveal.FILLED and state.visible_reveal("test_room") == reveal.FILLED and revealed_at.size() == 1)
+	_check("map: the base map outlines the rest of its rooms (not explored yet)",
+		state.visible_reveal("arena_room") == reveal.OUTLINED)
 	_check("map: the base map leaves out hidden rooms and rooms not on it",
 		state.reveal_of("secret_room") == reveal.UNKNOWN and state.reveal_of("bestiary") == reveal.UNKNOWN)
 	_check("map: the other zone's rooms stay unknown", state.reveal_of("upper_room") == reveal.UNKNOWN and not state.has_map("reaches"))
@@ -4933,9 +4966,6 @@ func _test_map() -> void:
 	await _frames(2)
 	_check("map: a taken map does not come back", game.map_pickups.size() == 1
 		and game.map_pickups.all(func(m: MapPickup) -> bool: return m.collected and not m.visible))
-	game.load_room("boss_room", "west")
-	await _frames(2)
-	_check("map: entering an outlined room fills it in", state.is_filled("boss_room"))
 	game.load_room("bestiary", "ceiling")
 	await _frames(2)
 	_check("map: entering a room that was not on the map adds it, filled in", state.is_filled("bestiary"))
@@ -4998,7 +5028,32 @@ func _test_map() -> void:
 	game.load_room("boss_room", "west")
 	await _frames(2)
 	_check("map anomaly: a runtime seal lasts only while the room is loaded", not _door("west").sealed)
-	_check("map: the Upper Reaches show on the map once a room of them is known", state.known_zones().size() == 2, state.known_zones())
+	# The Upper Reaches: explored (the vault, above) but no map yet.
+	game.load_room("upper_room", "east")
+	await _until(func() -> bool: return p.state_name() == "normal" and p.grounded, 120)
+	_check("map, Upper Reaches without its map: nothing is shown, though the vault and the Galleries are explored",
+		state.is_filled("hidden_vault") and state.is_filled("upper_room") and state.visible_reveal("hidden_vault") == reveal.UNKNOWN
+		and state.visible_reveal("upper_room") == reveal.UNKNOWN and state.known_zones() == ["halls"], state.known_zones())
+	Input.action_press(&"map")
+	await _frames(3)
+	_check("map: in a zone without its map Tab says \"No Map\", even though another zone's map is owned",
+		p.state_name() == "normal" and not overlay.is_open() and overlay.is_notice_shown(), p.state_name())
+	Input.action_release(&"map")
+	await _frames(2)
+	var reaches_map: MapPickup = game.map_pickups[0]
+	p.global_position = reaches_map.global_position
+	await _frames(3)
+	_check("map: taking the Upper Reaches map shows the vault and the Galleries at once, the Ember Crossing outlined",
+		state.has_map("reaches") and state.visible_reveal("hidden_vault") == reveal.FILLED and state.visible_reveal("upper_room") == reveal.FILLED
+		and state.visible_reveal("lava_room") == reveal.OUTLINED)
+	game.load_room("lava_room", "west")
+	await _frames(2)
+	_check("map: entering an outlined room fills it in", state.visible_reveal("lava_room") == reveal.FILLED)
+	Input.action_press(&"map")
+	await _until(func() -> bool: return p.state_name() == "map_read", 120)
+	_check("map: with the zone's map, Tab opens the quick view (no notice)", overlay.is_open() and not overlay.is_notice_shown(), p.state_name())
+	Input.action_release(&"map")
+	await _frames(3)
 
 	# --- Quick view: hold the Map key ---
 	await _reset()
@@ -5018,7 +5073,6 @@ func _test_map() -> void:
 	_check("debug overlay: a Map section grants maps and toggles auto-reveal and the player marker",
 		debug_texts.has("Grant Map (This Zone)") and debug_texts.has("Grant All Maps")
 		and debug_texts.has("Auto-Reveal Rooms") and debug_texts.has("Player Marker"), debug_texts)
-	var overlay: MapOverlay = game.map_overlay
 	var closed := []
 	var on_closed := func(reason: String) -> void: closed.append(reason)
 	Events.map_closed.connect(on_closed)
@@ -5044,8 +5098,7 @@ func _test_map() -> void:
 	_check("quick view: no spells and no attacks while the map is open",
 		is_equal_approx(p.health.energy, energy) and game.combat.attack.is_empty() and p.state_name() == "map_read", [p.health.energy, p.state_name()])
 	var marker: Vector2 = overlay.view.marker_position()
-	var zone := state.current_zone()
-	var here: Rect2 = overlay.view.room_rect(zone.get_room("test_room"), overlay.view._layout(zone))
+	var here: Rect2 = overlay.view.room_screen_rect(atlas.get_room("test_room"))
 	_check("player marker: shown inside the current room", marker != Vector2.INF and here.grow(1.0).has_point(marker), [marker, here])
 	Config.map.show_player_marker = false
 	_check("player marker: the toggle hides it", overlay.view.marker_position() == Vector2.INF)
@@ -5075,7 +5128,7 @@ func _test_map() -> void:
 	await _frames(2)
 	_check("player marker: precise mode follows the player inside the room", overlay.view.marker_position().x > before.x, [before, overlay.view.marker_position()])
 
-	# --- Inventory Map tab ---
+	# --- Inventory Map tab: world view, zoom, smooth navigation ---
 	var inv: InventoryMenu = game.inventory
 	Input.action_press(&"inventory")
 	await _frames(2)
@@ -5083,11 +5136,53 @@ func _test_map() -> void:
 	await _frames(2)
 	inv.tabs.current_tab = InventoryMenu.MAP_TAB
 	await _frames(2)
-	_check("inventory: a Map tab shows the zone you are in", inv.tabs.get_tab_count() == 3 and inv.map_view.is_visible_in_tree()
-		and inv.map_view.shown_zone() == state.current_zone())
-	var other := inv.map_view.cycle_zone(1)
-	_check("inventory map: Left / Right switch to the other known zone", other == "reaches" and inv.map_view.shown_zone().zone_id == "reaches", other)
-	_check("inventory map: no player marker on another zone's map", inv.map_view.marker_position() == Vector2.INF)
+	var mv: MapView = inv.map_view
+	var halls_box := mv.zone_box(atlas.get_zone("halls"))
+	var reaches_box := mv.zone_box(atlas.get_zone("reaches"))
+	var fitted := Rect2()
+	for r in atlas.get_zone("halls").rooms:
+		if state.visible_reveal(r.room_id) != reveal.UNKNOWN:
+			fitted = Rect2(atlas.world_rect(r)) if not fitted.has_area() else fitted.merge(Rect2(atlas.world_rect(r)))
+	_check("inventory map: a zone's frame fits the rooms its map shows (no hint of undiscovered ones)", halls_box == fitted, [halls_box, fitted])
+	_check("inventory: a Map tab that opens zoomed out on the whole world, your zone selected",
+		inv.tabs.get_tab_count() == 3 and mv.is_visible_in_tree() and mv.mode == MapView.Mode.WORLD and mv.zone_id == "halls"
+		and mv.listed_zones() == ["halls", "reaches"], [mv.mode, mv.zone_id, mv.listed_zones()])
+	var view_box := Rect2(mv._view_rect())
+	_check("inventory map: the world view shows every zone in full",
+		view_box.grow(1.0).encloses(mv.world_to_screen_rect(halls_box)) and view_box.grow(1.0).encloses(mv.world_to_screen_rect(reaches_box)))
+	var world_zoom := mv.zoom
+	mv.grab_focus()
+	await _ui_action(&"ui_up")
+	_check("inventory map, world view: Up selects the zone above (Upper Reaches)", mv.zone_id == "reaches" and mv.mode == MapView.Mode.WORLD, mv.zone_id)
+	await _ui_action(&"ui_accept")
+	var zoom_mid := mv.zoom
+	await _frames(90)
+	_check("inventory map: Enter zooms into the selected zone, smoothly",
+		mv.mode == MapView.Mode.ZONE and mv.shown_zone().zone_id == "reaches" and zoom_mid > world_zoom and zoom_mid < mv.zoom - 0.5
+		and mv.center.distance_to(reaches_box.get_center()) < 0.05, [world_zoom, zoom_mid, mv.zoom])
+	var start_center := mv.center
+	await _ui_action(&"ui_down")
+	var mid_center := mv.center
+	var path_ok := true
+	var last_y := mid_center.y
+	for i in 60:
+		await _frames(1)
+		path_ok = path_ok and mv.center.y >= last_y - 0.0001
+		last_y = mv.center.y
+	_check("inventory map, zoomed in: Down pans continuously to the zone below (no cut)",
+		mv.shown_zone().zone_id == "halls" and mid_center.y > start_center.y and mid_center.y < halls_box.get_center().y - 0.5 and path_ok
+		and mv.center.distance_to(halls_box.get_center()) < 0.05, [start_center, mid_center, mv.center])
+	_check("inventory map: the player marker shows in the zone you stand in", mv.marker_position() != Vector2.INF)
+	await _ui_action(&"ui_down")
+	_check("inventory map: nothing below the Halls: the view stays", mv.shown_zone().zone_id == "halls")
+	await _ui_action(&"menu_clear")
+	_check("inventory map: Backspace zooms back out to the world view", mv.mode == MapView.Mode.WORLD and mv.zone_id == "halls")
+	var halls_pal := MapView.palette(atlas.get_zone("halls"))
+	var reaches_pal := MapView.palette(atlas.get_zone("reaches"))
+	_check("inventory map: each zone is drawn in its own colours", halls_pal.fill != reaches_pal.fill and halls_pal.edge != reaches_pal.edge)
+	inv.tabs.current_tab = InventoryMenu.STATUS_TAB
+	inv.tabs.current_tab = InventoryMenu.MAP_TAB
+	_check("inventory map: coming back to the tab starts on the world view again", mv.mode == MapView.Mode.WORLD)
 	inv.tabs.current_tab = InventoryMenu.STATUS_TAB
 	Input.action_press(&"inventory")
 	await _frames(2)

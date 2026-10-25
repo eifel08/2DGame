@@ -27,6 +27,8 @@ extends RefCounted
 const WORLD := {
 	"halls": {
 		"name": "Testing Halls",
+		"origin": [0, 0],
+		"color": "#5b7bd5", # Slate blue.
 		"rooms": {
 			"test_room": {"name": "Testing Halls", "rect": [0, 0, 5, 2], "exits": [
 				{"door": "east", "side": "right", "at": 1, "to": "boss_room", "to_door": "west"},
@@ -50,8 +52,11 @@ const WORLD := {
 			]},
 		},
 	},
+	# Above the Halls: the Galleries' floor gap meets the Halls' ceiling gap.
 	"reaches": {
 		"name": "Upper Reaches",
+		"origin": [0, -2],
+		"color": "#d0843f", # Ember orange.
 		"rooms": {
 			"upper_room": {"name": "Upper Galleries", "rect": [2, 1, 3, 1], "exits": [
 				{"door": "floor", "side": "bottom", "at": 0, "to": "test_room", "to_door": "ceiling"},
@@ -130,23 +135,30 @@ func zone_ids() -> Array[String]:
 
 # ---------- Spatial anomalies ----------
 
-## True when `e` (a left / right exit of `r`) leads to a room that touches `r`
-## on that side of the map. Exits into another zone always count as touching:
-## they are drawn as a stub that leaves the map.
+## A room's rect on the world grid (its zone's world_origin applied).
+func world_rect(r: MapRoom) -> Rect2i:
+	var zone := zone_of(r.room_id)
+	return zone.world_rect(r) if zone else r.rect
+
+
+## True when `e` (an exit of `r`) leads to a room that touches `r` on that
+## side, on the world grid (so exits into another zone are checked too).
 func exit_is_adjacent(r: MapRoom, e: MapExit) -> bool:
 	var t := get_room(e.target_room)
-	if t == null or zone_of(t.room_id) != zone_of(r.room_id):
+	if t == null:
 		return true
-	var rows_overlap := t.rect.position.y < r.rect.end.y and r.rect.position.y < t.rect.end.y
-	var cols_overlap := t.rect.position.x < r.rect.end.x and r.rect.position.x < t.rect.end.x
+	var a := world_rect(r)
+	var b := world_rect(t)
+	var rows_overlap := b.position.y < a.end.y and a.position.y < b.end.y
+	var cols_overlap := b.position.x < a.end.x and a.position.x < b.end.x
 	match e.side:
 		"left":
-			return rows_overlap and t.rect.end.x == r.rect.position.x
+			return rows_overlap and b.end.x == a.position.x
 		"right":
-			return rows_overlap and t.rect.position.x == r.rect.end.x
+			return rows_overlap and b.position.x == a.end.x
 		"top":
-			return cols_overlap and t.rect.end.y == r.rect.position.y
-	return cols_overlap and t.rect.position.y == r.rect.end.y
+			return cols_overlap and b.end.y == a.position.y
+	return cols_overlap and b.position.y == a.end.y
 
 
 ## A room linked on both its left and right sides, where at least one of those

@@ -144,6 +144,8 @@ signal map_room_revealed(room_id: String, reveal: int) ## MapState.Reveal: OUTLI
 @warning_ignore("unused_signal")
 signal map_opened() ## The quick view opened (the Map key is held).
 @warning_ignore("unused_signal")
+signal map_denied() ## The Map key was pressed in a zone whose map is not owned ("No Map").
+@warning_ignore("unused_signal")
 signal map_closed(reason: String) ## "released", "damage" or "interrupted".
 
 # Animation (frame events from method tracks, e.g. "footstep", "swing")
