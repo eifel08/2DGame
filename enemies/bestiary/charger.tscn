@@ -14,7 +14,7 @@ max_health = 120.0
 currency_drop = 10
 contact_damage_mul = 1.5
 knockback_mul = 0.25
-sight_range = 300.0
+sight_range = 210.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -23)

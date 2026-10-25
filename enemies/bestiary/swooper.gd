@@ -14,7 +14,7 @@ func _think(delta: float) -> void:
 		"idle":
 			var dest := home + Vector2(sin(t * 0.9) * sway, -size.y / 2.0 + sin(t * 2.4) * 6.0) + Vector2(0, size.y / 2.0)
 			move_fly(delta, (dest - global_position) * 3.0, 1200.0)
-			if cooldown <= 0.0 and sees_target() and target_in_leash():
+			if sees_target() and cooldown <= 0.0 and target_in_leash():
 				face_target()
 				telegraph("swoop")
 				enter("alert")

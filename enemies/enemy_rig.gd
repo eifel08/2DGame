@@ -7,8 +7,8 @@ extends Node2D
 
 @export var look := "swooper"
 
-## States that announce an attack: a white glint blinks above the head.
-const TELEGRAPH_STATES: Array[String] = ["alert", "windup", "aim", "vanish", "crouch"]
+## No alert sign ("!") anywhere: an enemy that has noticed the player shows
+## it with red, glowing eyes (BaseEnemy.is_alerted); wind-ups show in the pose.
 
 var enemy: BaseEnemy
 
@@ -33,14 +33,17 @@ func _draw() -> void:
 	var fn := "_draw_" + look
 	if has_method(fn):
 		call(fn, s, enemy.state, enemy.state_time, enemy.t)
-	if enemy.state in TELEGRAPH_STATES and fmod(enemy.state_time, 0.16) < 0.1:
-		var top := Vector2(0, -s.y - 14.0)
-		draw_rect(Rect2(top + Vector2(-2, -12), Vector2(4, 9)), Color.WHITE)
-		draw_rect(Rect2(top + Vector2(-2, 0), Vector2(4, 4)), Color.WHITE)
 
 
+## An eye: pale while calm; red with a soft glow once the enemy has noticed
+## the player (or `alert`, e.g. during an attack).
 func _eye(at: Vector2, alert: bool, r := 3.0) -> void:
-	draw_circle(at, r, Color("#ff4d5e") if alert else Color("#ffe9a8"))
+	if alert or enemy.is_alerted():
+		draw_circle(at, r * 2.6, Color(1.0, 0.15, 0.2, 0.22))
+		draw_circle(at, r * 1.6, Color(1.0, 0.2, 0.25, 0.35))
+		draw_circle(at, r, Color("#ff3346"))
+	else:
+		draw_circle(at, r, Color("#ffe9a8"))
 
 
 func _draw_swooper(s: Vector2, state: String, _st: float, t: float) -> void:
@@ -60,6 +63,9 @@ func _draw_charger(s: Vector2, state: String, st: float, _t: float) -> void:
 	draw_set_transform(shake, 0.0, Vector2.ONE)
 	draw_rect(body, Color("#8b5a2b"))
 	draw_rect(Rect2(body.position + Vector2(0, -4), Vector2(s.x * 0.7, 6)), Color("#6e4520")) # Mane.
+	for i in 5: # Spiked back plates: nothing gets in from above.
+		var x := body.position.x + 4.0 + i * (s.x - 12.0) / 4.0
+		draw_colored_polygon(PackedVector2Array([Vector2(x - 5, body.position.y - 2), Vector2(x, body.position.y - 13), Vector2(x + 5, body.position.y - 2)]), Color("#d8dde6"))
 	for i in 2: # Legs.
 		draw_rect(Rect2(-s.x / 2.0 + 6 + i * (s.x - 20), -s.y * 0.2, 8, s.y * 0.2), Color("#5e3b18"))
 	var head := Vector2(s.x / 2.0 - 2, -s.y * 0.62 + lean * 20.0)
@@ -86,7 +92,7 @@ func _draw_brute(s: Vector2, state: String, st: float, _t: float) -> void:
 	var grip := Vector2(s.x * 0.35, -s.y * 0.55)
 	var angle := -2.4 if state == "windup" else (0.2 if state in ["smash", "recover"] else -0.8)
 	if state == "windup":
-		angle -= minf(st, 0.6) * 0.5
+		angle -= minf(st, 0.4) * 0.8
 	var d := Vector2.from_angle(angle)
 	var head := grip + d * 48.0
 	draw_line(grip, head, Color("#6b4423"), 9.0)
@@ -157,6 +163,11 @@ func _draw_orb_sentry(s: Vector2, state: String, st: float, t: float) -> void:
 
 func _draw_hopper(s: Vector2, state: String, _st: float, _t: float) -> void:
 	var sq := Vector2(1.25, 0.7) if state == "crouch" else (Vector2(0.85, 1.2) if state == "hop" else Vector2.ONE)
+	if state == "dart": # Balled up, spinning through the air.
+		var c := Vector2(0, -s.y / 2.0)
+		draw_circle(c, s.y * 0.6, Color("#7bc96f"))
+		draw_arc(c, s.y * 0.6, enemy.t * 20.0, enemy.t * 20.0 + 2.0, 10, Color("#4f8f45"), 2.0)
+		return
 	var w := s.x * sq.x
 	var h := s.y * sq.y
 	draw_rect(Rect2(-w / 2.0, -h, w, h), Color("#7bc96f"))
@@ -193,3 +204,22 @@ func _draw_phalanx(s: Vector2, state: String, _st: float, _t: float) -> void:
 	var shield := Rect2(s.x / 2.0 - 8, -s.y - 2, 9, s.y + 2)
 	draw_rect(shield, Color("#8c7a3a"))
 	draw_rect(shield, Color("#e2c044"), false, 2.0)
+
+
+func _draw_spearman(s: Vector2, state: String, st: float, t: float) -> void:
+	var c := Vector2(0, -s.y / 2.0)
+	var flap := sin(t * 12.0) * 0.5
+	for side: float in [-1.0, 1.0]: # Wings.
+		draw_colored_polygon(PackedVector2Array([c + Vector2(side * 4, -8), c + Vector2(side * s.x * 0.95, -s.y * 0.5 + flap * 10.0),
+			c + Vector2(side * 6, 2)]), Color("#c9d6ee"))
+	draw_rect(Rect2(-s.x * 0.3, -s.y, s.x * 0.6, s.y * 0.85), Color("#4a5a7a"))
+	draw_rect(Rect2(-s.x * 0.3, -s.y - 4, s.x * 0.6, 8), Color("#9aa6bf")) # Helmet.
+	_eye(Vector2(4, -s.y + 6), state == "windup", 2.5)
+	# The spear: drawn back in the wind-up; gone right after a throw.
+	var sp := enemy as SpearmanEnemy
+	if sp and sp.cooldown > sp.throw_interval - 0.35 and state != "windup":
+		return
+	var back := -10.0 - (minf(st, 0.35) * 30.0 if state == "windup" else 0.0)
+	var y := -s.y * 0.55
+	draw_line(Vector2(back, y), Vector2(back + 40.0, y), Color("#b08a5a"), 3.0)
+	draw_colored_polygon(PackedVector2Array([Vector2(back + 48.0, y), Vector2(back + 40.0, y - 4), Vector2(back + 40.0, y + 4)]), Color("#ffc94d"))

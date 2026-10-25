@@ -4009,7 +4009,7 @@ func _test_tutorials() -> void:
 # ---------- Bestiary: modular enemies, deflect / parry, the testing hall ----------
 
 const BESTIARY_KINDS := ["weak", "strong", "flyer", "swooper", "charger", "thrower", "brute", "ambusher",
-	"shellback", "urchin", "turret", "orb_sentry", "hopper", "crawler", "phalanx"]
+	"shellback", "urchin", "turret", "orb_sentry", "hopper", "crawler", "phalanx", "spearman"]
 
 
 func _beast(kind: String) -> Enemy:
@@ -4071,7 +4071,7 @@ func _test_bestiary() -> void:
 	var expected_kinds := BESTIARY_KINDS.duplicate()
 	expected_kinds.sort()
 	kinds.sort()
-	_check("the Bestiary holds every non-boss enemy type exactly once (old and new, 15)", kinds == expected_kinds, kinds)
+	_check("the Bestiary holds every non-boss enemy type exactly once (old and new, 16)", kinds == expected_kinds, kinds)
 	_check("each chamber has a sign", signs == BESTIARY_KINDS.size(), signs)
 	for kind in BESTIARY_KINDS:
 		_check("the '%s' kind is registered" % kind, game.ENEMY_SCENES.has(kind))
@@ -4161,7 +4161,7 @@ func _test_bestiary() -> void:
 	var ch: ChargerEnemy = _beast("charger")
 	await _frames(10)
 	_check("the charger stands its ground while the player is away", ch.state == "idle" and absf(ch.velocity.x) < 1.0)
-	_put(Vector2(ch.global_position.x - 230.0, 448))
+	_put(Vector2(ch.global_position.x - 180.0, 448))
 	var top_speed := 0.0
 	var saw_windup := false
 	var from_x := ch.global_position.x
@@ -4175,7 +4175,7 @@ func _test_bestiary() -> void:
 	# --- 3. Thrower: deflectable projectiles, swatted back into it ---
 	await _fresh_bestiary()
 	var th: ThrowerEnemy = _beast("thrower")
-	_put(Vector2(th.global_position.x - 240.0, 448), 1)
+	_put(Vector2(th.global_position.x - 200.0, 448), 1)
 	var shot: Dictionary = {}
 	for i in 150:
 		await _frames(1)
@@ -4186,15 +4186,42 @@ func _test_bestiary() -> void:
 	_check("the thrower throws a projectile at the player", not shot.is_empty())
 	_check("the thrower's projectile is deflectable", not shot.is_empty() and shot.deflectable)
 	if not shot.is_empty():
+		var rose := false
+		var fell := false
 		for i in 90:
-			if p.get_center().distance_to(shot.pos) < 62.0:
+			rose = rose or (shot.vel as Vector2).y < -40.0
+			fell = fell or (rose and (shot.vel as Vector2).y > 40.0)
+			if absf(shot.pos.x - p.get_center().x) < 64.0:
 				break
 			await _frames(1)
+		_check("the thrown projectile flies in an arc (up, then down)", shot.gravity > 0.0 and rose and fell, [shot.gravity, rose, fell])
 		await _swing(1)
-		await _frames(4)
-		_check("a melee swing sends the thrown projectile back", shot.deflected and not shot.hostile)
-		var hurt := await _until(func() -> bool: return th.health < th.max_health, 90)
-		_check("the deflected projectile hits the thrower", hurt, th.health)
+		await _frames(3)
+		var v: Vector2 = shot.vel
+		_check("a side swing knocks it away along the strike (straight ahead)", shot.deflected and not shot.hostile and v.x > 0.0 and absf(v.y) < 1.0
+			and is_zero_approx(shot.gravity), [shot.deflected, v])
+	proj.clear()
+	# Struck down (a pogo swing), a deflectable shot goes straight down.
+	await _frames(25) # The swing cooldown.
+	_put(Vector2(th.global_position.x - 200.0, 300.0))
+	proj.spawn({"position": p.get_center() + Vector2(0, 46), "velocity": Vector2(-60, -20), "hostile": true, "deflectable": true, "life": 5.0, "gravity": 900.0})
+	var low: Dictionary = proj.list.back()
+	Input.action_press(&"move_down")
+	await _swing(1)
+	await _frames(3)
+	Input.action_release(&"move_down")
+	var lv: Vector2 = low.vel
+	_check("struck downward, it flies straight down (and the pogo bounces)", low.deflected and lv.y > 0.0 and absf(lv.x) < 1.0 and p.velocity.y < 0.0, [lv, p.velocity.y])
+	proj.clear()
+	await _frames(40)
+	# A deflected orb flying along the strike into an enemy hurts it.
+	await _fresh_bestiary()
+	th = _beast("thrower")
+	_put(Vector2(th.global_position.x - 150.0, 448), 1)
+	await _frames(2)
+	proj.spawn({"position": p.get_center() + Vector2(30, 0), "velocity": Vector2(-10, 0), "hostile": true, "deflectable": true, "life": 5.0})
+	await _swing(1)
+	_check("the deflected orb hits the enemy in its path", await _until(func() -> bool: return th.health < th.max_health, 60), th.health)
 	proj.clear()
 
 	# --- 4. Brute: a non-deflectable smash for double damage ---
@@ -4285,7 +4312,7 @@ func _test_bestiary() -> void:
 	# --- 8. Turret: aims and fires non-deflectable bolts at the player ---
 	await _fresh_bestiary()
 	var tu: TurretEnemy = _beast("turret")
-	_put(Vector2(tu.global_position.x - 300.0, 448), 1)
+	_put(Vector2(tu.global_position.x - 220.0, 448), 1)
 	await _until(func() -> bool: return not _shots_of(tu).is_empty(), 120)
 	var bolts := _shots_of(tu)
 	var aimed := not bolts.is_empty() and (bolts[0].vel as Vector2).normalized().dot((p.get_center() - (bolts[0].pos as Vector2)).normalized()) > 0.9
@@ -4296,7 +4323,14 @@ func _test_bestiary() -> void:
 	# --- 9. Orb sentry: orbs in the 4 cardinal directions ---
 	await _fresh_bestiary()
 	var os: OrbSentryEnemy = _beast("orb_sentry")
-	_put(Vector2(os.home.x - 200.0, 448))
+	_put(Vector2(200, 448)) # Far away, out of sight.
+	var roamed := 0.0
+	for i in 240:
+		await _frames(1)
+		roamed = maxf(roamed, os.home_distance())
+	_check("the orb sentry wanders the room without seeing the player", roamed > 40.0 and not os.is_alerted(), roamed)
+	_check("and keeps firing its pattern anyway", os.volleys >= 2, os.volleys)
+	proj.clear()
 	await _until(func() -> bool: return _shots_of(os).size() >= 4, 240)
 	var orbs := _shots_of(os)
 	var cardinal := {}
@@ -4305,20 +4339,31 @@ func _test_bestiary() -> void:
 		cardinal[Vector2(roundf(v.x), roundf(v.y))] = true
 	_check("the floating sentry fires orbs Up, Down, Left and Right",
 		orbs.size() == 4 and cardinal.size() == 4 and cardinal.has(Vector2.UP) and cardinal.has(Vector2.DOWN) and cardinal.has(Vector2.LEFT) and cardinal.has(Vector2.RIGHT), cardinal.keys())
-	_check("its orbs are non-deflectable", orbs.all(func(o: Dictionary) -> bool: return not o.deflectable))
-	_check("it floats in place", os.home_distance() < 20.0, os.home_distance())
+	_check("its orbs CAN be deflected", orbs.all(func(o: Dictionary) -> bool: return o.deflectable))
 	proj.clear()
 
 	# --- 10. Hopper: random short hops ---
+	seed(20261025) # Its moves are random: a fixed seed keeps this check repeatable.
 	await _fresh_bestiary()
 	var ho: HopperEnemy = _beast("hopper")
-	_put(Vector2(200, 448))
+	_check("the hopper's chamber is cramped: a low ceiling over it", game.room.is_solid_at(ho.home + Vector2(0, -7 * 32)) and not game.room.is_solid_at(ho.home + Vector2(0, -3 * 32)))
+	_put(Vector2(200, 448)) # Far away: it does not care about the player.
 	var highest := ho.global_position.y
-	for i in 360:
+	var arc_seen := false
+	var line_seen := false
+	for i in 1500:
 		await _frames(1)
 		highest = minf(highest, ho.global_position.y)
-	_check("the hopper hops again and again", ho.hops >= 3, ho.hops)
-	_check("its hops leave the floor and stay short (near home)", highest < ho.home.y - 40.0 and ho.home_distance() < ho.leash_range, [highest, ho.home_distance()])
+		if ho.state == "hop" and ho.velocity.y > 0.0:
+			arc_seen = true # Falling at the end of a hop: a parabola.
+		if ho.state == "dart" and ho.state_time > 0.05 and absf(ho.velocity.length() - ho.dart_speed) < ho.dart_speed * 0.2:
+			line_seen = true
+		if ho.hops >= 2 and ho.darts >= 2 and ho.bounces >= 1:
+			break
+	_check("same level: it hops in a parabola", ho.hops >= 2 and arc_seen, [ho.hops, arc_seen])
+	_check("other height: it darts in a straight line", ho.darts >= 2 and line_seen, [ho.darts, line_seen])
+	_check("it bounces off the walls and the low ceiling", ho.bounces >= 1, ho.bounces)
+	_check("it stays in its chamber, near home", ho.home_distance() < ho.leash_range and highest < ho.home.y - 20.0, [ho.home_distance(), highest])
 
 	# --- 11. Bonus: wall-crawler circles its rock and drops on the player ---
 	await _fresh_bestiary()
@@ -4358,6 +4403,120 @@ func _test_bestiary() -> void:
 	await _frames(6)
 	Input.action_release(&"move_down")
 	_check("over the shield (from above) it is open too", ph.health < hp_ph, ph.health)
+
+	# --- Polish: alert cues, detection, speed, special rules ---
+	await _fresh_bestiary()
+	var rig_consts: Dictionary = (load("res://enemies/enemy_rig.gd") as Script).get_script_constant_map()
+	_check("no '!' alert sign exists any more (the rig has no telegraph glint)", not rig_consts.has("TELEGRAPH_STATES"))
+	var sw2: BaseEnemy = _beast("swooper")
+	_put(Vector2(sw2.home.x - 280.0, 448))
+	await _frames(40)
+	_check("detection is short: a swooper does not notice the player 280 px away", not sw2.is_alerted() and sw2.state == "idle", sw2.state)
+	var short := true
+	for e in game.enemies:
+		if e is BaseEnemy:
+			short = short and e.sight_range <= 260.0
+	_check("every enemy's detection range is short (260 px or less)", short)
+	_put(Vector2(sw2.home.x - 40.0, 448))
+	_check("noticing the player makes the eyes glow red", await _until(func() -> bool: return sw2.is_alerted(), 30))
+
+	# Brute: a faster club and a screen shake on impact.
+	await _fresh_bestiary()
+	var br2: BruteEnemy = _beast("brute")
+	_check("the club swing is faster (short wind-up and recovery)", br2.windup_time <= 0.45 and br2.recover_time <= 0.5, [br2.windup_time, br2.recover_time])
+	var slams := [0]
+	var on_slam := func(_e: Node, _pos: Vector2, _s: float) -> void: slams[0] += 1
+	Events.enemy_slam.connect(on_slam)
+	_put(Vector2(br2.global_position.x - 56.0, 448), 1)
+	var windup_frames := 0
+	var trauma_peak := 0.0
+	for i in 90:
+		await _frames(1)
+		if br2.state == "windup":
+			windup_frames += 1
+		if slams[0] > 0:
+			trauma_peak = maxf(trauma_peak, game.camera.trauma)
+			if br2.state == "recover":
+				break
+	Events.enemy_slam.disconnect(on_slam)
+	_check("the smash lands fast", slams[0] >= 1 and windup_frames <= 28, windup_frames)
+	_check("the impact shakes the screen hard", trauma_peak >= 0.4, trauma_peak)
+	await _frames(30)
+
+	# Charger: immune from above (no damage, no pogo).
+	await _fresh_bestiary()
+	var ch2: ChargerEnemy = _beast("charger")
+	await _frames(5)
+	_put(Vector2(ch2.global_position.x, ch2.global_position.y - 90.0))
+	Input.action_press(&"move_down")
+	await _swing(1)
+	await _frames(6)
+	Input.action_release(&"move_down")
+	_check("the charger is immune to attacks from above", is_equal_approx(ch2.health, ch2.max_health), ch2.health)
+	_check("and gives no pogo bounce", p.velocity.y > 0.0, p.velocity.y)
+	await _frames(40)
+
+	# Shorter cooldowns across the board.
+	var am2: AmbusherEnemy = _beast("ambusher")
+	var ur2: UrchinEnemy = _beast("urchin")
+	var os2: OrbSentryEnemy = _beast("orb_sentry")
+	var ph2: PhalanxEnemy = _beast("phalanx")
+	_check("cooldowns are short (ambusher, urchin, orb sentry, phalanx, turret)",
+		am2.vanish_time + am2.ghost_time <= 0.7 and os2.interval_max <= 1.3 and ph2.turn_delay <= 0.5
+		and (_beast("turret") as TurretEnemy).fire_interval <= 1.0)
+
+	# Spike urchin: wanders left and right when the player is away.
+	_put(Vector2(200, 448))
+	var ux := [ur2.global_position.x, ur2.global_position.x]
+	for i in 300:
+		await _frames(1)
+		ux[0] = minf(ux[0], ur2.global_position.x)
+		ux[1] = maxf(ux[1], ur2.global_position.x)
+	_check("the spike urchin wanders left and right", ux[1] - ux[0] > 30.0, ux[1] - ux[0])
+	await _fresh_bestiary()
+	ur2 = _beast("urchin")
+	await _frames(60)
+	var ucd: float = ur2.cooldown
+	_put(Vector2(ur2.global_position.x - 90.0, 448))
+	await _until(func() -> bool: return ur2.last_burst > 0, 60)
+	ur2.last_burst = 0
+	var second := await _until(func() -> bool: return ur2.last_burst > 0, 110)
+	_check("its bursts come quickly one after another", second, ucd)
+	proj.clear()
+
+	# Flying spearman: drifts in, throws a spear; a swing neutralizes it.
+	await _fresh_bestiary()
+	var sp: SpearmanEnemy = _beast("spearman")
+	_put(Vector2(sp.home.x - 150.0, 448), 1)
+	var start_d := sp.target_distance()
+	var spear: Dictionary = {}
+	for i in 180:
+		await _frames(1)
+		var spears := _shots_of(sp)
+		if not spears.is_empty():
+			spear = spears[0]
+			break
+	_check("the flying spearman drifts toward the player", sp.state in ["drift", "windup"] and sp.throws >= 1 and sp.target_distance() < start_d + 5.0, [sp.state, start_d, sp.target_distance()])
+	_check("it throws a deflectable spear at the player", not spear.is_empty() and spear.deflectable and spear.shape == "spear" and spear.on_deflect == "destroy")
+	if not spear.is_empty():
+		Config.upgrades.god_mode = false
+		var hp_sp := h.health
+		for i in 60:
+			if absf(spear.pos.x - p.get_center().x) < 60.0 or spear.dead:
+				break
+			await _frames(1)
+		var dir_to_spear := 1 if spear.pos.x > p.get_center().x else -1
+		if absf(spear.pos.y - p.get_center().y) > 40.0:
+			Input.action_press(&"move_up" if spear.pos.y < p.get_center().y else &"move_down")
+		await _swing(dir_to_spear)
+		Input.action_release(&"move_up")
+		Input.action_release(&"move_down")
+		await _frames(4)
+		_check("a melee strike knocks the spear out of the air (gone, not sent back)",
+			spear.deflected and spear.dead and not proj.list.has(spear) and is_equal_approx(sp.health, sp.max_health), [spear.deflected, spear.dead])
+		_check("the neutralized spear never hits the player", is_equal_approx(h.health, hp_sp), hp_sp - h.health)
+		Config.upgrades.god_mode = true
+	proj.clear()
 
 	# --- Modularity: every new kind is a BaseEnemy with the shared rig ---
 	await _fresh_bestiary()

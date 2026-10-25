@@ -3,11 +3,13 @@ extends BaseEnemy
 ## Large club-wielding brute. It lumbers toward the player and, in reach,
 ## raises its club (a long, clear wind-up) and smashes it down. The smash is
 ## NON-DEFLECTABLE (a swing cannot parry it) and deals DOUBLE damage
-## (2 x Config.combat.contact_damage). Dodge, then punish the recovery.
+## (2 x Config.combat.contact_damage). The swing is fast and the impact
+## shakes the screen (Events.enemy_slam). Dodge, then punish the recovery.
 
 @export var reach := 74.0
-@export var windup_time := 0.65
-@export var recover_time := 0.8
+@export var windup_time := 0.4
+@export var recover_time := 0.45
+@export var slam_shake := 0.55 ## Camera trauma on impact.
 
 
 func _on_spawn() -> void:
@@ -41,15 +43,16 @@ func _think(delta: float) -> void:
 			move_ground(delta, 0.0)
 			if state_time >= windup_time:
 				strike(front_rect(reach + 6.0, 64.0), smash_damage(), false, 0.12)
+				Events.enemy_slam.emit(self, Vector2(global_position.x + facing * (reach * 0.7), global_position.y), slam_shake)
 				enter("smash")
 		"smash":
 			move_ground(delta, 0.0)
-			if state_time >= 0.15:
+			if state_time >= 0.12:
 				enter("recover")
 		"recover":
 			move_ground(delta, 0.0)
 			if state_time >= recover_time:
-				cooldown = 0.9
+				cooldown = 0.35
 				enter("idle")
 		_:
 			enter("idle")

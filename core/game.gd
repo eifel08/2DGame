@@ -42,6 +42,7 @@ const ENEMY_SCENES := {
 	"hopper": preload("res://enemies/bestiary/hopper.tscn"),
 	"crawler": preload("res://enemies/bestiary/crawler.tscn"),
 	"phalanx": preload("res://enemies/bestiary/phalanx.tscn"),
+	"spearman": preload("res://enemies/bestiary/spearman.tscn"),
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
 const RESPAWN_FADE_TIME := 0.45

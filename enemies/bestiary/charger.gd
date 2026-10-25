@@ -5,11 +5,13 @@ extends BaseEnemy
 ## (a telegraph) and then rushes forward at high speed until it hits a wall,
 ## a ledge or runs `charge_distance`. After the charge it is winded for a
 ## moment (the opening), then walks back to its post.
+## Its back is armored with spikes: it is IMMUNE to attacks from above (no
+## damage, no pogo). Hit it from the side, best while it is winded.
 
 @export var charge_speed := 520.0
 @export var charge_distance := 420.0
 @export var windup_time := 0.5
-@export var recover_time := 0.9
+@export var recover_time := 0.55
 
 var _charge_from := 0.0
 
@@ -18,12 +20,19 @@ func _on_spawn() -> void:
 	poise_states = ["windup", "charge"]
 
 
+## Spiked back: every blow coming down from above is refused.
+func blocks_hit(direction: Vector2, _source: String) -> bool:
+	return direction.y > 0.5
+
+
 func _think(delta: float) -> void:
 	match state:
 		"idle":
 			move_ground(delta, 0.0)
-			if cooldown <= 0.0 and sees_target() and absf(target_center().y - get_center().y) < 60.0:
+			if sees_target(): # Look first (red eyes), attack when ready.
 				face_target()
+			if cooldown <= 0.0 and is_alerted() and target_valid() and absf(target_center().y - get_center().y) < 60.0 \
+					and target_distance() <= sight_range:
 				telegraph("charge")
 				enter("windup")
 		"windup":
@@ -42,7 +51,7 @@ func _think(delta: float) -> void:
 		"return":
 			var dx := home.x - global_position.x
 			if absf(dx) < 6.0:
-				cooldown = 0.6
+				cooldown = 0.35
 				face_target()
 				enter("idle")
 			else:

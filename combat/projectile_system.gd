@@ -6,8 +6,12 @@ extends Node2D
 ##
 ## DEFLECT RULE: a hostile projectile is either
 ##   deflectable      a warm gold orb with a white ring. A standard MELEE swing
-##                    that touches it swats it back (deflect_in_rect): it
-##                    turns friendly, flies at its shooter and hurts enemies.
+##                    that touches it swats it away (deflect_in_rect): it turns
+##                    friendly and flies straight along the strike (a side
+##                    swing sends it sideways, a down swing straight down, an
+##                    up swing straight up) and hurts the enemies it meets.
+##                    A projectile with on_deflect "destroy" (the spearman's
+##                    spear) is simply knocked out of the air instead.
 ##   non-deflectable  (default) a dark crimson / violet shape with a spiky rim.
 ##                    Swings pass through it; only dodging helps.
 ## Magic never deflects anything: only CombatManager's melee calls deflect.
@@ -27,7 +31,8 @@ func clear() -> void:
 ## opts: position, velocity, radius, damage, life, homing, color, source, knockback,
 ## delay, hostile (hits the player), shape ("orb", "wave" or "spike"), owner
 ## (the enemy that fired it, so a counter can strike back), deflectable
-## (hostile only: a melee swing can swat it back), gravity (px/s^2, arcs)
+## (hostile only: a melee swing can swat it back), gravity (px/s^2, arcs),
+## on_deflect ("reflect": fly along the strike, or "destroy": neutralized)
 func spawn(opts: Dictionary) -> void:
 	list.append({
 		"pos": opts.position,
@@ -44,6 +49,7 @@ func spawn(opts: Dictionary) -> void:
 		"shape": opts.get("shape", "orb"),
 		"owner": opts.get("owner"),
 		"deflectable": opts.get("deflectable", false),
+		"on_deflect": opts.get("on_deflect", "reflect"),
 		"gravity": opts.get("gravity", 0.0),
 		"deflected": false,
 		"frozen": 0.0, ## > 0: held in place and harmless (Stasis Field).
@@ -57,20 +63,31 @@ func hostile_count() -> int:
 
 
 ## Melee only. Every deflectable hostile projectile touching `rect` is swatted
-## back: it turns friendly, speeds up, aims at its shooter (or flies back the
-## way it came) and deals `damage` to the enemy it hits. Returns the count.
-func deflect_in_rect(rect: Rect2, damage: float) -> int:
+## away along `strike_dir` (the swing's direction: right, left, up or down):
+## it turns friendly, flies straight that way and deals `damage` to the enemy
+## it hits. One with on_deflect "destroy" is neutralized instead. Without a
+## strike direction it flies back at its shooter. Returns the count.
+func deflect_in_rect(rect: Rect2, damage: float, strike_dir := Vector2.ZERO) -> int:
 	var count := 0
 	for pr in list:
 		if pr.dead or not pr.hostile or not pr.deflectable:
 			continue
-		if not Geom.circle_overlaps_rect(pr.pos, pr.radius + 4.0, rect):
+		if not Geom.circle_overlaps_rect(pr.pos, pr.radius + 10.0, rect): # Forgiving, like the pogo.
 			continue
-		var speed: float = maxf(420.0, (pr.vel as Vector2).length() * 1.4)
+		count += 1
+		Events.projectile_deflected.emit(pr.pos)
+		if pr.on_deflect == "destroy":
+			pr.dead = true # Knocked out of the air: it can no longer hit anyone.
+			pr.deflected = true
+			pr.hostile = false
+			continue
+		var speed: float = maxf(460.0, (pr.vel as Vector2).length() * 1.4)
 		var shooter: Node = pr.owner if is_instance_valid(pr.owner) else null
-		var dir: Vector2 = -(pr.vel as Vector2).normalized()
-		if shooter and shooter.alive:
-			dir = (shooter.get_center() - pr.pos as Vector2).normalized()
+		var dir: Vector2 = strike_dir.normalized()
+		if dir == Vector2.ZERO:
+			dir = -(pr.vel as Vector2).normalized()
+			if shooter and shooter.alive:
+				dir = (shooter.get_center() - pr.pos as Vector2).normalized()
 		pr.vel = dir * speed
 		pr.hostile = false
 		pr.deflected = true
@@ -80,8 +97,6 @@ func deflect_in_rect(rect: Rect2, damage: float) -> int:
 		pr.source = "deflect"
 		pr.life = maxf(pr.life, 1.5)
 		pr.color = Color("#fff3c4")
-		count += 1
-		Events.projectile_deflected.emit(pr.pos)
 	return count
 
 
@@ -170,6 +185,14 @@ func _draw() -> void:
 			draw_arc(pr.pos, pr.radius + 5.0, 0.0, TAU, 16, Color("#bfe6ff"), 2.0, true)
 		if pr.hostile and not pr.deflectable and pr.shape != "wave":
 			_draw_hazardous(pr)
+			continue
+		if pr.hostile and pr.deflectable and pr.shape == "spear":
+			# A deflectable spear: gold shaft and head, white edge.
+			var d: Vector2 = (pr.vel as Vector2).normalized() if pr.vel != Vector2.ZERO else Vector2.RIGHT
+			draw_line(pr.pos - d * 22.0, pr.pos + d * 10.0, Color.WHITE, 5.0)
+			draw_line(pr.pos - d * 22.0, pr.pos + d * 10.0, Color("#ffc94d"), 3.0)
+			draw_colored_polygon(PackedVector2Array([pr.pos + d * 20.0, pr.pos + d * 8.0 + d.orthogonal() * 5.0,
+				pr.pos + d * 8.0 - d.orthogonal() * 5.0]), Color("#fff3c4"))
 			continue
 		if pr.hostile and pr.deflectable:
 			# Deflectable: warm gold, white ring (reads as "hit it back").

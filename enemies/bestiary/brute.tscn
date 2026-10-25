@@ -13,8 +13,8 @@ script = ExtResource("1_enemy")
 max_health = 160.0
 currency_drop = 12
 knockback_mul = 0.2
-sight_range = 320.0
-move_speed = 55.0
+sight_range = 190.0
+move_speed = 60.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -30)

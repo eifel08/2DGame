@@ -1,0 +1,30 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://enemies/bestiary/spearman.gd" id="1_enemy"]
+[ext_resource type="Script" path="res://enemies/enemy_rig.gd" id="2_rig"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(30, 36)
+
+[node name="Spearman" type="CharacterBody2D"]
+collision_layer = 8
+collision_mask = 33
+script = ExtResource("1_enemy")
+flying = true
+max_health = 40.0
+currency_drop = 7
+sight_range = 200.0
+leash_range = 360.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -18)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Flip" type="Node2D" parent="."]
+
+[node name="Rig" type="Node2D" parent="Flip"]
+script = ExtResource("2_rig")
+look = "spearman"
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+callback_mode_process = 2

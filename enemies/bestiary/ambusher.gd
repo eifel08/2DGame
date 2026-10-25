@@ -6,8 +6,8 @@ extends BaseEnemy
 ## toward the ghost in time parries it. While vanished or a ghost it cannot be
 ## hit and cannot hurt; after the strike it is open for a moment.
 
-@export var vanish_time := 0.35
-@export var ghost_time := 0.5
+@export var vanish_time := 0.25
+@export var ghost_time := 0.4
 @export var strike_damage := 15.0
 @export var behind := 46.0 ## Distance behind the player.
 
@@ -26,7 +26,7 @@ func _think(delta: float) -> void:
 	match state:
 		"idle":
 			visual_alpha = 1.0
-			if cooldown <= 0.0 and sees_target() and target_in_leash():
+			if sees_target() and cooldown <= 0.0 and target_in_leash():
 				telegraph("vanish")
 				enter("vanish")
 			elif home_distance() > leash_range and not sees_target():
@@ -58,8 +58,8 @@ func _think(delta: float) -> void:
 				enter("recover")
 		"recover", "staggered":
 			move_ground(delta, 0.0)
-			if state_time >= 0.9:
-				cooldown = 2.2
+			if state_time >= 0.5:
+				cooldown = 1.0
 				enter("idle")
 		_:
 			enter("idle")

@@ -17,7 +17,9 @@ extends Enemy
 ##     (a short melee hitbox; a deflectable strike is PARRIED by a player
 ##     swing that touches it in time: no damage, the enemy staggers)
 ##   - telegraphs: telegraph() before every attack (Events.enemy_telegraph,
-##     the rig shows the wind-up)
+##     the rig shows the wind-up pose)
+##   - noticing: while it has the player in sight (and a moment after) its
+##     eyes glow red (is_alerted). There is no "!" sign.
 ## The deflect rule (see ProjectileSystem): deflectable = a standard melee
 ## swing sends it back; non-deflectable = only dodging helps. Magic never
 ## deflects.
@@ -27,7 +29,7 @@ const PARRY_STAGGER := 0.9 ## Seconds stunned after a parried strike.
 
 @export var flying := false
 @export var move_speed := 60.0
-@export var sight_range := 260.0 ## How far it notices the player.
+@export var sight_range := 170.0 ## How far it notices the player (kept short on purpose).
 @export var leash_range := 420.0 ## Never chases further than this from home.
 @export var start_cooldown := 0.6
 
@@ -40,6 +42,7 @@ var t := 0.0 ## Free-running time (sways, bobs).
 var visual_alpha := 1.0 ## Rig opacity (ghosts, vanishing).
 var strike_info := {} ## {rect, damage, deflectable, time, hit} while a strike is live.
 var parried := false ## Last strike was parried (tests, rig).
+var alert_timer := 0.0 ## > 0: it has noticed the player (red eyes).
 ## States in which hits hurt but do not stun or push (committed attacks:
 ## a brute's smash cannot be cancelled by poking it).
 var poise_states: Array[String] = []
@@ -53,6 +56,7 @@ func _on_reset() -> void:
 	visual_alpha = 1.0
 	strike_info = {}
 	parried = false
+	alert_timer = 0.0
 	_on_spawn()
 
 
@@ -60,6 +64,7 @@ func _step_alive(delta: float) -> void:
 	t += delta
 	state_time += delta
 	cooldown -= delta
+	alert_timer -= delta
 	if stun_timer > 0.0:
 		strike_info = {}
 		_step_stunned(delta)
@@ -111,6 +116,15 @@ func telegraph(attack_name: String) -> void:
 
 # ---------- Senses ----------
 
+## Marks the player as noticed: the eyes glow red for a moment.
+func notice(duration := 1.0) -> void:
+	alert_timer = maxf(alert_timer, duration)
+
+
+func is_alerted() -> bool:
+	return alert_timer > 0.0
+
+
 func target_valid() -> bool:
 	return target != null and is_instance_valid(target)
 
@@ -133,7 +147,10 @@ func sees_target(range := -1.0) -> bool:
 	if not target_valid() or (target is Player and (target as Player).is_dying()):
 		return false
 	var r := sight_range if range < 0.0 else range
-	return target_distance() <= r and line_clear(get_center(), target_center())
+	if target_distance() <= r and line_clear(get_center(), target_center()):
+		notice()
+		return true
+	return false
 
 
 ## The player is close enough to home to be chased.

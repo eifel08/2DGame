@@ -155,7 +155,7 @@ func _step_attack(delta: float) -> void:
 	var blocked := false
 
 	# Deflect: swat back deflectable hostile projectiles (never magic).
-	var deflected := projectiles.deflect_in_rect(box, c.attack_damage * p.stat("damage_mul") * 1.5)
+	var deflected := projectiles.deflect_in_rect(box, c.attack_damage * p.stat("damage_mul") * 1.5, Vector2(dir_x, dir_y))
 
 	for enemy in get_enemies():
 		var er: Rect2 = enemy.get_rect()
@@ -190,7 +190,8 @@ func _step_attack(delta: float) -> void:
 	# falls in (hazard damage + safe-ground respawn, _resolve_hazards).
 	var on_hazard := dir == "down" and get_room().find_hazard(box, false).has_area()
 
-	if dir == "down" and (connected or on_hazard or deflected > 0 or blocked) and not attack.pogoed:
+	# A shield (blocks_hit) never gives a pogo: blocked from above means no bounce.
+	if dir == "down" and (connected or on_hazard or deflected > 0) and not attack.pogoed:
 		attack.pogoed = true
 		p.pogo(c.pogo_velocity)
 		Events.pogo_bounced.emit(p.global_position + Vector2(0, 10), on_hazard and not connected)

@@ -7,7 +7,7 @@ extends BaseEnemy
 ## off its helmet. When the player is in front and close, it thrusts its
 ## spear (a DEFLECTABLE strike: parry it with a swing).
 
-@export var turn_delay := 0.7
+@export var turn_delay := 0.5
 @export var reach := 64.0
 @export var thrust_damage := 15.0
 @export var start_facing := -1 ## Shield toward the way in (the Bestiary is walked left to right).
@@ -55,7 +55,7 @@ func _think(delta: float) -> void:
 			move_ground(delta, vx)
 		"windup":
 			move_ground(delta, 0.0)
-			if state_time >= 0.4:
+			if state_time >= 0.3:
 				strike(front_rect(reach + 10.0, 18.0, 18.0), thrust_damage, true, 0.12)
 				enter("thrust")
 		"thrust":
@@ -64,8 +64,8 @@ func _think(delta: float) -> void:
 				enter("recover")
 		"recover", "staggered":
 			move_ground(delta, 0.0)
-			if state_time >= 0.6:
-				cooldown = 1.0
+			if state_time >= 0.35:
+				cooldown = 0.45
 				enter("idle")
 		_:
 			enter("idle")

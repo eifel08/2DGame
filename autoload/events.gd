@@ -102,6 +102,8 @@ signal enemy_blocked(enemy: Node, direction: Vector2) ## A hit bounced off a shi
 @warning_ignore("unused_signal")
 signal enemy_telegraph(enemy: Node, attack: String) ## A BaseEnemy is about to attack (wind-up starts).
 @warning_ignore("unused_signal")
+signal enemy_slam(enemy: Node, position: Vector2, strength: float) ## A heavy blow hit the ground (screen shake).
+@warning_ignore("unused_signal")
 signal enemy_parried(enemy: Node, position: Vector2) ## A melee swing stopped a deflectable enemy strike.
 @warning_ignore("unused_signal")
 signal projectile_deflected(position: Vector2) ## A melee swing swatted a deflectable projectile back.

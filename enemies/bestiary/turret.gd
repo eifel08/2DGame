@@ -5,9 +5,9 @@ extends BaseEnemy
 ## straight at where it aimed. Cannot be knocked back.
 
 @export var bolt_speed := 380.0
-@export var aim_time := 0.6
+@export var aim_time := 0.45
 @export var lock_time := 0.15 ## The last part of the aim no longer tracks: jump then.
-@export var fire_interval := 1.5
+@export var fire_interval := 0.9
 @export var bolt_damage := 15.0
 
 var aim_dir := Vector2.RIGHT
@@ -38,7 +38,7 @@ func _think(delta: float) -> void:
 				enter("recover")
 		"recover":
 			move_ground(delta, 0.0)
-			if state_time >= 0.3:
+			if state_time >= 0.2:
 				enter("idle")
 		_:
 			enter("idle")

@@ -56,6 +56,12 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 		Sfx.play("hit", 1.5)
 		freeze(0.08)
 		effects.play("hit_spark", pos, {"scale": 1.3}))
+	# A heavy blow lands (the brute's club): a hard shake, a short freeze, dust.
+	Events.enemy_slam.connect(func(_enemy: Node, pos: Vector2, strength: float) -> void:
+		camera.add_trauma(strength)
+		freeze(0.06)
+		Sfx.play("break", 0.6)
+		effects.play("land_dust", pos, {"scale": 2.0}))
 	Events.projectile_deflected.connect(func(pos: Vector2) -> void:
 		Sfx.play("pogo", 1.3)
 		effects.play("pogo_spark", pos))

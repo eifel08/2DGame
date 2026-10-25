@@ -155,8 +155,10 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 
 ## Enemies — telegraph, and say what can be deflected
 
-- Every enemy attack has a visible wind-up (`BaseEnemy.telegraph()`, the rig's wind-up pose and white glint). No unannounced damage.
-- A hostile projectile is either **deflectable** (gold orb, white ring: a melee swing swats it back) or **non-deflectable** (dark crimson / violet, spiky: dodge it). Keep the two looks apart; never make a deflectable shot look dangerous or the other way round.
+- Every enemy attack has a visible wind-up (`BaseEnemy.telegraph()`, the rig's wind-up pose). No unannounced damage.
+- No alert signs ("!") over enemies. An enemy that has noticed the player shows it only with red, glowing eyes.
+- Keep detection short (`sight_range` 260 px at most): enemies notice the player up close, never from across the screen.
+- A hostile projectile is either **deflectable** (gold, white edge: a melee swing knocks it away along the strike, or knocks it out of the air if it is a spear) or **non-deflectable** (dark crimson / violet, spiky: dodge it). Keep the two looks apart; never make a deflectable shot look dangerous or the other way round.
 - Only melee deflects or parries. Spells never do.
 - Each new enemy type also gets a chamber in the Bestiary (`BESTIARY_LAYOUT` in `tools/build_assets.gd`, one chamber per type).
 
