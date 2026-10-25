@@ -4251,7 +4251,7 @@ func _test_bestiary() -> void:
 	_put(Vector2(am.global_position.x - 150.0, 448), 1)
 	var vanished := await _until(func() -> bool: return am.state == "vanish", 60)
 	_check("the ambusher vanishes when it spots the player (untouchable)", vanished and not am.hitbox_active())
-	var ghosted := await _until(func() -> bool: return am.state == "ghost", 40)
+	var ghosted := await _until(func() -> bool: return am.state == "ghost", 70)
 	_check("a semi-transparent ghost appears BEHIND the player",
 		ghosted and am.visual_alpha < 0.6 and signf(am.global_position.x - p.global_position.x) == -p.facing and not am.hitbox_active(),
 		[am.global_position.x - p.global_position.x, p.facing, am.visual_alpha])
@@ -4339,7 +4339,7 @@ func _test_bestiary() -> void:
 		cardinal[Vector2(roundf(v.x), roundf(v.y))] = true
 	_check("the floating sentry fires orbs Up, Down, Left and Right",
 		orbs.size() == 4 and cardinal.size() == 4 and cardinal.has(Vector2.UP) and cardinal.has(Vector2.DOWN) and cardinal.has(Vector2.LEFT) and cardinal.has(Vector2.RIGHT), cardinal.keys())
-	_check("its orbs CAN be deflected", orbs.all(func(o: Dictionary) -> bool: return o.deflectable))
+	_check("its orbs can NOT be deflected", orbs.all(func(o: Dictionary) -> bool: return not o.deflectable))
 	proj.clear()
 
 	# --- 10. Hopper: random short hops ---
@@ -4348,22 +4348,26 @@ func _test_bestiary() -> void:
 	var ho: HopperEnemy = _beast("hopper")
 	_check("the hopper's chamber is cramped: a low ceiling over it", game.room.is_solid_at(ho.home + Vector2(0, -7 * 32)) and not game.room.is_solid_at(ho.home + Vector2(0, -3 * 32)))
 	_put(Vector2(200, 448)) # Far away: it does not care about the player.
-	var highest := ho.global_position.y
 	var arc_seen := false
 	var line_seen := false
-	for i in 1500:
+	var walls_ok := true
+	for i in 2400:
 		await _frames(1)
-		highest = minf(highest, ho.global_position.y)
-		if ho.state == "hop" and ho.velocity.y > 0.0:
-			arc_seen = true # Falling at the end of a hop: a parabola.
-		if ho.state == "dart" and ho.state_time > 0.05 and absf(ho.velocity.length() - ho.dart_speed) < ho.dart_speed * 0.2:
+		if ho.state == "hop" and ho.velocity.dot(ho.normal) < 0.0:
+			arc_seen = true # Coming back down onto its surface: a parabola.
+		if ho.state == "dart" and ho.state_time > 0.05 and absf(ho.velocity.length() - ho.dart_speed) < 1.0:
 			line_seen = true
-		if ho.hops >= 2 and ho.darts >= 2 and ho.bounces >= 1:
+		if ho.state == "stick" and ho.normal != Vector2.UP:
+			# Clinging to a wall or the ceiling: it really stays there, no falling.
+			walls_ok = walls_ok and ho.velocity == Vector2.ZERO
+		var seen: Dictionary = ho.surfaces_seen
+		if ho.hops >= 2 and ho.darts >= 2 and seen.has(Vector2.DOWN) and (seen.has(Vector2.LEFT) or seen.has(Vector2.RIGHT)):
 			break
-	_check("same level: it hops in a parabola", ho.hops >= 2 and arc_seen, [ho.hops, arc_seen])
-	_check("other height: it darts in a straight line", ho.darts >= 2 and line_seen, [ho.darts, line_seen])
-	_check("it bounces off the walls and the low ceiling", ho.bounces >= 1, ho.bounces)
-	_check("it stays in its chamber, near home", ho.home_distance() < ho.leash_range and highest < ho.home.y - 20.0, [ho.home_distance(), highest])
+	_check("on its surface it hops in a parabola", ho.hops >= 2 and arc_seen, [ho.hops, arc_seen])
+	_check("to another surface it darts in a straight line", ho.darts >= 2 and line_seen, [ho.darts, line_seen])
+	_check("it sticks to walls and to the low ceiling", ho.surfaces_seen.has(Vector2.DOWN) and (ho.surfaces_seen.has(Vector2.LEFT) or ho.surfaces_seen.has(Vector2.RIGHT)) and walls_ok,
+		ho.surfaces_seen.keys())
+	_check("it stays in its chamber, near home", ho.home_distance() < ho.leash_range, ho.home_distance())
 
 	# --- 11. Bonus: wall-crawler circles its rock and drops on the player ---
 	await _fresh_bestiary()
@@ -4409,16 +4413,20 @@ func _test_bestiary() -> void:
 	var rig_consts: Dictionary = (load("res://enemies/enemy_rig.gd") as Script).get_script_constant_map()
 	_check("no '!' alert sign exists any more (the rig has no telegraph glint)", not rig_consts.has("TELEGRAPH_STATES"))
 	var sw2: BaseEnemy = _beast("swooper")
-	_put(Vector2(sw2.home.x - 280.0, 448))
+	_put(Vector2(200, 448))
 	await _frames(40)
-	_check("detection is short: a swooper does not notice the player 280 px away", not sw2.is_alerted() and sw2.state == "idle", sw2.state)
-	var short := true
+	_check("far away, a swooper has not noticed the player (calm eyes)", not sw2.is_alerted() and sw2.state == "idle", sw2.state)
+	var half_screen := true
 	for e in game.enemies:
-		if e is BaseEnemy:
-			short = short and e.sight_range <= 260.0
-	_check("every enemy's detection range is short (260 px or less)", short)
-	_put(Vector2(sw2.home.x - 40.0, 448))
-	_check("noticing the player makes the eyes glow red", await _until(func() -> bool: return sw2.is_alerted(), 30))
+		if e is BaseEnemy and e.kind in ["swooper", "charger", "thrower", "brute", "ambusher", "turret", "phalanx", "spearman"]:
+			half_screen = half_screen and e.sight_range >= 380.0 and e.sight_range <= 500.0
+	_check("most enemies see about half the screen (380-500 px)", half_screen)
+	_check("the turret sees half the screen", (_beast("turret") as BaseEnemy).sight_range >= 480.0)
+	_check("the spearman sees about half the screen and throws from further", (_beast("spearman") as SpearmanEnemy).sight_range >= 450.0
+		and (_beast("spearman") as SpearmanEnemy).throw_range > 190.0)
+	_check("the urchin's trigger range is much larger", (_beast("urchin") as UrchinEnemy).trigger_range >= 220.0)
+	_put(Vector2(sw2.home.x - 300.0, 448))
+	_check("noticing the player at about 300 px makes the eyes glow red", await _until(func() -> bool: return sw2.is_alerted(), 30))
 
 	# Brute: a faster club and a screen shake on impact.
 	await _fresh_bestiary()
@@ -4452,8 +4460,8 @@ func _test_bestiary() -> void:
 	await _swing(1)
 	await _frames(6)
 	Input.action_release(&"move_down")
-	_check("the charger is immune to attacks from above", is_equal_approx(ch2.health, ch2.max_health), ch2.health)
-	_check("and gives no pogo bounce", p.velocity.y > 0.0, p.velocity.y)
+	_check("the charger takes no damage from above", is_equal_approx(ch2.health, ch2.max_health), ch2.health)
+	_check("but the player still pogos off its back", p.velocity.y < -200.0, p.velocity.y)
 	await _frames(40)
 
 	# Shorter cooldowns across the board.
@@ -4461,8 +4469,9 @@ func _test_bestiary() -> void:
 	var ur2: UrchinEnemy = _beast("urchin")
 	var os2: OrbSentryEnemy = _beast("orb_sentry")
 	var ph2: PhalanxEnemy = _beast("phalanx")
-	_check("cooldowns are short (ambusher, urchin, orb sentry, phalanx, turret)",
-		am2.vanish_time + am2.ghost_time <= 0.7 and os2.interval_max <= 1.3 and ph2.turn_delay <= 0.5
+	_check("the orb sentry fires at a slow rate", os2.interval_min >= 1.5, os2.interval_min)
+	_check("cooldowns are short (ambusher, urchin, phalanx, turret)",
+		am2.vanish_time + am2.hidden_time <= 0.7 and ph2.turn_delay <= 0.5
 		and (_beast("turret") as TurretEnemy).fire_interval <= 1.0)
 
 	# Spike urchin: wanders left and right when the player is away.
@@ -4517,6 +4526,92 @@ func _test_bestiary() -> void:
 		_check("the neutralized spear never hits the player", is_equal_approx(h.health, hp_sp), hp_sp - h.health)
 		Config.upgrades.god_mode = true
 	proj.clear()
+
+	# --- Round 2: thrower, ambusher, leniency, elites ---
+	# Thrower: wanders out of range; plain melee hurts it up close.
+	await _fresh_bestiary()
+	var th2: ThrowerEnemy = _beast("thrower")
+	_put(Vector2(200, 448))
+	var tx := [th2.global_position.x, th2.global_position.x]
+	for i in 480:
+		await _frames(1)
+		tx[0] = minf(tx[0], th2.global_position.x)
+		tx[1] = maxf(tx[1], th2.global_position.x)
+	_check("out of range, the thrower wanders left and right", tx[1] - tx[0] > 12.0 and not th2.is_alerted(), tx[1] - tx[0])
+	_check("the thrower sees far (half the screen)", th2.sight_range >= 480.0)
+	_put(Vector2(th2.global_position.x - 40.0, 448), 1)
+	await _frames(2)
+	await _swing(1)
+	await _frames(6)
+	_check("up close, a plain melee strike hurts the thrower", th2.health < th2.max_health, th2.health)
+	proj.clear()
+	await _frames(20)
+
+	# Ambusher: wanders out of range; vanishes the instant it sees the player.
+	await _fresh_bestiary()
+	var am3: AmbusherEnemy = _beast("ambusher")
+	_put(Vector2(200, 448))
+	var ax := [am3.global_position.x, am3.global_position.x]
+	for i in 300:
+		await _frames(1)
+		ax[0] = minf(ax[0], am3.global_position.x)
+		ax[1] = maxf(ax[1], am3.global_position.x)
+	_check("out of range, the ambusher wanders left and right", ax[1] - ax[0] > 20.0 and am3.state == "idle", ax[1] - ax[0])
+	_put(Vector2(am3.global_position.x - 200.0, 448), 1)
+	await _frames(2)
+	_check("the instant the player is in range it vanishes (no free hit)", am3.state in ["vanish", "hidden"] and not am3.hitbox_active(), am3.state)
+	var hid := await _until(func() -> bool: return am3.state == "hidden", 20)
+	var waited := 0
+	while am3.state == "hidden" and waited < 90:
+		await _frames(1)
+		waited += 1
+	_check("it waits unseen for a short cooldown, then ghosts behind the player", hid and waited >= 15 and am3.state == "ghost", [waited, am3.state])
+	await _frames(60)
+
+	# Deflect leniency: a shot just outside the swing's damage box still counts.
+	await _fresh_bestiary()
+	_put(Vector2(200, 448), 1)
+	await _frames(3)
+	var strict: Rect2 = game.combat.get_attack_hitbox("right")
+	proj.spawn({"position": Vector2(strict.end.x + 14.0, strict.get_center().y), "velocity": Vector2(-5, 0), "hostile": true,
+		"deflectable": true, "life": 5.0, "radius": 6.0})
+	var edge: Dictionary = proj.list.back()
+	await _swing(1)
+	await _frames(12)
+	_check("deflecting is forgiving: a shot just past the swing's edge is knocked away", edge.deflected, edge.pos)
+	_check("the deflect window outlasts the damage frames", CombatManager.DEFLECT_LATE > 0.0 and CombatManager.DEFLECT_GROW > 0.0)
+	proj.clear()
+
+	# Elites: charger, brute, turret and phalanx do not come back on re-entry.
+	await _fresh_bestiary()
+	for kind in ["charger", "brute", "turret", "phalanx"]:
+		var elite: Enemy = _beast(kind)
+		_check("the %s is an elite (strong tier, keeps its wounds)" % kind, elite.tier == "strong" and elite.keeps_wounds)
+	var killed: Enemy = _beast("charger")
+	killed.kill()
+	Events.enemy_killed.emit(killed)
+	var wounded: Enemy = _beast("brute")
+	wounded.health = wounded.max_health - 50.0
+	var weakling: Enemy = _beast("thrower")
+	weakling.kill()
+	Events.enemy_killed.emit(weakling)
+	await _frames(2)
+	game.load_room("test_room", "floor")
+	await _frames(30)
+	game.load_room("bestiary", "ceiling")
+	await _frames(10)
+	_check("a slain charger stays dead when the player comes back", _beast("charger") == null)
+	_check("a wounded brute keeps its wounds", _beast("brute") != null and is_equal_approx(_beast("brute").health, _beast("brute").max_health - 50.0),
+		_beast("brute").health if _beast("brute") else -1.0)
+	_check("an ordinary enemy (thrower) is back", _beast("thrower") != null and _beast("thrower").alive)
+	var flame: Checkpoint = game.checkpoints[0]
+	game.save_at_checkpoint(flame) # Resting: elites return, survivors heal.
+	p.fsm.change("normal")
+	game.load_room("test_room", "floor")
+	await _frames(30)
+	game.load_room("bestiary", "ceiling")
+	await _frames(10)
+	_check("a checkpoint rest brings the elites back, healed", _beast("charger") != null and is_equal_approx(_beast("brute").health, _beast("brute").max_health))
 
 	# --- Modularity: every new kind is a BaseEnemy with the shared rig ---
 	await _fresh_bestiary()

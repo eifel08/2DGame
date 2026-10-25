@@ -162,19 +162,25 @@ func _draw_orb_sentry(s: Vector2, state: String, st: float, t: float) -> void:
 
 
 func _draw_hopper(s: Vector2, state: String, _st: float, _t: float) -> void:
-	var sq := Vector2(1.25, 0.7) if state == "crouch" else (Vector2(0.85, 1.2) if state == "hop" else Vector2.ONE)
-	if state == "dart": # Balled up, spinning through the air.
-		var c := Vector2(0, -s.y / 2.0)
-		draw_circle(c, s.y * 0.6, Color("#7bc96f"))
-		draw_arc(c, s.y * 0.6, enemy.t * 20.0, enemy.t * 20.0 + 2.0, 10, Color("#4f8f45"), 2.0)
+	# Drawn in the frame of the surface it clings to: "up" is away from it.
+	var hopper := enemy as HopperEnemy
+	var n := hopper.normal if hopper else Vector2.UP
+	var center := Vector2(0, -s.y / 2.0)
+	draw_set_transform(center, n.angle() + PI / 2.0)
+	if state == "dart" or state == "fall": # Balled up, spinning through the air.
+		draw_circle(Vector2.ZERO, s.y * 0.6, Color("#7bc96f"))
+		draw_arc(Vector2.ZERO, s.y * 0.6, enemy.t * 20.0, enemy.t * 20.0 + 2.0, 10, Color("#4f8f45"), 2.0)
+		draw_set_transform(Vector2.ZERO)
 		return
+	var sq := Vector2(1.25, 0.7) if state == "crouch" else (Vector2(0.85, 1.2) if state == "hop" else Vector2.ONE)
 	var w := s.x * sq.x
 	var h := s.y * sq.y
-	draw_rect(Rect2(-w / 2.0, -h, w, h), Color("#7bc96f"))
+	var base := s.y / 2.0 # The surface side, in this frame.
+	draw_rect(Rect2(-w / 2.0, base - h, w, h), Color("#7bc96f"))
 	for side: float in [-1.0, 1.0]:
-		draw_rect(Rect2(side * w / 2.0 - (4.0 if side > 0 else 0.0), -4, 4, 4), Color("#4f8f45")) # Feet.
-	_eye(Vector2(w * 0.2, -h + 5), false, 2.5)
-
+		draw_rect(Rect2(side * w / 2.0 - (4.0 if side > 0 else 0.0), base - 4, 4, 4), Color("#4f8f45")) # Feet.
+	_eye(Vector2(w * 0.2, base - h + 5), false, 2.5)
+	draw_set_transform(Vector2.ZERO)
 
 func _draw_crawler(s: Vector2, state: String, _st: float, t: float) -> void:
 	var crawler := enemy as CrawlerEnemy

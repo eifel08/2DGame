@@ -263,6 +263,8 @@ func _handle_meta_input() -> void:
 func _load_room_scene(id: String) -> void:
 	arena_director.abort()
 	for enemy in enemies:
+		if enemy.keeps_wounds and enemy.alive and enemy.spawn_id != "" and enemy.health < enemy.max_health:
+			world.set_wound(room_id, enemy.spawn_id, enemy.health) # Elites keep their damage.
 		enemy.queue_free()
 	enemies.clear()
 	for coin in coins:
@@ -588,7 +590,10 @@ func remove_enemy(enemy: Enemy) -> void:
 func _spawn_room_enemies() -> void:
 	for spawn in room.get_enemy_spawns():
 		if not world.is_dead(room_id, spawn.id):
-			spawn_enemy_kind(spawn.kind, spawn.position, spawn.id)
+			var enemy := spawn_enemy_kind(spawn.kind, spawn.position, spawn.id)
+			var wound := world.get_wound(room_id, spawn.id)
+			if enemy and enemy.keeps_wounds and wound > 0.0:
+				enemy.health = wound
 
 
 func _on_enemy_killed(enemy: Node) -> void:

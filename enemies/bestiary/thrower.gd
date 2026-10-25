@@ -4,6 +4,8 @@ extends BaseEnemy
 ## projectiles at the player: a wind-up (arm back), then a gold orb thrown in
 ## an arc (a parabola) that comes down on the player. A melee swing that meets
 ## the orb knocks it away along the strike (ProjectileSystem.deflect_in_rect).
+## It sees far (about half the screen). While the player is out of sight it
+## wanders left and right at random. Up close, plain melee hurts it.
 
 @export var throw_speed := 300.0
 @export var throw_interval := 1.2
@@ -15,15 +17,17 @@ extends BaseEnemy
 func _think(delta: float) -> void:
 	match state:
 		"idle":
+			if not sees_target():
+				wander(delta, move_speed * 0.7)
+				return
 			var vx := 0.0
-			if sees_target():
-				face_target()
-				var dx := target.global_position.x - global_position.x
-				if absf(dx) < keep_away and ground_ahead(-facing) and not wall_ahead(-facing):
-					vx = -facing * move_speed # Back off, still facing the player.
-				if cooldown <= 0.0:
-					telegraph("throw")
-					enter("windup")
+			face_target()
+			var dx := target.global_position.x - global_position.x
+			if absf(dx) < keep_away and ground_ahead(-facing) and not wall_ahead(-facing):
+				vx = -facing * move_speed # Back off, still facing the player.
+			if cooldown <= 0.0:
+				telegraph("throw")
+				enter("windup")
 			move_ground(delta, vx)
 		"windup":
 			face_target()

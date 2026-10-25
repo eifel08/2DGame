@@ -157,8 +157,10 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 
 - Every enemy attack has a visible wind-up (`BaseEnemy.telegraph()`, the rig's wind-up pose). No unannounced damage.
 - No alert signs ("!") over enemies. An enemy that has noticed the player shows it only with red, glowing eyes.
-- Keep detection short (`sight_range` 260 px at most): enemies notice the player up close, never from across the screen.
-- A hostile projectile is either **deflectable** (gold, white edge: a melee swing knocks it away along the strike, or knocks it out of the air if it is a spear) or **non-deflectable** (dark crimson / violet, spiky: dodge it). Keep the two looks apart; never make a deflectable shot look dangerous or the other way round.
+- Detection: about half the screen (`sight_range` ≈ 420 px; turrets and ranged enemies 480 px), always with line of sight. Never across the whole screen.
+- Major enemies (charger, club brute, turret, shield phalanx and future ones like them) are elites: `tier = "strong"` and `keeps_wounds = true`, so they do not come back or heal when the player re-enters the room.
+- A hostile projectile is either **deflectable** (gold, white edge: a melee swing knocks it away along the strike, or knocks it out of the air if it is a spear) or **non-deflectable** (dark crimson / violet, spiky: dodge it).
+- Deflects and parries stay forgiving (`CombatManager.deflect_box()`): do not tighten them below the swing's own hitbox and timing. Keep the two looks apart; never make a deflectable shot look dangerous or the other way round.
 - Only melee deflects or parries. Spells never do.
 - Each new enemy type also gets a chamber in the Bestiary (`BESTIARY_LAYOUT` in `tools/build_assets.gd`, one chamber per type).
 

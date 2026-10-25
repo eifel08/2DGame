@@ -23,6 +23,9 @@ const SPAWN_TELEGRAPH := 0.35 ## Arena wave spawns: seconds harmless (the "spawn
 @export var currency_drop := 6 ## Shards dropped when destroyed.
 @export var contact_damage_mul := 1.0
 @export var knockback_mul := 1.0 ## Lower = heavier.
+## Elites: damage it took stays when the player leaves the room and comes back
+## (WorldState.wounds, cleared at a checkpoint rest).
+@export var keeps_wounds := false
 
 @onready var flip: Node2D = $Flip
 @onready var anim: AnimationPlayer = $AnimationPlayer
@@ -131,6 +134,12 @@ func take_hit(damage: float, direction: Vector2, knockback: float, source := "")
 		health = 0.0
 		_die()
 	return damage
+
+
+## A blow from above that it refuses still gives the player a pogo bounce
+## (e.g. the charger's spiked back: no damage, but a foothold).
+func pogo_on_block() -> bool:
+	return false
 
 
 ## Instant death (e.g. touching spikes). Returns true if it was alive.

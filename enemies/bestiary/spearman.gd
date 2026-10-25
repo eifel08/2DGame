@@ -7,8 +7,8 @@ extends BaseEnemy
 ## out of the air (on_deflect "destroy"), so it cannot hit the player.
 
 @export var drift_speed := 75.0
-@export var keep_distance := 130.0
-@export var throw_range := 190.0
+@export var keep_distance := 170.0
+@export var throw_range := 240.0
 @export var spear_speed := 380.0
 @export var spear_damage := 15.0
 @export var throw_interval := 1.2

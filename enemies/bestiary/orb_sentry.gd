@@ -4,19 +4,18 @@ extends BaseEnemy
 ## at random, whether it has seen the player or not, and keeps firing its
 ## pattern: a short glow, then energy orbs in the four cardinal directions
 ## (Up, Down, Left, Right) at once, at random short intervals.
-## Its orbs are DEFLECTABLE: a melee swing knocks one away along the strike.
+## Its orbs are NOT deflectable: dodge them. It fires at a slow rate.
 
 @export var orb_speed := 200.0
 @export var orb_damage := 15.0
-@export var interval_min := 0.6
-@export var interval_max := 1.2
+@export var interval_min := 1.6
+@export var interval_max := 2.6
 @export var wander_area := Vector2(260.0, 110.0) ## Half-size of the box around home it roams.
 @export var drift_speed := 70.0
 
 const DIRECTIONS: Array[Vector2] = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
 
 var wander_to := Vector2.ZERO
-var _wander_time := 0.0
 var volleys := 0 ## Volleys fired (tests, debug).
 
 
@@ -51,7 +50,7 @@ func _think(delta: float) -> void:
 			if state_time >= 0.3:
 				for dir in DIRECTIONS:
 					shoot(get_center() + dir * 18.0, dir, orb_speed, {"radius": 9.0, "damage": orb_damage, "life": 2.6,
-						"color": Color("#ffc94d"), "deflectable": true})
+						"color": Color("#8a3df0")})
 				volleys += 1
 				cooldown = randf_range(interval_min, interval_max)
 				enter("idle")

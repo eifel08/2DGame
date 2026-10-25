@@ -5,8 +5,10 @@ extends BaseEnemy
 ## (a telegraph) and then rushes forward at high speed until it hits a wall,
 ## a ledge or runs `charge_distance`. After the charge it is winded for a
 ## moment (the opening), then walks back to its post.
-## Its back is armored with spikes: it is IMMUNE to attacks from above (no
-## damage, no pogo). Hit it from the side, best while it is winded.
+## Its back is armored with spikes: it is IMMUNE to damage from above. A down
+## strike still POGOS off it (a foothold, no damage). Hit it from the side,
+## best while it is winded. An elite: it does not come back when you re-enter
+## the room, and keeps its wounds (strong tier, keeps_wounds).
 
 @export var charge_speed := 520.0
 @export var charge_distance := 420.0
@@ -20,9 +22,14 @@ func _on_spawn() -> void:
 	poise_states = ["windup", "charge"]
 
 
-## Spiked back: every blow coming down from above is refused.
+## Spiked back: every blow coming down from above is refused...
 func blocks_hit(direction: Vector2, _source: String) -> bool:
 	return direction.y > 0.5
+
+
+## ...but the player can still pogo off it.
+func pogo_on_block() -> bool:
+	return true
 
 
 func _think(delta: float) -> void:

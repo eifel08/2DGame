@@ -12,7 +12,8 @@ collision_mask = 37
 script = ExtResource("1_enemy")
 max_health = 45.0
 currency_drop = 8
-sight_range = 170.0
+sight_range = 400.0
+move_speed = 45.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -21)

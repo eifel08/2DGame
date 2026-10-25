@@ -29,8 +29,10 @@ const PARRY_STAGGER := 0.9 ## Seconds stunned after a parried strike.
 
 @export var flying := false
 @export var move_speed := 60.0
-@export var sight_range := 170.0 ## How far it notices the player (kept short on purpose).
-@export var leash_range := 420.0 ## Never chases further than this from home.
+## How far it notices the player: about half the screen (the view is 960 px
+## wide), and only with a clear line of sight.
+@export var sight_range := 420.0
+@export var leash_range := 520.0 ## Never chases further than this from home.
 @export var start_cooldown := 0.6
 
 var combat: CombatManager ## Set by Game when spawned.
@@ -46,6 +48,8 @@ var alert_timer := 0.0 ## > 0: it has noticed the player (red eyes).
 ## States in which hits hurt but do not stun or push (committed attacks:
 ## a brute's smash cannot be cancelled by poking it).
 var poise_states: Array[String] = []
+var wander_dir := 0 ## wander(): -1, 0 (pause) or 1.
+var _wander_time := 0.0
 
 
 func _on_reset() -> void:
@@ -180,6 +184,22 @@ func move_ground(delta: float, vx: float) -> void:
 	move_and_slide()
 
 
+## Random idle stroll for walkers: walk left or right for a while, pause now
+## and then, turn at walls and ledges. Call it from _think while idle.
+func wander(delta: float, speed := -1.0) -> void:
+	_wander_time -= delta
+	if _wander_time <= 0.0:
+		wander_dir = [-1, 0, 1, 1, -1].pick_random()
+		if home_distance() > leash_range * 0.4:
+			wander_dir = 1 if home.x > global_position.x else -1 # Drift back home.
+		_wander_time = randf_range(0.8, 2.0)
+	if wander_dir != 0 and is_on_floor() and (not ground_ahead(wander_dir) or wall_ahead(wander_dir)):
+		wander_dir = -wander_dir
+	if wander_dir != 0:
+		facing = wander_dir
+	move_ground(delta, wander_dir * (move_speed if speed < 0.0 else speed))
+
+
 ## Steers toward `desired` velocity (flyers).
 func move_fly(delta: float, desired: Vector2, accel := 900.0) -> void:
 	velocity = velocity.move_toward(desired, accel * delta)
@@ -231,7 +251,7 @@ func _step_strike(delta: float) -> void:
 		return
 	var rect: Rect2 = strike_info.rect
 	if strike_info.deflectable and combat != null:
-		var swing := combat.swing_box()
+		var swing := combat.deflect_box() # Forgiving window and box (see CombatManager).
 		if swing.has_area() and swing.intersects(rect.grow(6.0)):
 			strike_info = {}
 			parried = true

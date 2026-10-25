@@ -13,8 +13,8 @@ script = ExtResource("1_enemy")
 flying = true
 max_health = 40.0
 currency_drop = 7
-sight_range = 200.0
-leash_range = 360.0
+sight_range = 480.0
+leash_range = 560.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -18)

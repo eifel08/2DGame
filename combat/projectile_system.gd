@@ -72,7 +72,7 @@ func deflect_in_rect(rect: Rect2, damage: float, strike_dir := Vector2.ZERO) -> 
 	for pr in list:
 		if pr.dead or not pr.hostile or not pr.deflectable:
 			continue
-		if not Geom.circle_overlaps_rect(pr.pos, pr.radius + 10.0, rect): # Forgiving, like the pogo.
+		if not Geom.circle_overlaps_rect(pr.pos, pr.radius + 12.0, rect): # Forgiving, like the pogo (rect is already grown).
 			continue
 		count += 1
 		Events.projectile_deflected.emit(pr.pos)

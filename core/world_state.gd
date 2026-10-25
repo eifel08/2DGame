@@ -8,7 +8,9 @@ extends RefCounted
 ##   strong enemies - revive only at a checkpoint save
 ##   bosses         - never revive in this playthrough
 ## Survivors are re-created on every room load, so an enemy that was damaged
-## but not killed is back at full health when the player returns.
+## but not killed is back at full health when the player returns. Except
+## elites (Enemy.keeps_wounds): their damage is kept in `wounds` until a
+## checkpoint rest.
 ## Cleared arenas, collected placed shards, opened secrets and relics also
 ## stay that way. to_dict()/from_dict() feed the save slots; respawnable
 ## enemy deaths are deliberately not saved (loading resets them).
@@ -19,6 +21,7 @@ var cleared_arenas := {} ## arena_id -> true
 var collected_coins := {} ## room_id -> {coin_name: true}
 var secrets := {} ## secret_id -> true (broken walls, found Type 1 hidden pockets)
 var relics := {} ## relic_id -> true
+var wounds := {} ## room_id -> {spawn_id: health}: damaged elites (not saved).
 
 
 func new_game() -> void:
@@ -28,6 +31,7 @@ func new_game() -> void:
 	collected_coins.clear()
 	secrets.clear()
 	relics.clear()
+	wounds.clear()
 
 
 func to_dict() -> Dictionary:
@@ -79,13 +83,27 @@ func on_room_entered(room_id: String) -> void:
 ## Returning to a checkpoint (saving, dying or loading) revives weak and
 ## strong enemies everywhere.
 func on_checkpoint_rest() -> void:
+	wounds.clear()
 	for room_id in dead_enemies.keys():
 		_revive(room_id, ["weak", "strong"])
 
 
 ## Debug helper: revive every non-boss enemy in a room.
 func revive_room(room_id: String) -> void:
+	wounds.erase(room_id)
 	_revive(room_id, ["weak", "strong"])
+
+
+## An elite left the room damaged: remember its health.
+func set_wound(room_id: String, spawn_id: String, health: float) -> void:
+	if not wounds.has(room_id):
+		wounds[room_id] = {}
+	wounds[room_id][spawn_id] = health
+
+
+## Health an elite keeps, or -1 when it is unhurt.
+func get_wound(room_id: String, spawn_id: String) -> float:
+	return wounds.get(room_id, {}).get(spawn_id, -1.0)
 
 
 func _revive(room_id: String, tiers: Array) -> void:

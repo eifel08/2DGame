@@ -111,6 +111,22 @@ func swing_box() -> Rect2:
 	return get_attack_hitbox(attack.dir)
 
 
+## Deflect / parry leniency: a swing catches shots and enemy strikes a bit
+## before and after its damage frames, in a slightly larger box.
+const DEFLECT_EARLY := 0.02 ## Seconds before the damage frames start.
+const DEFLECT_LATE := 0.06 ## Seconds after they end.
+const DEFLECT_GROW := 8.0 ## Extra pixels around the swing hitbox.
+
+
+## The forgiving deflect / parry box of the current swing, else an empty Rect2.
+func deflect_box() -> Rect2:
+	if attack.is_empty():
+		return Rect2()
+	if attack.t < Config.combat.attack_active_start - DEFLECT_EARLY or attack.t > active_end(attack.dir) + DEFLECT_LATE:
+		return Rect2()
+	return get_attack_hitbox(attack.dir).grow(DEFLECT_GROW)
+
+
 ## The downward swing stays active longer (pogo leniency).
 func active_end(dir: String) -> float:
 	return Config.combat.pogo_active_end if dir == "down" else Config.combat.attack_active_end
@@ -144,18 +160,28 @@ func _step_attack(delta: float) -> void:
 	if not p.can_attack() or attack.t >= c.attack_duration:
 		_end_attack()
 		return
+
+	var dir: String = attack.dir
+	var dir_x := 1.0 if dir == "right" else (-1.0 if dir == "left" else 0.0)
+	var dir_y := -1.0 if dir == "up" else (1.0 if dir == "down" else 0.0)
+	# Deflect: knock away deflectable hostile projectiles (never magic). Its
+	# window and box are more forgiving than the damage frames (deflect_box).
+	var deflected := 0
+	var dbox := deflect_box()
+	if dbox.has_area():
+		deflected = projectiles.deflect_in_rect(dbox, c.attack_damage * p.stat("damage_mul") * 1.5, Vector2(dir_x, dir_y))
+	if deflected > 0 and dir == "down" and not attack.pogoed:
+		attack.pogoed = true
+		p.pogo(c.pogo_velocity)
+		Events.pogo_bounced.emit(p.global_position + Vector2(0, 10), false)
+
 	if attack.t < c.attack_active_start or attack.t > active_end(attack.dir):
 		return
 
-	var dir: String = attack.dir
 	var box := get_attack_hitbox(dir)
-	var dir_x := 1.0 if dir == "right" else (-1.0 if dir == "left" else 0.0)
-	var dir_y := -1.0 if dir == "up" else (1.0 if dir == "down" else 0.0)
 	var connected := false
 	var blocked := false
-
-	# Deflect: swat back deflectable hostile projectiles (never magic).
-	var deflected := projectiles.deflect_in_rect(box, c.attack_damage * p.stat("damage_mul") * 1.5, Vector2(dir_x, dir_y))
+	var block_pogo := false
 
 	for enemy in get_enemies():
 		var er: Rect2 = enemy.get_rect()
@@ -175,6 +201,7 @@ func _step_attack(delta: float) -> void:
 			connected = true
 		elif enemy.alive and enemy.blocks_hit(Vector2(hx, dir_y), "melee"):
 			blocked = true
+			block_pogo = block_pogo or enemy.pogo_on_block()
 
 	# Breakable walls (hidden passages) take hits from any swing. Rule C
 	# (GUIDELINES.md): never gate this on arena state; secret exits must
@@ -190,8 +217,9 @@ func _step_attack(delta: float) -> void:
 	# falls in (hazard damage + safe-ground respawn, _resolve_hazards).
 	var on_hazard := dir == "down" and get_room().find_hazard(box, false).has_area()
 
-	# A shield (blocks_hit) never gives a pogo: blocked from above means no bounce.
-	if dir == "down" and (connected or on_hazard or deflected > 0) and not attack.pogoed:
+	# A shield (blocks_hit) gives no pogo, unless the enemy offers a foothold
+	# (pogo_on_block: the charger's spiked back, no damage but a bounce).
+	if dir == "down" and (connected or on_hazard or block_pogo) and not attack.pogoed:
 		attack.pogoed = true
 		p.pogo(c.pogo_velocity)
 		Events.pogo_bounced.emit(p.global_position + Vector2(0, 10), on_hazard and not connected)

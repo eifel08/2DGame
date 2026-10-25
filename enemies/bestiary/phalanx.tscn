@@ -10,10 +10,11 @@ size = Vector2(34, 48)
 collision_layer = 8
 collision_mask = 37
 script = ExtResource("1_enemy")
+tier = "strong"
+keeps_wounds = true
 max_health = 70.0
 currency_drop = 9
 knockback_mul = 0.4
-sight_range = 180.0
 move_speed = 40.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]

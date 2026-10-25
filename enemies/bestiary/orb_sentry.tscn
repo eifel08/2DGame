@@ -14,7 +14,6 @@ flying = true
 max_health = 50.0
 currency_drop = 7
 knockback_mul = 0.3
-sight_range = 200.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 position = Vector2(0, -15)
