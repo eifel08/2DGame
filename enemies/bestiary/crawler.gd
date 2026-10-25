@@ -22,6 +22,10 @@ var fall_speed := 0.0
 var turns := 0 ## Corners taken (tests, debug).
 
 
+func surface_normal() -> Vector2:
+	return normal if state != "fall" else Vector2.ZERO
+
+
 func _on_spawn() -> void:
 	contact = home
 	normal = Vector2.UP

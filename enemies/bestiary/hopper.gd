@@ -40,6 +40,10 @@ func _on_spawn() -> void:
 	_wait = randf_range(0.0, wait_time.y * 2.0) # A random first delay.
 
 
+func surface_normal() -> Vector2:
+	return normal if state in ["stick", "crouch", "idle"] else Vector2.ZERO
+
+
 func tangent() -> Vector2:
 	return Vector2(-normal.y, normal.x)
 

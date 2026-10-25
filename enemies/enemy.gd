@@ -136,6 +136,12 @@ func take_hit(damage: float, direction: Vector2, knockback: float, source := "")
 	return damage
 
 
+## The surface it clings to, as a normal pointing into open air, or zero
+## when it stands normally. Drops leave it that way (see Game.drop_currency).
+func surface_normal() -> Vector2:
+	return Vector2.ZERO
+
+
 ## A blow from above that it refuses still gives the player a pogo bounce
 ## (e.g. the charger's spiked back: no damage, but a foothold).
 func pogo_on_block() -> bool:

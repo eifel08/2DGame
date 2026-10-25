@@ -293,6 +293,9 @@ func _run() -> void:
 	# --- Bestiary: BaseEnemy roster, deflect / parry, the testing hall ---
 	await _test_bestiary()
 
+	# --- Drops: shards never spawn or end up inside walls / ceilings ---
+	await _test_drops()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -4714,4 +4717,103 @@ func _test_bestiary() -> void:
 
 	Config.upgrades.god_mode = god
 	proj.clear()
+	await _reset()
+
+
+# ---------- Drops never end up inside walls or ceilings ----------
+
+## Follows every new dropped shard for `frames`: none may ever overlap rock,
+## and all must come to rest on the ground. Returns [never_inside, settled, count].
+func _watch_drops(before: Array, frames: int) -> Array:
+	var fresh: Array = game.coins.filter(func(c: Coin) -> bool: return c.dropped and not before.has(c))
+	var never_inside := true
+	for i in frames:
+		await _frames(1)
+		for c in fresh:
+			if is_instance_valid(c) and not c.collected and game.room.rect_blocked(c.get_rect()):
+				never_inside = false
+	var settled := fresh.size() > 0
+	for c in fresh:
+		if not is_instance_valid(c) or c.collected:
+			continue
+		settled = settled and c.velocity == Vector2.ZERO and game.room.is_ground_at(c.global_position + Vector2(0, 2)) \
+			and not game.room.rect_blocked(c.get_rect())
+	return [never_inside, settled, fresh.size()]
+
+
+func _test_drops() -> void:
+	var p: Player = game.player
+	var god: bool = Config.upgrades.god_mode
+	Config.upgrades.god_mode = true
+	await _fresh_bestiary()
+	_put(Vector2(200, 448)) # Far away: nothing gets picked up.
+	var ho: HopperEnemy = _beast("hopper")
+	var room: Room = game.room
+
+	# 1. A Hopper clinging to the low ceiling dies: its shards fall, not up into rock.
+	var x := ho.home.x
+	while room.is_solid_at(Vector2(x, 300)) or room.is_solid_at(Vector2(x - 12, 300)) or room.is_solid_at(Vector2(x + 12, 300)):
+		x += 32.0
+	var ceiling := 9.0 * 32.0
+	ho.global_position = Vector2(x, ceiling + ho.size.y + 1.0)
+	ho.normal = Vector2.DOWN
+	ho.velocity = Vector2.ZERO
+	ho.enter("stick")
+	await _frames(1)
+	_check("a Hopper can cling to the low ceiling (setup)", ho.surface_normal() == Vector2.DOWN and room.is_solid_at(Vector2(x, ceiling - 4.0)))
+	var before: Array = game.coins.duplicate()
+	ho.currency_drop = 10
+	ho.kill()
+	Events.enemy_killed.emit(ho)
+	var r: Array = await _watch_drops(before, 150)
+	_check("shards of a Hopper killed on the ceiling never enter the rock", r[0] and r[2] >= 3, r)
+	_check("and they settle on the floor below", r[1], r)
+
+	# 2. A Hopper clinging to a wall dies: its shards pop away from the wall.
+	await _fresh_bestiary()
+	_put(Vector2(200, 448))
+	ho = _beast("hopper")
+	var wx := ho.home.x
+	while not (room.is_solid_at(Vector2(wx + 16.0, 12 * 32 + 16)) and not room.is_solid_at(Vector2(wx + 16.0, 11 * 32 + 16))):
+		wx += 32.0 # Find a low wall (rock in row 12, open above it).
+	var face := floorf((wx + 16.0) / 32.0) * 32.0
+	ho.global_position = Vector2(face - ho.size.x / 2.0 - 0.5, 13 * 32.0 - 4.0)
+	ho.normal = Vector2.LEFT
+	ho.velocity = Vector2.ZERO
+	ho.enter("stick")
+	await _frames(1)
+	before = game.coins.duplicate()
+	ho.currency_drop = 10
+	ho.kill()
+	Events.enemy_killed.emit(ho)
+	var fresh: Array = game.coins.filter(func(c: Coin) -> bool: return c.dropped and not before.has(c))
+	_check("shards of a Hopper killed on a wall start in open air, moving away from it",
+		fresh.size() >= 3 and fresh.all(func(c: Coin) -> bool: return not room.rect_blocked(c.get_rect()) and c.velocity.x < 0.0),
+		fresh.map(func(c: Coin) -> Vector2: return c.velocity))
+	r = await _watch_drops(before, 150)
+	_check("they never enter the wall and settle on the ground", r[0] and r[1], r)
+
+	# 3. A drop that would start inside rock is moved out to the nearest open air.
+	before = game.coins.duplicate()
+	var inside := Vector2(face + 16.0, 12 * 32.0 + 16.0)
+	_check("(setup) the drop point is inside the wall", room.is_solid_at(inside))
+	game.drop_currency(inside, 10)
+	fresh = game.coins.filter(func(c: Coin) -> bool: return c.dropped and not before.has(c))
+	_check("a drop inside a wall is pushed out to open air", fresh.size() >= 3 and fresh.all(func(c: Coin) -> bool: return not room.rect_blocked(c.get_rect())))
+	r = await _watch_drops(before, 150)
+	_check("and those shards stay out of the rock and settle", r[0] and r[1], r)
+
+	# 4. A drop inside the ceiling rock comes out below it.
+	before = game.coins.duplicate()
+	game.drop_currency(Vector2(x, ceiling - 20.0), 8)
+	r = await _watch_drops(before, 150)
+	_check("a drop inside the ceiling is pushed out, falls and settles", r[0] and r[1] and r[2] >= 3, r)
+
+	# 5. In open air, drops still burst upward (the usual feel).
+	before = game.coins.duplicate()
+	game.drop_currency(Vector2(200, 400), 10)
+	fresh = game.coins.filter(func(c: Coin) -> bool: return c.dropped and not before.has(c))
+	_check("in open air, shards still burst upward", fresh.size() >= 3 and fresh.all(func(c: Coin) -> bool: return c.velocity.y < -200.0))
+	await _frames(60)
+	Config.upgrades.god_mode = god
 	await _reset()

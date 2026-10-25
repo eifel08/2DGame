@@ -68,6 +68,53 @@ func is_ground_at(world_pos: Vector2) -> bool:
 	return d != null and not d.get_custom_data("hazard")
 
 
+## True when any corner or the middle of `r` is inside solid rock.
+func rect_blocked(r: Rect2) -> bool:
+	for p in [r.position, Vector2(r.end.x, r.position.y), Vector2(r.position.x, r.end.y), r.end, r.get_center()]:
+		if is_solid_at(p):
+			return true
+	return false
+
+
+## The nearest point to `pos` where a box `size` (bottom-centered on the
+## point, like the objects' feet) is free of solid rock. Searches rings
+## outward in `step` px up to `max_dist`; returns `pos` if nothing is found.
+func free_spot(pos: Vector2, size: Vector2, step := 4.0, max_dist := 128.0) -> Vector2:
+	var box := func(at: Vector2) -> Rect2: return Rect2(at - Vector2(size.x / 2.0, size.y), size)
+	if not rect_blocked(box.call(pos)):
+		return pos
+	var r := step
+	while r <= max_dist:
+		var n := maxi(8, int(TAU * r / step))
+		for i in n:
+			var at := pos + Vector2.from_angle(TAU * i / n) * r
+			if not rect_blocked(box.call(at)):
+				return at
+		r += step
+	return pos
+
+
+## The way out into open air from `pos`: away from the rock found within
+## `reach` px around it (zero in the middle of open space).
+func open_direction(pos: Vector2, reach := 24.0) -> Vector2:
+	var away := Vector2.ZERO
+	for i in 8:
+		var d := Vector2.from_angle(TAU * i / 8.0)
+		if is_solid_at(pos + d * reach):
+			away -= d
+	return away.normalized() if away.length() > 0.01 else Vector2.ZERO
+
+
+## Free space straight above `pos` (px), up to `limit`.
+func headroom(pos: Vector2, limit := 400.0) -> float:
+	var d := 0.0
+	while d < limit:
+		if is_solid_at(pos + Vector2(0, -d)):
+			return d
+		d += 4.0
+	return limit
+
+
 ## True when the feet rest only on one-way tiles (drop-through allowed).
 func standing_on_one_way_only(rect: Rect2) -> bool:
 	var y := rect.end.y + 2.0

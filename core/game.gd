@@ -597,7 +597,7 @@ func _spawn_room_enemies() -> void:
 
 
 func _on_enemy_killed(enemy: Node) -> void:
-	drop_currency(enemy.get_center(), enemy.currency_drop)
+	drop_currency(enemy.get_center(), enemy.currency_drop, enemy.surface_normal())
 	if enemy is BossSentinel:
 		world.defeat_boss(enemy.boss_id)
 		Events.boss_defeated.emit(enemy)
@@ -875,17 +875,30 @@ func hit_breakable(wall: BreakableWall, at: Vector2) -> void:
 
 
 ## Bursts `amount` shards out of `origin` (used when enemies die).
-func drop_currency(origin: Vector2, amount: int) -> void:
+## Safe placement: the shards start in open air, never inside rock. The burst
+## points away from the surface the enemy clung to (`surface_normal`, e.g. a
+## Hopper on a wall or ceiling), or away from any rock right next to it, and
+## it never rises higher than the headroom above (low ceilings).
+func drop_currency(origin: Vector2, amount: int, surface_normal := Vector2.ZERO) -> void:
 	if amount <= 0:
 		return
+	var away := surface_normal if surface_normal != Vector2.ZERO else room.open_direction(origin)
+	# The coin's feet sit 11 px below the middle of its box.
+	var feet := room.free_spot(origin + away * 10.0 + Vector2(0, 11), Coin.SIZE + Vector2(0, 2))
+	var room_above := room.headroom(feet + Vector2(0, -Coin.SIZE.y - 2.0))
+	var max_rise := sqrt(2.0 * Coin.GRAVITY * maxf(room_above - 6.0, 0.0))
 	var pieces := clampi(amount / 2, 1, 5)
 	for i in pieces:
 		var coin: Coin = COIN_SCENE.instantiate()
 		coin.value = amount / pieces + (1 if i < amount % pieces else 0)
 		coin.dropped = true
 		pickups_root.add_child(coin)
-		coin.global_position = origin
-		coin.velocity = Vector2(randf_range(-160.0, 160.0), randf_range(-420.0, -260.0))
+		coin.global_position = feet
+		var v := Vector2(randf_range(-160.0, 160.0), randf_range(-420.0, -260.0)) + away * 220.0
+		v.y = maxf(v.y, -max_rise) # Never up into a low ceiling.
+		if away.y > 0.5:
+			v.y = maxf(v.y, randf_range(40.0, 120.0)) # Under a ceiling: pop down, not up.
+		coin.velocity = v if v != Vector2.ZERO else Vector2(0, 1)
 		coins.append(coin)
 
 
