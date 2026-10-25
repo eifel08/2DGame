@@ -4029,6 +4029,17 @@ func _fresh_bestiary() -> void:
 	await _frames(3)
 
 
+func _all_of(kind: String) -> Array:
+	return game.enemies.filter(func(e: Enemy) -> bool: return e.kind == kind and e.alive)
+
+
+## Removes every enemy of `kind` but the first (checks that need one alone).
+func _keep_one(kind: String) -> void:
+	var all := _all_of(kind)
+	for i in range(1, all.size()):
+		game.remove_enemy(all[i])
+
+
 func _put(at: Vector2, facing := 1) -> void:
 	var p: Player = game.player
 	p.global_position = at
@@ -4070,8 +4081,17 @@ func _test_bestiary() -> void:
 	scene_root.free()
 	var expected_kinds := BESTIARY_KINDS.duplicate()
 	expected_kinds.sort()
-	kinds.sort()
-	_check("the Bestiary holds every non-boss enemy type exactly once (old and new, 16)", kinds == expected_kinds, kinds)
+	var counts := {}
+	for k in kinds:
+		counts[k] = counts.get(k, 0) + 1
+	var kind_set: Array = counts.keys()
+	kind_set.sort()
+	_check("the Bestiary holds every non-boss enemy type (old and new, 16)", kind_set == expected_kinds, kind_set)
+	var singles := true
+	for k in counts:
+		if not k in ["ambusher", "hopper"]:
+			singles = singles and counts[k] == 1
+	_check("3 Ambushers, 20 Hoppers, one of every other type", counts.get("ambusher", 0) == 3 and counts.get("hopper", 0) == 20 and singles, counts)
 	_check("each chamber has a sign", signs == BESTIARY_KINDS.size(), signs)
 	for kind in BESTIARY_KINDS:
 		_check("the '%s' kind is registered" % kind, game.ENEMY_SCENES.has(kind))
@@ -4246,6 +4266,7 @@ func _test_bestiary() -> void:
 
 	# --- 5. Ambusher: vanish, ghost behind the player, strike; parry it ---
 	await _fresh_bestiary()
+	_keep_one("ambusher") # The single-ambusher checks; the trio is checked below.
 	var am: AmbusherEnemy = _beast("ambusher")
 	Config.upgrades.god_mode = false
 	_put(Vector2(am.global_position.x - 150.0, 448), 1)
@@ -4549,6 +4570,7 @@ func _test_bestiary() -> void:
 
 	# Ambusher: wanders out of range; vanishes the instant it sees the player.
 	await _fresh_bestiary()
+	_keep_one("ambusher")
 	var am3: AmbusherEnemy = _beast("ambusher")
 	_put(Vector2(200, 448))
 	var ax := [am3.global_position.x, am3.global_position.x]
@@ -4612,6 +4634,75 @@ func _test_bestiary() -> void:
 	game.load_room("bestiary", "ceiling")
 	await _frames(10)
 	_check("a checkpoint rest brings the elites back, healed", _beast("charger") != null and is_equal_approx(_beast("brute").health, _beast("brute").max_health))
+
+	# --- Three Ambushers together ---
+	await _fresh_bestiary()
+	var trio := _all_of("ambusher")
+	var trio_home := 0.0
+	for e in trio:
+		trio_home += e.home.x / 3.0
+	var one_room := true
+	for e in trio:
+		var x0: float = minf(e.home.x, trio_home)
+		var x1: float = maxf(e.home.x, trio_home)
+		var x := x0 + 16.0
+		while x < x1:
+			one_room = one_room and not game.room.is_solid_at(Vector2(x, 5 * 32 + 16))
+			x += 32.0
+	_check("the Ambusher chamber holds 3 of them, together", trio.size() == 3 and one_room, trio.size())
+	_put(Vector2(trio_home, 448), 1)
+	var all_went := await _until(func() -> bool: return trio.all(func(e: Enemy) -> bool: return e.state != "idle"), 10)
+	_check("all three vanish at once when the player walks in", all_went, trio.map(func(e: Enemy) -> String: return e.state))
+	await _frames(90)
+
+	# --- Twenty Hoppers: a long section, staggered jumps, smooth frames ---
+	await _fresh_bestiary()
+	var swarm := _all_of("hopper")
+	var xs_h: Array = swarm.map(func(e: Enemy) -> float: return e.home.x)
+	var span: float = xs_h.max() - xs_h.min()
+	_check("the Hopper section holds 20 Hoppers", swarm.size() == 20, swarm.size())
+	var low_ceiling := true
+	var x_h: float = xs_h.min()
+	while x_h <= xs_h.max():
+		low_ceiling = low_ceiling and game.room.is_solid_at(Vector2(x_h, 6 * 32 + 16))
+		x_h += 32.0
+	_check("their section is long (well over 40 tiles) with a low ceiling all along", span > 40.0 * 32.0 and low_ceiling, span / 32.0)
+	var tempos := {}
+	for e in swarm:
+		tempos[snappedf(e.tempo, 0.001)] = true
+	_check("each Hopper has its own tempo", tempos.size() >= 15, tempos.size())
+	_put(Vector2(200, 448))
+	var launches := {} # frame -> launches in that frame
+	var waits := {} # hopper -> rolled pauses
+	var prev_state := {}
+	var t0 := Time.get_ticks_usec()
+	for f in 360:
+		await _frames(1)
+		for e in swarm:
+			var st: String = e.state
+			if st == "crouch" and prev_state.get(e, "") != "crouch":
+				launches[f] = launches.get(f, 0) + 1
+			if st == "stick" and prev_state.get(e, "") != "stick":
+				if not waits.has(e):
+					waits[e] = []
+				waits[e].append(e._wait)
+			prev_state[e] = st
+	var avg_ms := (Time.get_ticks_usec() - t0) / 360.0 / 1000.0
+	var total := 0
+	var busiest := 0
+	for f in launches:
+		total += launches[f]
+		busiest = maxi(busiest, launches[f])
+	_check("the swarm keeps jumping (many jumps in 6 s)", total >= 60, total)
+	_check("they never jump in unison (at most 3 take off in the same frame)", busiest <= 3, busiest)
+	var rerolled := true
+	for e in waits:
+		var w: Array = waits[e]
+		if w.size() >= 3:
+			rerolled = rerolled and not (is_equal_approx(w[0], w[1]) and is_equal_approx(w[1], w[2]))
+	_check("each pause before a jump is rolled anew", rerolled and waits.size() >= 10, waits.size())
+	_check("20 Hoppers run smoothly (average step well under 16 ms)", avg_ms < 16.0, avg_ms)
+	print("       (20 hoppers: %.2f ms per step, %d jumps in 6 s, at most %d in one frame)" % [avg_ms, total, busiest])
 
 	# --- Modularity: every new kind is a BaseEnemy with the shared rig ---
 	await _fresh_bestiary()

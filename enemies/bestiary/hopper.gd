@@ -9,19 +9,24 @@ extends BaseEnemy
 ##   other surface  a straight dart across the open space; whatever it hits
 ##                  first (wall, ceiling, floor) it sticks to
 ## It drifts back toward home when it strays too far.
+## Staggered timing: before EVERY jump it waits a freshly rolled random pause,
+## scaled by its own tempo (rolled once per hopper), and its very first pause
+## is random too. A swarm of hoppers therefore never jumps in unison.
 
 @export var reach := 170.0 ## How far its target points lie.
 @export var hop_time := 0.45 ## Flight time of a parabola hop (s).
 @export var hop_gravity := 1600.0 ## Its pull toward the surface during a hop.
 @export var dart_speed := 300.0
 @export var dart_time := 1.0 ## A dart that hits nothing falls after this long.
-@export var wait_time := Vector2(0.3, 0.8) ## min, max pause on a surface.
+@export var wait_time := Vector2(0.25, 1.1) ## min, max pause on a surface before a jump.
+@export var tempo_range := Vector2(0.7, 1.4) ## Each hopper's own pause multiplier (min, max).
 
 var normal := Vector2.UP ## Points away from the surface it clings to.
 var goal := Vector2.ZERO ## The point it is heading for.
 var hops := 0 ## Parabola hops so far (tests, debug).
 var darts := 0 ## Straight darts so far.
 var surfaces_seen := {} ## normal -> true: floor UP, walls LEFT / RIGHT, ceiling DOWN.
+var tempo := 1.0 ## This hopper's own pace (rolled at spawn).
 var _wait := 0.5
 
 
@@ -31,7 +36,8 @@ func _on_spawn() -> void:
 	hops = 0
 	darts = 0
 	surfaces_seen = {Vector2.UP: true}
-	_wait = randf_range(wait_time.x, wait_time.y)
+	tempo = randf_range(tempo_range.x, tempo_range.y)
+	_wait = randf_range(0.0, wait_time.y * 2.0) # A random first delay.
 
 
 func tangent() -> Vector2:
@@ -92,7 +98,7 @@ func _attach(n: Vector2) -> void:
 	normal = Vector2(signf(n.x), 0.0) if absf(n.x) > absf(n.y) else Vector2(0.0, signf(n.y))
 	velocity = Vector2.ZERO
 	surfaces_seen[normal] = true
-	_wait = randf_range(wait_time.x, wait_time.y)
+	_wait = roll_wait()
 	enter("stick")
 
 
@@ -133,3 +139,8 @@ func _step_stunned(delta: float) -> void:
 
 func _on_hit(_direction: Vector2, _knockback: float) -> void:
 	stun_timer = 0.08
+
+
+## The pause before the next jump: random every time, scaled by its tempo.
+func roll_wait() -> float:
+	return randf_range(wait_time.x, wait_time.y) * tempo
