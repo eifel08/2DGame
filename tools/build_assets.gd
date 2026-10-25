@@ -522,6 +522,8 @@ const PLAYER_ANIMS := {
 	"trance": {"frames": 6, "fps": 4, "loop": true, "color": "#c9f2ff", "sx": 0.95, "sy": 1.02, "bob": 2.0, "float": 14.0},
 	# Meditation at an altar: kneel low (squashed), weapon away, a slow breath.
 	"meditate": {"frames": 8, "fps": 5, "loop": true, "color": "#b9a8ff", "sx": 1.12, "sy": 0.78, "bob": 2.5},
+	# Map quick view: standing, head bowed over the map held up in front.
+	"map_read": {"frames": 6, "fps": 4, "loop": true, "color": "#e6d6a6", "sx": 1.02, "sy": 0.94, "bob": 1.0, "lean": 0.08, "arm": [-0.35, -0.5]},
 }
 
 const DUMMY_ANIMS := {
@@ -854,6 +856,8 @@ func _build_input_map() -> void:
 		"spell": [_key(KEY_U), _joy_button(JOY_BUTTON_Y)],
 		"interact": [_key(KEY_E), _joy_button(JOY_BUTTON_B)],
 		"inventory": [_key(KEY_I), _joy_button(JOY_BUTTON_BACK)],
+		# Hold to read the map (quick view, MapReadState).
+		"map": [_key(KEY_TAB), _joy_button(JOY_BUTTON_RIGHT_STICK)],
 		"pause": [_key(KEY_ESCAPE), _joy_button(JOY_BUTTON_START)],
 		# Fixed debug actions (Settings.RESERVED: their keys cannot be rebound to).
 		"toggle_debug": [_key(KEY_F1), _key(KEY_QUOTELEFT)],

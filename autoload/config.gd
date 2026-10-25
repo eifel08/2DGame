@@ -129,6 +129,28 @@ class CameraCfg:
 	var look_speed := 4.0 ## Easing rate toward the look offset (twice as fast back).
 
 
+## Map system (map/, ui/map_view.gd, player/states/map_read_state.gd). Flags
+## for the gameplay decisions that are still open; the debug overlay toggles them.
+class MapCfg:
+	## true: entering a room fills it in on the map at once. false: manual
+	## marking: entered rooms wait (MapState.pending) until they are marked,
+	## at a checkpoint save (mark_on_rest) or by MapState.mark_room().
+	var auto_mark_rooms := true
+	var mark_on_rest := true ## Manual marking: a checkpoint save marks the pending rooms.
+	## A small marker for the player's position on the map (quick view and
+	## inventory). false: no marker at all.
+	var show_player_marker := true
+	## With the marker on: true places it where the player stands inside the
+	## room; false only marks the room (its center).
+	var precise_player_marker := true
+	## Spatial anomalies (MapAtlas.resolve_anomalies): true also seals the
+	## suppressed doorway in the world (wall tiles), so only the intended or
+	## secret entrance can be used. false: the map hides it, the door still works.
+	var seal_anomaly_entrances := true
+	var quick_view_needs_ground := true ## The quick view (hold the Map key) opens only on the ground.
+	var quick_view_decel := 3400.0 ## How fast the player stops when the quick view opens.
+
+
 class DebugFlags:
 	var show_hitboxes := false
 	var show_anim_labels := false
@@ -146,6 +168,7 @@ var vitals: Vitals
 var progression: Progression
 var debug: DebugFlags
 var camera: CameraCfg
+var map: MapCfg
 ## One block per ultimate, keyed by ability id. `cost` is fully configurable.
 var ultimates: Dictionary
 
@@ -163,6 +186,7 @@ func restore_defaults() -> void:
 	progression = Progression.new()
 	debug = DebugFlags.new()
 	camera = CameraCfg.new()
+	map = MapCfg.new()
 	ultimates = {
 		# Mana Discharge (the neutral spell): always drains ALL energy. `cost`
 		# is the least energy for a real wave; below it the wave fizzles out

@@ -2,7 +2,7 @@ class_name PauseMenu
 extends CanvasLayer
 ## In-game pause menu (Esc / P / gamepad Start): Resume, Settings, Quit to
 ## title. The inventory is not reachable from here, only by its own key
-## (I / Tab). The game simulation is paused while the menu is open. Works
+## (I). The game simulation is paused while the menu is open. Works
 ## with mouse and keyboard/gamepad.
 
 var game: Node

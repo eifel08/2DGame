@@ -15,13 +15,13 @@ extends Node
 ## Actions whose keyboard key and gamepad button can be rebound.
 const REBINDABLE: Array[String] = [
 	"move_left", "move_right", "move_up", "move_down",
-	"jump", "attack", "dash", "heal", "grapple", "spell", "interact", "inventory", "pause",
+	"jump", "attack", "dash", "heal", "grapple", "spell", "interact", "inventory", "map", "pause",
 ]
 const LABELS := {
 	"move_left": "Move left", "move_right": "Move right", "move_up": "Aim up", "move_down": "Aim down",
 	"jump": "Jump", "attack": "Attack", "dash": "Dash", "heal": "Heal", "grapple": "Grapple", "interact": "Interact / Save",
 	"spell": "Spell (+ direction)",
-	"inventory": "Inventory", "pause": "Pause",
+	"inventory": "Inventory", "map": "Map (hold)", "pause": "Pause",
 }
 
 var config_path := "user://settings.cfg"

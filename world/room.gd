@@ -227,5 +227,46 @@ func border_openings() -> Array[Vector2i]:
 	return gaps
 
 
+const EDGE_TOP := 1
+const EDGE_RIGHT := 2
+const EDGE_BOTTOM := 4
+const EDGE_LEFT := 8
+const WALL_VARIANTS := 16 ## Atlas columns 0..15: solid wall, lit by edge mask (tools/build_assets.gd).
+
+
+## Fills `cells` with solid wall (e.g. a sealed doorway, Game.seal_door) and
+## re-lights the faces around them the way the generator does: a wall tile
+## lights every face that borders open space.
+func seal_cells(cells: Array[Vector2i]) -> void:
+	if cells.is_empty():
+		return
+	for cell in cells:
+		tiles.set_cell(cell, 0, Vector2i(0, 0))
+	for cell in cells:
+		for n in [cell, cell + Vector2i.UP, cell + Vector2i.RIGHT, cell + Vector2i.DOWN, cell + Vector2i.LEFT]:
+			_relight(n)
+	tiles.update_internals() # Collision is there on the very next physics step.
+
+
+func _relight(cell: Vector2i) -> void:
+	var coords := tiles.get_cell_atlas_coords(cell)
+	if tiles.get_cell_source_id(cell) != 0 or coords.y != 0 or coords.x >= WALL_VARIANTS:
+		return
+	var mask := 0
+	if not _wall_or_outside(cell + Vector2i.UP):
+		mask |= EDGE_TOP
+	if not _wall_or_outside(cell + Vector2i.RIGHT):
+		mask |= EDGE_RIGHT
+	if not _wall_or_outside(cell + Vector2i.DOWN):
+		mask |= EDGE_BOTTOM
+	if not _wall_or_outside(cell + Vector2i.LEFT):
+		mask |= EDGE_LEFT
+	tiles.set_cell(cell, 0, Vector2i(mask, 0))
+
+
+func _wall_or_outside(cell: Vector2i) -> bool:
+	return not tiles.get_used_rect().has_point(cell) or is_solid_at(cell_center(cell))
+
+
 func cell_center(cell: Vector2i) -> Vector2:
 	return tiles.to_global(tiles.map_to_local(cell))

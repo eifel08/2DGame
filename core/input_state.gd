@@ -7,7 +7,7 @@ extends RefCounted
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down",
 	&"jump", &"attack", &"dash", &"heal", &"grapple", &"spell",
-	&"interact", &"inventory", &"pause", &"toggle_debug", &"debug_navigate", &"reset_room",
+	&"interact", &"inventory", &"map", &"pause", &"toggle_debug", &"debug_navigate", &"reset_room",
 ]
 
 var _pressed := {}

@@ -40,6 +40,9 @@ const SIDE_ARRIVAL := 40.0 ## Just past the trigger, inside the room.
 const RISE_SPEED := 900.0 ## Fallback only: rise speed when no side of a floor gap is standable.
 
 var locked := false
+## Sealed for good in this room (a spatial anomaly's suppressed entrance,
+## Game.seal_door): always locked, and its gap is filled with wall.
+var sealed := false
 
 
 func get_trigger_rect() -> Rect2:

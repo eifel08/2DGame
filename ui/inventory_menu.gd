@@ -1,9 +1,12 @@
 class_name InventoryMenu
 extends CanvasLayer
-## Inventory window (I / Esc, gamepad Back) with two tabs:
+## Inventory window (I / Esc, gamepad Back) with three tabs:
 ##   Status    - shards (the only number), health and energy as bars
 ##   Abilities - the spell cross (left, a D-pad: SpellCross) and every
 ##               equippable spell the player knows (right)
+##   Map       - the zone map with its fog of war (MapView). Down from the
+##               tab row focuses it; Left / Right then switch between the
+##               zones the player knows. It opens on the player's zone.
 ##
 ## The cross: Center = Mana Discharge (fixed: it cannot be moved or removed),
 ## Up / Down = their slots, Left AND Right = the one Side slot (both cards
@@ -27,6 +30,7 @@ extends CanvasLayer
 
 const STATUS_TAB := 0
 const ABILITIES_TAB := 1
+const MAP_TAB := 2
 ## Corner tag of an equipped spell in the pool, per slot.
 const SLOT_TAGS: Array[String] = ["Up", "Side", "Down"]
 
@@ -45,6 +49,7 @@ var detail_name: Label
 var detail_desc: Label
 var detail_gauge: EnergyGauge
 var notice_label: Label
+var map_view: MapView
 var pending_ability_id := "" ## Ability waiting for a slot choice.
 
 
@@ -67,6 +72,7 @@ func toggle() -> void:
 	pending_ability_id = ""
 	if panel.visible:
 		_rebuild_pool()
+		map_view.follow_player()
 		refresh()
 		tab_bar.grab_focus() # Left / Right switches tabs right away.
 	else:
@@ -94,8 +100,10 @@ func switch_tab(step: int) -> void:
 	tab_bar.grab_focus()
 
 
-func _on_tab_changed(_tab: int) -> void:
+func _on_tab_changed(tab: int) -> void:
 	pending_ability_id = ""
+	# Down from the tab row enters the tab's content.
+	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(map_view if tab == MAP_TAB else cross.card("Up"))
 	if is_open():
 		refresh()
 
@@ -304,6 +312,8 @@ func _build() -> void:
 	root.add_child(tabs)
 	tabs.add_child(_build_status_tab())
 	tabs.add_child(_build_abilities_tab())
+	tabs.add_child(_build_map_tab())
+	map_view.focus_neighbor_top = map_view.get_path_to(tab_bar) # Up from the map returns to the tabs.
 	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(cross.card("Up")) # Down from the tabs enters the cross.
 	tabs.tab_changed.connect(_on_tab_changed) # After the tabs exist.
 
@@ -406,6 +416,25 @@ func _build_abilities_tab() -> Control:
 	notice_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	notice_label.add_theme_font_size_override("font_size", 11)
 	box.add_child(notice_label)
+	return box
+
+
+func _build_map_tab() -> Control:
+	var box := VBoxContainer.new()
+	box.name = "Map"
+	box.add_theme_constant_override("separation", 6)
+	map_view = MapView.new()
+	map_view.name = "MapView"
+	map_view.focus_mode = Control.FOCUS_ALL
+	map_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	map_view.custom_minimum_size = Vector2(0, 340)
+	box.add_child(map_view)
+	map_view.setup(game)
+	var note := Label.new()
+	note.text = "Down  select the map    Left / Right  other zones    Up  back to the tabs"
+	note.add_theme_color_override("font_color", Color(1, 1, 1, 0.5))
+	note.add_theme_font_size_override("font_size", 11)
+	box.add_child(note)
 	return box
 
 

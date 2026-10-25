@@ -8,6 +8,12 @@ extends Node2D
 ## must survive room loads (dead enemies, bosses, arenas, shards) lives in
 ## WorldState; see core/world_state.gd for the respawn hierarchy.
 ##
+## Map: `atlas` holds every zone map (map/map_atlas.gd), `map_state` the fog
+## of war (map/map_state.gd). Every room load updates it; MapPickups give a
+## zone's base map. Holding the Map key opens the quick view (MapReadState,
+## MapOverlay); the inventory has a Map tab. Rooms with a spatial anomaly get
+## their suppressed doorway sealed here (_apply_map_anomalies).
+##
 ## Save slots: when started from the title screen, Saves.active_slot is set
 ## and the slot is written at every checkpoint save and on lasting progress
 ## (boss, arena, secret, relic). Running this scene directly starts a new
@@ -45,6 +51,7 @@ const ENEMY_SCENES := {
 	"spearman": preload("res://enemies/bestiary/spearman.tscn"),
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
+const MAP_PICKUP_SCENE := preload("res://world/objects/map_pickup.tscn")
 const RESPAWN_FADE_TIME := 0.45
 ## Progression: a new game starts LOW. Max health and energy are small
 ## (HealthEnergy.STARTING_MAX_*), NO equippable spell is known and the Up /
@@ -83,6 +90,8 @@ var input := InputState.new()
 var player_data := PlayerData.new()
 var world := WorldState.new()
 var arena_director := ArenaDirector.new()
+var atlas := MapAtlas.create_default() ## Every zone map: rooms, layout, exits.
+var map_state := MapState.new(atlas) ## Fog of war: owned maps, outlined and filled rooms.
 var room: Room
 var room_id := ""
 var enemies: Array[Enemy] = []
@@ -97,6 +106,9 @@ var relics: Array[Relic] = [] ## Relics and potions (Potion extends Relic).
 var scrolls: Array[SpellScroll] = []
 var altars: Array[MeditationAltar] = []
 var ability_pickups: Array[AbilityPickup] = []
+var map_pickups: Array[MapPickup] = [] ## Zone maps lying in this room (placed from MapZone.map_pickup).
+var sealed_doors: Array[Door] = [] ## Doorways sealed in this room (spatial anomalies, MapAtlas).
+var map_overlay: MapOverlay ## The quick view (hold the Map key).
 ## Full-screen tutorial popups (created in _ready). Set tutorials_enabled
 ## false to never show them (tests that do not check them).
 var tutorial: TutorialPopup
@@ -129,6 +141,10 @@ func _ready() -> void:
 	tutorial = TutorialPopup.new()
 	tutorial.name = "Tutorial"
 	add_child(tutorial)
+	map_overlay = MapOverlay.new()
+	map_overlay.name = "MapOverlay"
+	add_child(map_overlay)
+	map_overlay.setup(self)
 	feedback.setup(camera, effects)
 	hud.setup(player, ultimates, player_data)
 	hud.boss_provider = active_boss
@@ -281,6 +297,8 @@ func _load_room_scene(id: String) -> void:
 	scrolls.clear()
 	altars.clear()
 	ability_pickups.clear()
+	map_pickups.clear()
+	sealed_doors.clear()
 	platforms.clear()
 	grapple_pegs.clear()
 	current_checkpoint = null
@@ -295,6 +313,7 @@ func _load_room_scene(id: String) -> void:
 	room = ROOM_SCENES[id].instantiate()
 	room_root.add_child(room)
 	world.on_room_entered(id)
+	map_state.enter_room(id) # Fog of war: fills the room in (or marks it pending).
 	player.room = room
 
 	for node in room.get_objects():
@@ -340,6 +359,8 @@ func _load_room_scene(id: String) -> void:
 			coins.append(node)
 			if world.is_coin_collected(id, node.name):
 				node.collect()
+	_place_map_pickups()
+	_apply_map_anomalies()
 	_spawn_room_enemies()
 	arena_director.setup(self, room.get_arena())
 	camera.setup(room.get_bounds())
@@ -469,7 +490,7 @@ func _update_doors() -> void:
 	var arena_lock := arena_director.is_active()
 	var pr := player.get_rect()
 	for door in doors:
-		door.locked = arena_lock and not door.secret
+		door.locked = door.sealed or (arena_lock and not door.secret)
 		if not door.locked and door.get_trigger_rect().intersects(pr):
 			begin_transition(door.target_room, door.target_door, door.offset_of(player.global_position))
 			return
@@ -663,6 +684,8 @@ func save_at_checkpoint(cp: Checkpoint) -> void:
 	player.health.full_heal()
 	player.at_checkpoint = true
 	world.on_checkpoint_rest()
+	if not Config.map.auto_mark_rooms and Config.map.mark_on_rest:
+		map_state.mark_pending() # Manual marking: the rest puts the explored rooms on the map.
 	_refresh_room_enemies()
 	Events.player_rested.emit(cp)
 	player.enter_trance() # Saving, loading and respawning all wake from a trance.
@@ -728,6 +751,9 @@ func _update_pickups(delta: float) -> void:
 	for pickup in ability_pickups:
 		if not pickup.collected and pickup.get_rect().intersects(pr):
 			collect_ability(pickup)
+	for pickup in map_pickups:
+		if not pickup.collected and pickup.get_rect().intersects(pr):
+			collect_map(pickup)
 
 
 ## Permanent upgrade: raises max health or max energy for this save. Potions
@@ -768,6 +794,76 @@ func collect_ability(pickup: AbilityPickup) -> void:
 	Events.movement_learned.emit(pickup.ability, pickup.global_position)
 	show_tutorial(pickup.ability)
 	write_save()
+
+
+# ---------- Map ----------
+
+## A zone's map lying in the world: its base map is the player's for good.
+func collect_map(pickup: MapPickup) -> void:
+	pickup.collect()
+	acquire_map(pickup.zone_id)
+	Events.map_collected.emit(pickup.zone_id, pickup.global_position)
+
+
+## Gives the base map of `zone_id` (pickups, debug, later vendors or story
+## events): its base-map rooms appear as outlines. Saved at once.
+func acquire_map(zone_id: String) -> void:
+	if atlas.get_zone(zone_id) == null or map_state.has_map(zone_id):
+		return
+	map_state.acquire_map(zone_id)
+	for pickup in map_pickups:
+		if pickup.zone_id == zone_id and not pickup.collected:
+			pickup.collect()
+	write_save()
+
+
+## Places the MapPickup of every zone whose map lies in this room and is not
+## owned yet (MapZone.map_pickup).
+func _place_map_pickups() -> void:
+	var objects := room.get_node_or_null("Objects")
+	if objects == null:
+		return
+	for zone in atlas.zones:
+		if zone.map_pickup.get("room", "") != room_id or map_state.has_map(zone.zone_id):
+			continue
+		var pickup: MapPickup = MAP_PICKUP_SCENE.instantiate()
+		pickup.name = "MapPickup_%s" % zone.zone_id
+		pickup.zone_id = zone.zone_id
+		pickup.position = zone.map_pickup.position
+		objects.add_child(pickup)
+		map_pickups.append(pickup)
+
+
+## Spatial anomalies (MapAtlas.resolve_anomalies): the suppressed doorways of
+## this room are sealed with wall, so only the intended (or secret) entrance
+## works. With Config.map.seal_anomaly_entrances off, only the map hides them.
+func _apply_map_anomalies() -> void:
+	if not Config.map.seal_anomaly_entrances:
+		return
+	var suppressed := atlas.suppressed_doors(room_id)
+	for door in doors:
+		if door.door_id in suppressed:
+			seal_door(door)
+
+
+## Closes a doorway for good in this room: the door never fires and its gap
+## is filled with solid wall tiles (collision and look, Rule D).
+func seal_door(door: Door) -> void:
+	if door.sealed:
+		return
+	door.sealed = true
+	door.locked = true
+	var trigger := door.get_trigger_rect()
+	var cells: Array[Vector2i] = []
+	var first := room.tiles.local_to_map(room.tiles.to_local(trigger.position + Vector2(1, 1)))
+	var last := room.tiles.local_to_map(room.tiles.to_local(trigger.end - Vector2(1, 1)))
+	for y in range(first.y, last.y + 1):
+		for x in range(first.x, last.x + 1):
+			var cell := Vector2i(x, y)
+			if not room.is_solid_at(room.cell_center(cell)):
+				cells.append(cell)
+	room.seal_cells(cells)
+	sealed_doors.append(door)
 
 
 # ---------- Tutorials ----------
@@ -977,6 +1073,7 @@ func spawn_enemy(flying: bool, kind := "") -> void:
 ## Debug: a completely new playthrough (bosses and arenas come back).
 func new_game() -> void:
 	world.new_game()
+	map_state.new_game()
 	respawn = {}
 	pending_respawn = false
 	_pending_door = {}
@@ -1013,6 +1110,7 @@ func make_save_data() -> Dictionary:
 		"max_health_bonus": player.health.max_health_bonus,
 		"max_energy_bonus": player.health.max_energy_bonus,
 		"playtime": playtime,
+		"map": map_state.to_dict(),
 	})
 	return data
 
@@ -1026,6 +1124,7 @@ func write_save() -> void:
 ## energy (in a trance), respawnable enemies reset.
 func apply_save_data(data: Dictionary) -> void:
 	world.from_dict(data)
+	map_state.from_dict(data.get("map", {})) # A save from before the map system: an empty map.
 	player_data.currency = int(data.get("currency", 0))
 	var unlocked: Array[String] = []
 	for id in data.get("unlocked", []):

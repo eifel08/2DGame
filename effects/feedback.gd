@@ -67,6 +67,7 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 		effects.play("pogo_spark", pos))
 	Events.potion_collected.connect(_on_potion_collected)
 	Events.scroll_collected.connect(_on_scroll_collected)
+	Events.map_collected.connect(_on_map_collected)
 	Events.meditation_finished.connect(_on_meditation_finished)
 	Events.player_dying.connect(func(_p: Node) -> void: Sfx.play("death"))
 	Events.trance_broken.connect(func(p: Node) -> void: effects.play("trance_break", p.get_center()))
@@ -230,6 +231,12 @@ func _on_potion_collected(_potion_id: String, stat: String, pos: Vector2) -> voi
 func _on_scroll_collected(_spell_id: String, pos: Vector2) -> void:
 	Sfx.play("pickup", 1.15)
 	effects.play("scroll_pickup", pos + Vector2(0, -18))
+
+
+## A zone map: the same soft pickup as a scroll (Rule F: no celebration).
+func _on_map_collected(_zone_id: String, pos: Vector2) -> void:
+	Sfx.play("pickup", 1.0)
+	effects.play("scroll_pickup", pos + Vector2(0, -16))
 
 
 ## A meditation completed: one low, calm tone. Nothing on an interruption.

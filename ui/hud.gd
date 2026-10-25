@@ -134,7 +134,7 @@ func _draw() -> void:
 
 	# Control hints (bottom).
 	draw_string(font, Vector2(0, view.y - 12),
-		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Grapple H · Spell %s (+ ↑ ← → ↓) · Interact E · Inventory I/Tab · Debug F1/`" % spell_key_label(),
+		"Move ←→/AD · Jump Space · Attack J · Dash K · Heal hold L · Grapple H · Spell %s (+ ↑ ← → ↓) · Interact E · Inventory I · Map hold %s · Debug F1/`" % [spell_key_label(), Settings.key_name("map")],
 		HORIZONTAL_ALIGNMENT_RIGHT, view.x - 14, 10, Color(1, 1, 1, 0.5))
 	if Config.debug.paused:
 		draw_string(font, Vector2(0, view.y / 2.0), "PAUSED", HORIZONTAL_ALIGNMENT_CENTER, view.x, 22)

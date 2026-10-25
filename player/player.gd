@@ -11,6 +11,8 @@ extends CharacterBody2D
 ##   eject   - carried up out of a floor gap after an upward room transition
 ##   grapple - pulled toward the grappling hook's anchor (combat/grapple_hook.gd)
 ##   meditate - kneeling at a Meditation Altar until a spell slot opens
+##   map_read - holding the Map key: the map quick view (no movement, no
+##              spells; a hit closes it)
 ##
 ## The node origin is at the feet (bottom-center). Game calls step() from
 ## its own fixed-step loop, so hitstop can freeze everything in one place.
@@ -58,6 +60,9 @@ var last_wall_dir := 0
 var air_jumps_used := 0
 var air_dash_used := false
 var is_jumping := false ## True while the jump can still be cut short.
+## The Map key was pressed and is still held: the quick view opens as soon as
+## the player may read (NormalState). A hit or releasing the key clears it.
+var map_request := false
 
 
 func _ready() -> void:
@@ -76,6 +81,7 @@ func _ready() -> void:
 	fsm.add("eject", EjectState.new(self))
 	fsm.add("grapple", GrappleState.new(self))
 	fsm.add("meditate", MeditateState.new(self))
+	fsm.add("map_read", MapReadState.new(self))
 	health.energy_gain_source = func() -> float: return stat("energy_gain_mul")
 	animator.setup(self)
 
@@ -109,6 +115,7 @@ func reset() -> void:
 	air_jumps_used = 0
 	air_dash_used = false
 	is_jumping = false
+	map_request = false
 	set_collision_mask_value(ONE_WAY_LAYER, true)
 	fsm.change("normal")
 	modifiers.clear()
@@ -191,6 +198,10 @@ func step(delta: float) -> void:
 	health.step(delta)
 	if input.was_pressed(&"jump"):
 		jump_buffer_timer = Config.movement.jump_buffer_time
+	if input.was_pressed(&"map"):
+		map_request = true
+	elif not input.is_down(&"map"):
+		map_request = false
 
 	fsm.step(delta)
 
@@ -315,6 +326,17 @@ func is_meditating() -> bool:
 	return fsm.is_in("meditate")
 
 
+## The map quick view is open (the Map key is held, see MapReadState).
+func is_reading_map() -> bool:
+	return fsm.is_in("map_read")
+
+
+## True when the quick view may open now: normal state, and on the ground
+## unless Config.map.quick_view_needs_ground is off.
+func can_read_map() -> bool:
+	return fsm.is_in("normal") and attack_dir == "" and (grounded or not Config.map.quick_view_needs_ground)
+
+
 ## Hands movement to `controller`, an object with
 ## control_start(player), control_step(delta, player) -> bool (true = done),
 ## control_finish(player) and an `invulnerable` property.
@@ -335,6 +357,7 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 			if guard.call(damage, attacker, source):
 				return false
 	health.take_damage(damage)
+	map_request = false # A hit closes the map quick view; it needs a fresh press.
 	var dir := 1 if global_position.x >= source_x else -1
 	Events.player_hurt.emit(self, damage)
 	if health.health <= 0.0:
@@ -379,6 +402,7 @@ func hazard_respawn(damage: float) -> void:
 	var took_damage := not health.blocks(Damage.Source.HAZARD)
 	if took_damage:
 		health.take_damage(damage)
+		map_request = false
 		if health.health <= 0.0:
 			Events.player_hurt.emit(self, damage)
 			die()

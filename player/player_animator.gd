@@ -19,6 +19,7 @@ func setup(p: Player) -> void:
 		["dying", func() -> bool: return p.state_name() == "dying"],
 		["trance", func() -> bool: return p.state_name() == "trance"],
 		["meditate", func() -> bool: return p.state_name() == "meditate"],
+		["map_read", func() -> bool: return p.state_name() == "map_read"],
 		["hurt", func() -> bool: return p.state_name() == "hurt"],
 		["cast", func() -> bool: return p.state_name() == "cast"],
 		["heal", func() -> bool: return p.state_name() == "heal"],

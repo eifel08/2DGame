@@ -134,6 +134,18 @@ signal tutorial_opened(tutorial_id: String)
 @warning_ignore("unused_signal")
 signal tutorial_closed(tutorial_id: String)
 
+# Map (map/map_state.gd, the quick view)
+@warning_ignore("unused_signal")
+signal map_acquired(zone_id: String) ## A zone's base map was taken: its rooms are outlined.
+@warning_ignore("unused_signal")
+signal map_collected(zone_id: String, position: Vector2) ## A MapPickup was touched (feedback).
+@warning_ignore("unused_signal")
+signal map_room_revealed(room_id: String, reveal: int) ## MapState.Reveal: OUTLINED or FILLED.
+@warning_ignore("unused_signal")
+signal map_opened() ## The quick view opened (the Map key is held).
+@warning_ignore("unused_signal")
+signal map_closed(reason: String) ## "released", "damage" or "interrupted".
+
 # Animation (frame events from method tracks, e.g. "footstep", "swing")
 @warning_ignore("unused_signal")
 signal anim_event(owner: Node, event_name: String)

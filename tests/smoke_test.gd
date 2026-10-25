@@ -296,6 +296,9 @@ func _run() -> void:
 	# --- Drops: shards never spawn or end up inside walls / ceilings ---
 	await _test_drops()
 
+	# --- Map: zones, fog of war, anomaly, quick view, marker, inventory tab ---
+	await _test_map()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -4816,4 +4819,243 @@ func _test_drops() -> void:
 	_check("in open air, shards still burst upward", fresh.size() >= 3 and fresh.all(func(c: Coin) -> bool: return c.velocity.y < -200.0))
 	await _frames(60)
 	Config.upgrades.god_mode = god
+	await _reset()
+
+
+# ---------- Map: zones, fog of war, spatial anomaly, quick view ----------
+
+func _test_map() -> void:
+	var p: Player = game.player
+	var atlas: MapAtlas = game.atlas
+	var state: MapState = game.map_state
+	var reveal := MapState.Reveal
+
+	# --- Architecture: zones, every room on exactly one map, exits = doors ---
+	_check("map: the atlas has several zones", atlas.zones.size() >= 2, atlas.zone_ids())
+	var missing := []
+	for rid in game.ROOM_SCENES:
+		if atlas.zone_of(rid) == null:
+			missing.append(rid)
+	_check("map: every room scene is on exactly one zone map", missing.is_empty(), missing)
+	_check("map: the Testing Halls and the Upper Galleries are in different zones",
+		atlas.zone_of("test_room") != atlas.zone_of("upper_room"), [atlas.zone_of("test_room").zone_id, atlas.zone_of("upper_room").zone_id])
+	var mismatched := []
+	for rid in game.ROOM_SCENES:
+		var scene: Room = game.ROOM_SCENES[rid].instantiate()
+		var from_doors := []
+		for door in scene.get_doors():
+			from_doors.append("%s>%s.%s" % [door.door_id, door.target_room, door.target_door])
+		scene.free()
+		var from_map := []
+		for e in atlas.get_room(rid).exits:
+			from_map.append("%s>%s.%s" % [e.door_id, e.target_room, e.target_door])
+		from_doors.sort()
+		from_map.sort()
+		if from_doors != from_map:
+			mismatched.append([rid, from_doors, from_map])
+	_check("map: every room's map exits match its doors (id and target)", mismatched.is_empty(), mismatched)
+	var one_way := []
+	for zone in atlas.zones:
+		for r in zone.rooms:
+			for e in r.exits:
+				var back: MapExit = atlas.get_room(e.target_room).get_exit(e.target_door)
+				if back == null or back.target_room != r.room_id or back.target_door != e.door_id or back.secret != e.secret:
+					one_way.append("%s.%s" % [r.room_id, e.door_id])
+	_check("map: every connection is listed on both ends, with the same secret flag", one_way.is_empty(), one_way)
+
+	# --- Spatial anomaly: the Hidden Vault is linked left AND right ---
+	var vault := atlas.get_room("hidden_vault")
+	_check("map: the Hidden Vault is detected as a spatial anomaly", atlas.is_anomaly_room(vault))
+	var suppressed := []
+	for zone in atlas.zones:
+		for r in zone.rooms:
+			for e in r.exits:
+				if e.suppressed:
+					suppressed.append("%s.%s" % [r.room_id, e.door_id])
+	suppressed.sort()
+	_check("map: only the vault's non-secret entrance is suppressed (both ends), the secret doorway stays",
+		suppressed == ["hidden_vault.west", "lava_room.east"] and not vault.get_exit("east").suppressed, suppressed)
+	# A made-up zone: a room linked to the same neighbour on both sides.
+	var test_zone := MapZone.from_dict("anomaly_test", {"rooms": {
+		"a": {"rect": [0, 0, 1, 1], "exits": [
+			{"door": "l", "side": "left", "to": "b", "to_door": "r", "secret": true},
+			{"door": "r", "side": "right", "to": "b", "to_door": "l"}]},
+		"b": {"rect": [1, 0, 1, 1], "exits": [
+			{"door": "l", "side": "left", "to": "a", "to_door": "r"},
+			{"door": "r", "side": "right", "to": "a", "to_door": "l", "secret": true}]},
+	}})
+	var test_atlas := MapAtlas.new()
+	test_atlas.add_zone(test_zone)
+	var room_a := test_zone.get_room("a")
+	_check("map anomaly: a room linked to the same room left and right keeps the secret way, hides the other",
+		room_a.get_exit("l").suppressed == false and room_a.get_exit("r").suppressed == false
+		and test_atlas.is_anomaly_room(room_a), [room_a.get_exit("l").suppressed, room_a.get_exit("r").suppressed])
+	# Without a secret way, the adjacent one is kept; intended_entrance overrides.
+	room_a.get_exit("l").secret = false
+	test_zone.get_room("b").get_exit("r").secret = false
+	test_atlas.rebuild()
+	_check("map anomaly: without a secret way the exit that touches its neighbour stays, the other is suppressed",
+		room_a.get_exit("l").suppressed and not room_a.get_exit("r").suppressed and test_zone.get_room("b").get_exit("r").suppressed)
+	room_a.intended_entrance = "l"
+	test_atlas.rebuild()
+	_check("map anomaly: intended_entrance keeps the chosen way in", not room_a.get_exit("l").suppressed)
+
+	# --- Fog of war ---
+	Config.map.auto_mark_rooms = true
+	state.new_game()
+	game.load_room("test_room", "east") # A fresh entry: the room is filled, its map is placed.
+	await _reset()
+	_check("map: a new map owns no zone map; only the room you stand in is filled",
+		state.acquired.is_empty() and state.is_filled("test_room") and state.reveal_of("boss_room") == reveal.UNKNOWN, state.to_dict())
+	var pickups: Array = game.map_pickups
+	_check("map: the Testing Halls map lies in the Testing Halls, on the floor",
+		pickups.size() == 1 and pickups[0].zone_id == "halls" and game.room.is_solid_at(pickups[0].global_position + Vector2(0, 16))
+		and not game.room.is_solid_at(pickups[0].global_position + Vector2(0, -16)), pickups.size())
+	p.global_position = pickups[0].global_position
+	await _frames(3)
+	_check("map: touching the map takes it (base map acquired)", pickups[0].collected and state.has_map("halls"))
+	_check("map: the base map outlines its rooms (not explored yet)",
+		state.reveal_of("boss_room") == reveal.OUTLINED and state.reveal_of("arena_room") == reveal.OUTLINED and state.is_filled("test_room"))
+	_check("map: the base map leaves out hidden rooms and rooms not on it",
+		state.reveal_of("secret_room") == reveal.UNKNOWN and state.reveal_of("bestiary") == reveal.UNKNOWN)
+	_check("map: the other zone's rooms stay unknown", state.reveal_of("upper_room") == reveal.UNKNOWN and not state.has_map("reaches"))
+	game.load_room("test_room", "east")
+	await _frames(2)
+	_check("map: a taken map does not come back", game.map_pickups.is_empty())
+	game.load_room("boss_room", "west")
+	await _frames(2)
+	_check("map: entering an outlined room fills it in", state.is_filled("boss_room"))
+	game.load_room("bestiary", "ceiling")
+	await _frames(2)
+	_check("map: entering a room that was not on the map adds it, filled in", state.is_filled("bestiary"))
+
+	# Manual marking (Config.map.auto_mark_rooms = false).
+	Config.map.auto_mark_rooms = false
+	game.load_room("arena_room", "west")
+	await _frames(2)
+	_check("map, manual marking: entering a room does not fill it in", state.reveal_of("arena_room") == reveal.OUTLINED and state.pending.has("arena_room"))
+	var arena_cp: Checkpoint = null
+	for cp in game.checkpoints:
+		arena_cp = cp
+	game.save_at_checkpoint(arena_cp)
+	_check("map, manual marking: a checkpoint save marks the explored rooms", state.is_filled("arena_room") and state.pending.is_empty())
+	Config.map.auto_mark_rooms = true
+
+	# Saves keep the map.
+	var saved: Dictionary = game.make_save_data()
+	var copy := MapState.new(atlas)
+	copy.from_dict(JSON.parse_string(JSON.stringify(saved.map)))
+	_check("map: the save keeps owned maps, outlines and filled rooms", copy.to_dict().hash() == state.to_dict().hash()
+		and copy.has_map("halls") and copy.reveal_of("arena_room") == reveal.FILLED, saved.map)
+	var old := MapState.new(atlas)
+	old.from_dict({})
+	_check("map: a save from before the map system loads with an empty map", old.acquired.is_empty() and old.rooms.is_empty())
+
+	# --- The anomaly in the world: the vault's west doorway is sealed ---
+	game.load_room("hidden_vault", "east")
+	await _frames(2)
+	var west := _door("west")
+	var gap_solid := true
+	for y in range(int(west.get_trigger_rect().position.y) + 8, int(west.get_trigger_rect().end.y), 16):
+		gap_solid = gap_solid and game.room.is_solid_at(Vector2(west.global_position.x, y))
+	_check("map anomaly: the vault's west doorway is sealed with wall", west.sealed and west.locked and gap_solid)
+	_check("map anomaly: the vault's secret doorway (its intended entrance) still works", not _door("east").sealed)
+	p.global_position = west.global_position + Vector2(60, 0)
+	p.velocity = Vector2.ZERO
+	await _frames(5)
+	Input.action_press(&"move_left")
+	await _frames(50)
+	Input.action_release(&"move_left")
+	_check("map anomaly: walking into the sealed doorway goes nowhere", game.room_id == "hidden_vault" and p.global_position.x > west.global_position.x, [game.room_id, p.global_position])
+	game.load_room("lava_room", "west")
+	await _frames(2)
+	_check("map anomaly: the Ember Crossing's end of it is sealed too", _door("east").sealed and not _door("west").sealed)
+	Config.map.seal_anomaly_entrances = false
+	game.load_room("hidden_vault", "east")
+	await _frames(2)
+	_check("map anomaly: with sealing off, the doorway stays open (the map still hides it)", not _door("west").sealed and atlas.get_room("hidden_vault").get_exit("west").suppressed)
+	Config.map.seal_anomaly_entrances = true
+	_check("map: the Upper Reaches show on the map once a room of them is known", state.known_zones().size() == 2, state.known_zones())
+
+	# --- Quick view: hold the Map key ---
+	await _reset()
+	_check("map key: Map is rebindable, Tab by default (gamepad R3)",
+		Settings.REBINDABLE.has("map") and Settings.key_name("map") == "Tab" and Settings.button_name("map") == "R3" and _actions_for(KEY_TAB) == ["map"],
+		[Settings.key_name("map"), Settings.button_name("map"), _actions_for(KEY_TAB)])
+	var overlay: MapOverlay = game.map_overlay
+	var closed := []
+	var on_closed := func(reason: String) -> void: closed.append(reason)
+	Events.map_closed.connect(on_closed)
+	p.health.set_energy(p.health.get_max_energy())
+	Input.action_press(&"map")
+	await _frames(3)
+	_check("quick view: holding the Map key opens the map in front of the player", p.state_name() == "map_read" and overlay.is_open(), p.state_name())
+	_check("quick view: the player plays the map-reading clip", p.animator.current == "map_read", p.animator.current)
+	var x0 := p.global_position.x
+	Input.action_press(&"move_right")
+	Input.action_press(&"jump")
+	await _frames(20)
+	Input.action_release(&"jump")
+	Input.action_release(&"move_right")
+	_check("quick view: no moving or jumping while the map is open", absf(p.global_position.x - x0) < 1.0 and p.grounded, p.global_position.x - x0)
+	var energy := p.health.energy
+	Input.action_press(&"spell")
+	Input.action_press(&"attack")
+	await _frames(6)
+	Input.action_release(&"spell")
+	Input.action_release(&"attack")
+	await _frames(2)
+	_check("quick view: no spells and no attacks while the map is open",
+		is_equal_approx(p.health.energy, energy) and game.combat.attack.is_empty() and p.state_name() == "map_read", [p.health.energy, p.state_name()])
+	var marker: Vector2 = overlay.view.marker_position()
+	var zone := state.current_zone()
+	var here: Rect2 = overlay.view.room_rect(zone.get_room("test_room"), overlay.view._layout(zone))
+	_check("player marker: shown inside the current room", marker != Vector2.INF and here.grow(1.0).has_point(marker), [marker, here])
+	Config.map.show_player_marker = false
+	_check("player marker: the toggle hides it", overlay.view.marker_position() == Vector2.INF)
+	Config.map.show_player_marker = true
+	Input.action_release(&"map")
+	await _frames(3)
+	_check("quick view: releasing the key closes it; play goes on", p.state_name() == "normal" and not overlay.is_open() and closed == ["released"], closed)
+
+	# A hit closes it at once; the player is not protected.
+	Input.action_press(&"map")
+	await _frames(3)
+	var hp := p.health.health
+	p.health.iframe_timer = 0.0
+	var hit := p.receive_hit(10.0, p.global_position.x - 20.0)
+	_check("quick view: the player can still be hit while reading", hit and p.health.health < hp, [hit, p.health.health, hp])
+	_check("quick view: a hit closes the map at once and stops the clip",
+		not overlay.is_open() and p.state_name() == "hurt" and closed.back() == "damage", [overlay.is_open(), p.state_name(), closed])
+	await _frames(40)
+	_check("quick view: still holding the key after a hit does not reopen it", p.state_name() == "normal" and not overlay.is_open(), p.state_name())
+	Input.action_release(&"map")
+	await _frames(2)
+	Events.map_closed.disconnect(on_closed)
+	p.global_position.x += 40.0
+	await _frames(2)
+	var before := overlay.view.marker_position()
+	p.global_position.x += 400.0
+	await _frames(2)
+	_check("player marker: precise mode follows the player inside the room", overlay.view.marker_position().x > before.x, [before, overlay.view.marker_position()])
+
+	# --- Inventory Map tab ---
+	var inv: InventoryMenu = game.inventory
+	Input.action_press(&"inventory")
+	await _frames(2)
+	Input.action_release(&"inventory")
+	await _frames(2)
+	inv.tabs.current_tab = InventoryMenu.MAP_TAB
+	await _frames(2)
+	_check("inventory: a Map tab shows the zone you are in", inv.tabs.get_tab_count() == 3 and inv.map_view.is_visible_in_tree()
+		and inv.map_view.shown_zone() == state.current_zone())
+	var other := inv.map_view.cycle_zone(1)
+	_check("inventory map: Left / Right switch to the other known zone", other == "reaches" and inv.map_view.shown_zone().zone_id == "reaches", other)
+	_check("inventory map: no player marker on another zone's map", inv.map_view.marker_position() == Vector2.INF)
+	inv.tabs.current_tab = InventoryMenu.STATUS_TAB
+	Input.action_press(&"inventory")
+	await _frames(2)
+	Input.action_release(&"inventory")
+	await _frames(2)
+	_check("inventory: closes again", not inv.is_open())
 	await _reset()

@@ -164,6 +164,14 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 - Only melee deflects or parries. Spells never do.
 - Each new enemy type also gets a chamber in the Bestiary (`BESTIARY_LAYOUT` in `tools/build_assets.gd`, one chamber per type).
 
+## Map — every room on one zone map
+
+- Every room scene is on exactly one zone map (`map/map_atlas.gd`, `WORLD`), with a rect in map cells and **one exit per door** (same `door_id`, target room and target door, and `secret` for a breakable wall or a secret doorway). The smoke test fails otherwise.
+- A secret room is `hidden`: never on a base map. A room the base map should not show is `"base": false`.
+- **Spatial anomaly.** If a room is linked on both its left and right sides and one of those links cannot touch its neighbour on the map, only the intended way in stays: the secret exit, or `intended_entrance`. The other connection is suppressed on both ends: the map hides it and `Game.seal_door()` fills its gap with wall (Rule D holds). Prefer a layout that needs no anomaly; when you do build one, decide the intended entrance on purpose.
+- A zone map lying in the world (`map_pickup`) sits on standable floor, like every progression object, and never over a hazard.
+- Taking a map is not a celebration (Rule F): a soft pickup sound and a small puff.
+
 ## Checklist for a new room or exit
 
 1. Side exit: a 3-tile gap in the side wall, door letter in its bottom cell (`D` / `H`). Arrival keeps height and speed.
@@ -178,4 +186,5 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 10. Progression objects? Potions (`h`, `e`), scrolls (`?`), altars (`A`) and movement items (`j`, `d`, `c`, `g`) sit on standable floor or a platform. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell and one item per movement ability in the whole world, and make sure each is reachable with what the player can have found before it.
 11. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
 12. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
-13. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.
+13. Map: add the room to its zone in `map/map_atlas.gd`, with one exit per door (see "Map" above).
+14. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.

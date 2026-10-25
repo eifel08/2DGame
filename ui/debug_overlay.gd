@@ -20,6 +20,9 @@ const TOGGLES := [
 	["debug.screen_shake", "Screen Shake"],
 	["debug.paused", "Pause"],
 	["combat.hazard_to_safe_ground", "Spikes → Safe Ground"],
+	["map.auto_mark_rooms", "Map: Auto-Mark Rooms"],
+	["map.show_player_marker", "Map: Player Marker"],
+	["map.precise_player_marker", "Map: Precise Marker"],
 ]
 
 const SLIDERS := [
@@ -116,6 +119,19 @@ func _actions() -> Array:
 				game.player_data.learn_movement(ability_id)
 			Events.loadout_changed.emit()],
 		["Reset Tutorials", func() -> void: game.player_data.seen_tutorials.clear()],
+		["Map: Acquire This Zone", func() -> void:
+			var zone: MapZone = game.map_state.current_zone()
+			if zone:
+				game.acquire_map(zone.zone_id)],
+		["Map: Mark Pending Rooms", func() -> void: game.map_state.mark_pending()],
+		["Map: Reveal All Zones", func() -> void:
+			for zone in game.atlas.zones:
+				game.acquire_map(zone.zone_id)
+				for r in zone.rooms:
+					game.map_state.mark_room(r.room_id)],
+		["Map: Forget Map", func() -> void:
+			game.map_state.new_game()
+			game.map_state.enter_room(game.room_id)],
 		["Reset Player", func() -> void: game.reset_player()],
 		["Reset Room", func() -> void: game.reset_room()],
 		["Restore Defaults", func() -> void: game.restore_defaults()],
