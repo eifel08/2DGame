@@ -21,6 +21,7 @@ const ROOM_SCENES := {
 	"upper_room": preload("res://world/upper_room.tscn"),
 	"hidden_vault": preload("res://world/hidden_vault.tscn"),
 	"lava_room": preload("res://world/lava_room.tscn"),
+	"bestiary": preload("res://world/bestiary.tscn"), # Testing mega-hall below the Testing Halls.
 }
 const START_ROOM := "test_room"
 const ENEMY_SCENES := {
@@ -28,6 +29,19 @@ const ENEMY_SCENES := {
 	"flyer": preload("res://enemies/flying_dummy.tscn"),
 	"strong": preload("res://enemies/strong_dummy.tscn"),
 	"boss": preload("res://enemies/boss_sentinel.tscn"),
+	# The BaseEnemy roster (enemies/bestiary/). Each has a chamber in the Bestiary.
+	"swooper": preload("res://enemies/bestiary/swooper.tscn"),
+	"charger": preload("res://enemies/bestiary/charger.tscn"),
+	"thrower": preload("res://enemies/bestiary/thrower.tscn"),
+	"brute": preload("res://enemies/bestiary/brute.tscn"),
+	"ambusher": preload("res://enemies/bestiary/ambusher.tscn"),
+	"shellback": preload("res://enemies/bestiary/shellback.tscn"),
+	"urchin": preload("res://enemies/bestiary/urchin.tscn"),
+	"turret": preload("res://enemies/bestiary/turret.tscn"),
+	"orb_sentry": preload("res://enemies/bestiary/orb_sentry.tscn"),
+	"hopper": preload("res://enemies/bestiary/hopper.tscn"),
+	"crawler": preload("res://enemies/bestiary/crawler.tscn"),
+	"phalanx": preload("res://enemies/bestiary/phalanx.tscn"),
 }
 const COIN_SCENE := preload("res://world/objects/coin.tscn")
 const RESPAWN_FADE_TIME := 0.45
@@ -347,6 +361,10 @@ func load_room(id: String, arrival_door := "", offset := 0.0, velocity := Vector
 					player.facing = door.inward
 				-1: # Arriving from above (a downward transition): Rule A.
 					arrival = _landing_arrival(door, arrival)
+					# A drop-through started above (Down + Jump on a plank) must not
+					# carry over: land on the platform below the gap.
+					player.drop_through_timer = 0.0
+					player.set_collision_mask_value(Player.ONE_WAY_LAYER, true)
 				1: # Arriving from below (an upward transition): Rule B.
 					var eject := _ejection_arrival(door)
 					if not eject.is_empty():
@@ -538,8 +556,9 @@ func spawn_enemy_kind(kind: String, at: Vector2, spawn_id := "", telegraph := fa
 		at = _spawn_point_away_from_player(at)
 	enemies_root.add_child(enemy)
 	enemy.spawn_id = spawn_id
+	enemy.kind = kind
 	enemy.setup(room, at, player, telegraph)
-	if enemy is BossSentinel:
+	if enemy is BossSentinel or enemy is BaseEnemy:
 		enemy.combat = combat
 		enemy.effects = effects
 	enemies.append(enemy)

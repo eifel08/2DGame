@@ -98,6 +98,14 @@ signal arena_cleared(arena_id: String)
 @warning_ignore("unused_signal")
 signal enemy_spawning(enemy: Node)
 @warning_ignore("unused_signal")
+signal enemy_blocked(enemy: Node, direction: Vector2) ## A hit bounced off a shield (Enemy.blocks_hit).
+@warning_ignore("unused_signal")
+signal enemy_telegraph(enemy: Node, attack: String) ## A BaseEnemy is about to attack (wind-up starts).
+@warning_ignore("unused_signal")
+signal enemy_parried(enemy: Node, position: Vector2) ## A melee swing stopped a deflectable enemy strike.
+@warning_ignore("unused_signal")
+signal projectile_deflected(position: Vector2) ## A melee swing swatted a deflectable projectile back.
+@warning_ignore("unused_signal")
 signal secret_found(secret_id: String, position: Vector2)
 @warning_ignore("unused_signal")
 signal hidden_pocket_found(secret_id: String) ## A Type 1 hidden pocket was walked into (no feedback: Rule F).

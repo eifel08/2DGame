@@ -290,6 +290,9 @@ func _run() -> void:
 	# --- Movement items and full-screen tutorial popups ---
 	await _test_tutorials()
 
+	# --- Bestiary: BaseEnemy roster, deflect / parry, the testing hall ---
+	await _test_bestiary()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -4000,4 +4003,370 @@ func _test_tutorials() -> void:
 	h.max_health_bonus = 0.0
 	h.max_energy_bonus = 0.0
 	h.full_heal()
+	await _reset()
+
+
+# ---------- Bestiary: modular enemies, deflect / parry, the testing hall ----------
+
+const BESTIARY_KINDS := ["weak", "strong", "flyer", "swooper", "charger", "thrower", "brute", "ambusher",
+	"shellback", "urchin", "turret", "orb_sentry", "hopper", "crawler", "phalanx"]
+
+
+func _beast(kind: String) -> Enemy:
+	for e in game.enemies:
+		if e.kind == kind:
+			return e
+	return null
+
+
+## Into the Bestiary with every enemy fresh at home.
+func _fresh_bestiary() -> void:
+	if game.room_id != "bestiary":
+		game.load_room("bestiary", "ceiling")
+		await _frames(20)
+	game.reset_enemies()
+	game.combat.projectiles.clear()
+	await _frames(3)
+
+
+func _put(at: Vector2, facing := 1) -> void:
+	var p: Player = game.player
+	p.global_position = at
+	p.velocity = Vector2.ZERO
+	p.fsm.change("normal")
+	p.facing = facing
+	p.health.iframe_timer = 0.0
+	p.health.full_heal()
+
+
+func _shots_of(owner: Node) -> Array:
+	return game.combat.projectiles.list.filter(func(pr: Dictionary) -> bool: return pr.owner == owner and pr.hostile)
+
+
+func _swing(facing: int) -> void:
+	game.player.facing = facing
+	Input.action_press(&"attack")
+	await _frames(2)
+	Input.action_release(&"attack")
+
+
+func _test_bestiary() -> void:
+	var p: Player = game.player
+	var h := p.health
+	var god: bool = Config.upgrades.god_mode
+	Config.upgrades.god_mode = true
+
+	# --- The hall: one chamber per enemy type, in a row, very long ---
+	var scene_root: Node = (game.ROOM_SCENES["bestiary"] as PackedScene).instantiate()
+	var kinds := []
+	var xs := []
+	for m in scene_root.get_node("EnemySpawns").get_children():
+		kinds.append(String(m.get_meta("kind")))
+		xs.append(m.position.x)
+	var signs := 0
+	for node in scene_root.get_node("Objects").get_children():
+		if node is ChamberSign:
+			signs += 1
+	scene_root.free()
+	var expected_kinds := BESTIARY_KINDS.duplicate()
+	expected_kinds.sort()
+	kinds.sort()
+	_check("the Bestiary holds every non-boss enemy type exactly once (old and new, 15)", kinds == expected_kinds, kinds)
+	_check("each chamber has a sign", signs == BESTIARY_KINDS.size(), signs)
+	for kind in BESTIARY_KINDS:
+		_check("the '%s' kind is registered" % kind, game.ENEMY_SCENES.has(kind))
+
+	# --- Way in: drop through the plank in the Testing Halls floor ---
+	await _reset()
+	var gap: Door = _door("floor")
+	_check("the Testing Halls floor has a gap down to the Bestiary", gap != null and gap.target_room == "bestiary")
+	_put(Vector2(gap.global_position.x, 704.0))
+	await _frames(10)
+	_check("the plank over the gap holds the player", p.grounded and game.room_id == "test_room", [p.grounded, p.global_position])
+	Input.action_press(&"move_down")
+	Input.action_press(&"jump")
+	await _frames(3)
+	Input.action_release(&"jump")
+	Input.action_release(&"move_down")
+	_check("Down + Jump drops through the plank into the Bestiary", await _until(func() -> bool: return game.room_id == "bestiary", 90), game.room_id)
+	_check("the arrival lands on the platform under the ceiling gap (Rule A)",
+		await _until(func() -> bool: return p.grounded, 60) and p.global_position.y < 150.0, p.global_position)
+	var room_w: float = game.room.get_bounds().size.x
+	_check("the Bestiary is a very long hall", room_w > 10000.0, room_w)
+	# Chambers: a divider hangs between every two neighbouring enemies.
+	var homes := []
+	for kind in BESTIARY_KINDS:
+		var e := _beast(kind)
+		homes.append(e.home.x if e else -1.0)
+	var separated := true
+	for i in homes.size() - 1:
+		var wall := false
+		var x: float = homes[i] + 16.0
+		while x < homes[i + 1]:
+			if game.room.is_solid_at(Vector2(x, 5 * 32 + 16)) and game.room.is_solid_at(Vector2(x, 13 * 32 + 16)):
+				wall = true
+			x += 32.0
+		separated = separated and wall
+	var ordered := homes.duplicate()
+	ordered.sort()
+	_check("every enemy has its own chamber, in order (dividers with a curb between them)", separated and ordered == homes, homes)
+	# Way out: jump from the top platform back up through the gap.
+	Input.action_press(&"jump")
+	await _frames(20)
+	Input.action_release(&"jump")
+	_check("jumping up the gap returns to the Testing Halls beside the plank (Rule B)",
+		await _until(func() -> bool: return game.room_id == "test_room" and p.grounded, 120) and not game.last_ejection.is_empty(), game.room_id)
+
+	# --- Old enemies in their chambers ---
+	await _fresh_bestiary()
+	for kind in ["weak", "strong", "flyer"]:
+		var e := _beast(kind)
+		_check("the old '%s' enemy stands in its Bestiary chamber" % kind, e != null and e.alive)
+
+	# --- Deflect rule ---
+	var proj: ProjectileSystem = game.combat.projectiles
+	_put(Vector2(200, 448))
+	await _frames(5)
+	proj.spawn({"position": p.get_center() + Vector2(40, 0), "velocity": Vector2(-5, 0), "hostile": true, "deflectable": true, "life": 5.0})
+	var probe: Dictionary = proj.list.back()
+	h.set_energy(h.get_max_energy())
+	await _cast_neutral()
+	await _frames(10)
+	_check("magic never deflects: Mana Discharge leaves a deflectable shot hostile", probe.hostile and not probe.deflected)
+	_put(Vector2(200, 448))
+	probe.pos = p.get_center() + Vector2(36, 0)
+	await _swing(1)
+	await _frames(6)
+	_check("a melee swing deflects a deflectable shot (it turns friendly)", not probe.hostile and probe.deflected and probe.source == "deflect")
+	proj.spawn({"position": p.get_center() + Vector2(36, 0), "velocity": Vector2(-5, 0), "hostile": true, "deflectable": false, "life": 5.0, "damage": 1.0})
+	var hard: Dictionary = proj.list.back()
+	await _frames(20)
+	await _swing(1)
+	await _frames(3)
+	_check("a swing passes through a non-deflectable shot", hard.hostile and not hard.deflected)
+	proj.clear()
+
+	# --- 1. Swooper: floats, then flies at the player in range ---
+	await _fresh_bestiary()
+	var sw: BaseEnemy = _beast("swooper")
+	_check("the swooper floats at home while the player is away", sw.state == "idle" and sw.home_distance() < 80.0, sw.state)
+	_put(Vector2(sw.home.x - 60.0, 448))
+	await _until(func() -> bool: return sw.state == "chase", 90)
+	var d0: float = sw.target_distance()
+	await _frames(25)
+	_check("in range, the swooper flies directly at the player", sw.state == "chase" and sw.target_distance() < d0 - 20.0, [sw.state, d0, sw.target_distance()])
+
+	# --- 2. Charger: stands, then rushes at high speed ---
+	await _fresh_bestiary()
+	var ch: ChargerEnemy = _beast("charger")
+	await _frames(10)
+	_check("the charger stands its ground while the player is away", ch.state == "idle" and absf(ch.velocity.x) < 1.0)
+	_put(Vector2(ch.global_position.x - 230.0, 448))
+	var top_speed := 0.0
+	var saw_windup := false
+	var from_x := ch.global_position.x
+	for i in 90:
+		await _frames(1)
+		saw_windup = saw_windup or ch.state == "windup"
+		top_speed = maxf(top_speed, absf(ch.velocity.x))
+	_check("in proximity, the charger paws (telegraph) and charges at high speed",
+		saw_windup and top_speed >= ch.charge_speed * 0.9 and from_x - ch.global_position.x > 100.0, [saw_windup, top_speed])
+
+	# --- 3. Thrower: deflectable projectiles, swatted back into it ---
+	await _fresh_bestiary()
+	var th: ThrowerEnemy = _beast("thrower")
+	_put(Vector2(th.global_position.x - 240.0, 448), 1)
+	var shot: Dictionary = {}
+	for i in 150:
+		await _frames(1)
+		var shots := _shots_of(th)
+		if not shots.is_empty():
+			shot = shots[0]
+			break
+	_check("the thrower throws a projectile at the player", not shot.is_empty())
+	_check("the thrower's projectile is deflectable", not shot.is_empty() and shot.deflectable)
+	if not shot.is_empty():
+		for i in 90:
+			if p.get_center().distance_to(shot.pos) < 62.0:
+				break
+			await _frames(1)
+		await _swing(1)
+		await _frames(4)
+		_check("a melee swing sends the thrown projectile back", shot.deflected and not shot.hostile)
+		var hurt := await _until(func() -> bool: return th.health < th.max_health, 90)
+		_check("the deflected projectile hits the thrower", hurt, th.health)
+	proj.clear()
+
+	# --- 4. Brute: a non-deflectable smash for double damage ---
+	await _fresh_bestiary()
+	var br: BruteEnemy = _beast("brute")
+	Config.upgrades.god_mode = false
+	_put(Vector2(br.global_position.x - 56.0, 448), 1)
+	var hp0 := h.health
+	var smashed := false
+	for i in 120:
+		if br.state == "windup" and i % 12 == 0:
+			await _swing(1) # Try to parry: a swing cannot stop the club.
+		else:
+			await _frames(1)
+		if h.health < hp0:
+			smashed = true
+			break
+	_check("the brute's smash cannot be parried", smashed and not br.parried, [smashed, br.state])
+	_check("the brute's smash deals double damage", is_equal_approx(hp0 - h.health, Config.combat.contact_damage * 2.0), hp0 - h.health)
+	Config.upgrades.god_mode = true
+	await _frames(40)
+
+	# --- 5. Ambusher: vanish, ghost behind the player, strike; parry it ---
+	await _fresh_bestiary()
+	var am: AmbusherEnemy = _beast("ambusher")
+	Config.upgrades.god_mode = false
+	_put(Vector2(am.global_position.x - 150.0, 448), 1)
+	var vanished := await _until(func() -> bool: return am.state == "vanish", 60)
+	_check("the ambusher vanishes when it spots the player (untouchable)", vanished and not am.hitbox_active())
+	var ghosted := await _until(func() -> bool: return am.state == "ghost", 40)
+	_check("a semi-transparent ghost appears BEHIND the player",
+		ghosted and am.visual_alpha < 0.6 and signf(am.global_position.x - p.global_position.x) == -p.facing and not am.hitbox_active(),
+		[am.global_position.x - p.global_position.x, p.facing, am.visual_alpha])
+	hp0 = h.health
+	await _until(func() -> bool: return am.state == "recover", 60)
+	_check("it materializes and strikes", h.health < hp0, hp0 - h.health)
+	# Second ambush: turn and swing at the ghost in time to parry.
+	await _frames(20)
+	_put(Vector2(p.global_position.x, 448), 1)
+	await _until(func() -> bool: return am.state == "appear", 400)
+	hp0 = h.health
+	await _swing(int(signf(am.global_position.x - p.global_position.x)))
+	await _frames(15)
+	_check("a swing at the right moment parries its strike (deflectable)", am.parried and is_equal_approx(h.health, hp0), [am.parried, hp0 - h.health])
+	Config.upgrades.god_mode = true
+
+	# --- 6. Shellback: immune from the sides, hurt from above ---
+	await _fresh_bestiary()
+	var sb: BaseEnemy = _beast("shellback")
+	var blocks := [0]
+	var on_block := func(_e: Node, _d: Vector2) -> void: blocks[0] += 1
+	Events.enemy_blocked.connect(on_block)
+	_put(Vector2(sb.global_position.x - 48.0, 448), 1)
+	await _frames(2)
+	await _swing(1)
+	await _frames(25)
+	_put(Vector2(sb.global_position.x + 48.0, 448), -1)
+	await _frames(2)
+	await _swing(-1)
+	await _frames(25)
+	_check("side hits bounce off the shellback's plates (both sides)", is_equal_approx(sb.health, sb.max_health) and blocks[0] >= 2, [sb.health, blocks[0]])
+	_put(Vector2(sb.global_position.x, sb.global_position.y - 70.0))
+	Input.action_press(&"move_down")
+	await _swing(1)
+	await _frames(6)
+	Input.action_release(&"move_down")
+	_check("a down strike from above hurts it", sb.health < sb.max_health, sb.health)
+	Events.enemy_blocked.disconnect(on_block)
+	await _frames(30)
+
+	# --- 7. Urchin: a burst of non-deflectable spikes when too close ---
+	await _fresh_bestiary()
+	var ur: UrchinEnemy = _beast("urchin")
+	_put(Vector2(ur.global_position.x - 300.0, 448))
+	await _frames(40)
+	_check("the urchin waits while the player keeps away", _shots_of(ur).is_empty())
+	_put(Vector2(ur.global_position.x - 90.0, 448))
+	await _until(func() -> bool: return not _shots_of(ur).is_empty(), 60)
+	var spikes := _shots_of(ur)
+	var dirs := {}
+	for s in spikes:
+		dirs[roundi(rad_to_deg((s.vel as Vector2).angle()))] = true
+	_check("too close: it fires spikes in all directions", ur.last_burst == 8 and spikes.size() >= ur.spike_count - 1 and dirs.size() == spikes.size(),
+		[ur.last_burst, spikes.size()])
+	_check("its spikes are non-deflectable", spikes.all(func(s: Dictionary) -> bool: return not s.deflectable))
+	proj.clear()
+
+	# --- 8. Turret: aims and fires non-deflectable bolts at the player ---
+	await _fresh_bestiary()
+	var tu: TurretEnemy = _beast("turret")
+	_put(Vector2(tu.global_position.x - 300.0, 448), 1)
+	await _until(func() -> bool: return not _shots_of(tu).is_empty(), 120)
+	var bolts := _shots_of(tu)
+	var aimed := not bolts.is_empty() and (bolts[0].vel as Vector2).normalized().dot((p.get_center() - (bolts[0].pos as Vector2)).normalized()) > 0.9
+	_check("the turret fires straight at the player", aimed)
+	_check("the turret's bolts are non-deflectable", not bolts.is_empty() and not bolts[0].deflectable)
+	proj.clear()
+
+	# --- 9. Orb sentry: orbs in the 4 cardinal directions ---
+	await _fresh_bestiary()
+	var os: OrbSentryEnemy = _beast("orb_sentry")
+	_put(Vector2(os.home.x - 200.0, 448))
+	await _until(func() -> bool: return _shots_of(os).size() >= 4, 240)
+	var orbs := _shots_of(os)
+	var cardinal := {}
+	for o in orbs:
+		var v: Vector2 = (o.vel as Vector2).normalized()
+		cardinal[Vector2(roundf(v.x), roundf(v.y))] = true
+	_check("the floating sentry fires orbs Up, Down, Left and Right",
+		orbs.size() == 4 and cardinal.size() == 4 and cardinal.has(Vector2.UP) and cardinal.has(Vector2.DOWN) and cardinal.has(Vector2.LEFT) and cardinal.has(Vector2.RIGHT), cardinal.keys())
+	_check("its orbs are non-deflectable", orbs.all(func(o: Dictionary) -> bool: return not o.deflectable))
+	_check("it floats in place", os.home_distance() < 20.0, os.home_distance())
+	proj.clear()
+
+	# --- 10. Hopper: random short hops ---
+	await _fresh_bestiary()
+	var ho: HopperEnemy = _beast("hopper")
+	_put(Vector2(200, 448))
+	var highest := ho.global_position.y
+	for i in 360:
+		await _frames(1)
+		highest = minf(highest, ho.global_position.y)
+	_check("the hopper hops again and again", ho.hops >= 3, ho.hops)
+	_check("its hops leave the floor and stay short (near home)", highest < ho.home.y - 40.0 and ho.home_distance() < ho.leash_range, [highest, ho.home_distance()])
+
+	# --- 11. Bonus: wall-crawler circles its rock and drops on the player ---
+	await _fresh_bestiary()
+	var cr: CrawlerEnemy = _beast("crawler")
+	_put(Vector2(200, 448))
+	var normals := {}
+	for i in 480:
+		await _frames(1)
+		normals[cr.normal] = true
+	_check("the crawler creeps around its rock: floor, walls and ceiling", cr.turns >= 4 and normals.size() == 4, [cr.turns, normals.keys()])
+	await _until(func() -> bool: return cr.normal == Vector2.DOWN and absf(cr.contact.x - cr.home.x) < 40.0, 600)
+	_put(Vector2(cr.contact.x, 448))
+	var dropped := await _until(func() -> bool: return cr.state == "fall", 30)
+	_check("hanging upside down above the player, it drops", dropped, cr.state)
+	_check("it lands and crawls on", await _until(func() -> bool: return cr.state == "crawl" and cr.normal == Vector2.UP, 90), cr.state)
+
+	# --- 12. Bonus: shield phalanx, front blocked, back and top open ---
+	await _fresh_bestiary()
+	var ph: PhalanxEnemy = _beast("phalanx")
+	var front: int = ph.facing
+	_put(Vector2(ph.global_position.x + front * 52.0, 448), -front)
+	await _frames(2)
+	await _swing(-front)
+	await _frames(8)
+	_check("the phalanx's shield blocks a hit from the front", is_equal_approx(ph.health, ph.max_health), ph.health)
+	_put(Vector2(ph.global_position.x - front * 52.0, 448), front)
+	await _frames(2)
+	await _swing(front)
+	await _frames(8)
+	_check("from behind it is open", ph.health < ph.max_health, ph.health)
+	var hp_ph := ph.health
+	await _frames(int(ph.turn_delay * 60.0) + 20)
+	_check("it turns to face the player only after a delay", ph.facing == -front, ph.facing)
+	_put(Vector2(ph.global_position.x, ph.global_position.y - 80.0))
+	Input.action_press(&"move_down")
+	await _swing(1)
+	await _frames(6)
+	Input.action_release(&"move_down")
+	_check("over the shield (from above) it is open too", ph.health < hp_ph, ph.health)
+
+	# --- Modularity: every new kind is a BaseEnemy with the shared rig ---
+	await _fresh_bestiary()
+	var modular := true
+	for kind in BESTIARY_KINDS.slice(3):
+		var e := _beast(kind)
+		modular = modular and e is BaseEnemy and e.get_node_or_null("Flip/Rig") is EnemyRig and e.combat != null
+	_check("every new enemy type extends BaseEnemy and draws through EnemyRig", modular)
+
+	Config.upgrades.god_mode = god
+	proj.clear()
 	await _reset()

@@ -48,6 +48,17 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	Events.enemy_spawning.connect(_on_enemy_spawning)
 	Events.secret_found.connect(_on_secret_found)
 	Events.relic_collected.connect(_on_relic_collected)
+	# Deflect / parry / shields (BaseEnemy roster).
+	Events.enemy_blocked.connect(func(enemy: Node, _dir: Vector2) -> void:
+		Sfx.play("grapple_latch", 1.3) # A dull clank: the shield held.
+		effects.play("pogo_spike", enemy.get_center()))
+	Events.enemy_parried.connect(func(_enemy: Node, pos: Vector2) -> void:
+		Sfx.play("hit", 1.5)
+		freeze(0.08)
+		effects.play("hit_spark", pos, {"scale": 1.3}))
+	Events.projectile_deflected.connect(func(pos: Vector2) -> void:
+		Sfx.play("pogo", 1.3)
+		effects.play("pogo_spark", pos))
 	Events.potion_collected.connect(_on_potion_collected)
 	Events.scroll_collected.connect(_on_scroll_collected)
 	Events.meditation_finished.connect(_on_meditation_finished)

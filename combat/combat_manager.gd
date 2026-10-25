@@ -8,6 +8,12 @@ extends Node2D
 ##     (the three damage sources and their i-frame rules: combat/damage.gd)
 ## Outcomes are reported only through Events (hit_landed, pogo_bounced, ...).
 ## Also draws the placeholder slash and the debug hitboxes / animation labels.
+##
+## Deflect / parry (melee only, never magic): an active swing swats back any
+## DEFLECTABLE hostile projectile it touches (ProjectileSystem.deflect_in_rect)
+## and stops a deflectable enemy strike (BaseEnemy.strike asks swing_box()).
+## Non-deflectable projectiles and strikes ignore swings. A hit that a shield
+## blocks (Enemy.blocks_hit) recoils the player like a wall.
 
 @onready var projectiles: ProjectileSystem = $Projectiles
 @onready var grapple: GrappleHook = $Grapple
@@ -95,6 +101,16 @@ func get_attack_hitbox(dir: String) -> Rect2:
 			return Rect2(x, r.get_center().y - size.y / 2.0 - 2.0, size.x, size.y)
 
 
+## The hitbox of the swing while its active frames run, else an empty Rect2.
+## Enemy strikes use it to check for a parry.
+func swing_box() -> Rect2:
+	if attack.is_empty():
+		return Rect2()
+	if attack.t < Config.combat.attack_active_start or attack.t > active_end(attack.dir):
+		return Rect2()
+	return get_attack_hitbox(attack.dir)
+
+
 ## The downward swing stays active longer (pogo leniency).
 func active_end(dir: String) -> float:
 	return Config.combat.pogo_active_end if dir == "down" else Config.combat.attack_active_end
@@ -136,6 +152,10 @@ func _step_attack(delta: float) -> void:
 	var dir_x := 1.0 if dir == "right" else (-1.0 if dir == "left" else 0.0)
 	var dir_y := -1.0 if dir == "up" else (1.0 if dir == "down" else 0.0)
 	var connected := false
+	var blocked := false
+
+	# Deflect: swat back deflectable hostile projectiles (never magic).
+	var deflected := projectiles.deflect_in_rect(box, c.attack_damage * p.stat("damage_mul") * 1.5)
 
 	for enemy in get_enemies():
 		var er: Rect2 = enemy.get_rect()
@@ -153,6 +173,8 @@ func _step_attack(delta: float) -> void:
 		})
 		if applied > 0.0:
 			connected = true
+		elif enemy.alive and enemy.blocks_hit(Vector2(hx, dir_y), "melee"):
+			blocked = true
 
 	# Breakable walls (hidden passages) take hits from any swing. Rule C
 	# (GUIDELINES.md): never gate this on arena state; secret exits must
@@ -168,19 +190,20 @@ func _step_attack(delta: float) -> void:
 	# falls in (hazard damage + safe-ground respawn, _resolve_hazards).
 	var on_hazard := dir == "down" and get_room().find_hazard(box, false).has_area()
 
-	if dir == "down" and (connected or on_hazard) and not attack.pogoed:
+	if dir == "down" and (connected or on_hazard or deflected > 0 or blocked) and not attack.pogoed:
 		attack.pogoed = true
 		p.pogo(c.pogo_velocity)
 		Events.pogo_bounced.emit(p.global_position + Vector2(0, 10), on_hazard and not connected)
-	elif connected and dir_x != 0.0:
-		p.velocity.x = -dir_x * c.recoil_velocity # Recoil sells the impact.
+	elif (connected or blocked) and dir_x != 0.0:
+		p.velocity.x = -dir_x * c.recoil_velocity * (1.6 if blocked and not connected else 1.0) # Recoil sells the impact; a shield pushes harder.
 
 
 # ---------- Generic damage API (ultimates, projectiles) ----------
 
 ## opts: damage, direction (Vector2), knockback, source, grants_energy, strength, position.
 func apply_damage(target: Node, opts: Dictionary) -> float:
-	var applied: float = target.take_hit(opts.get("damage", 0.0), opts.get("direction", Vector2.ZERO), opts.get("knockback", 0.0))
+	var applied: float = target.take_hit(opts.get("damage", 0.0), opts.get("direction", Vector2.ZERO), opts.get("knockback", 0.0),
+		String(opts.get("source", "")))
 	if applied <= 0.0:
 		return 0.0
 	Events.hit_landed.emit({

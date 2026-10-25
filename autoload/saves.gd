@@ -14,6 +14,7 @@ const ROOM_NAMES := {
 	"arena_room": "Proving Grounds",
 	"secret_room": "Hidden Shrine",
 	"upper_room": "Upper Galleries",
+	"bestiary": "Bestiary",
 }
 
 var save_dir := "user://saves"

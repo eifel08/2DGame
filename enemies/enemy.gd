@@ -32,6 +32,7 @@ const SPAWN_TELEGRAPH := 0.35 ## Arena wave spawns: seconds harmless (the "spawn
 var room: Room
 var target: Node2D ## Usually the player.
 var spawn_id := "" ## Persistence key; "" = not persisted (e.g. arena waves).
+var kind := "" ## Game.ENEMY_SCENES key it was spawned from ("weak", "brute", ...).
 var home := Vector2.ZERO
 var health := 80.0
 var alive := true
@@ -114,9 +115,14 @@ func restore_full_health() -> void:
 		health = max_health
 
 
-## Returns damage actually applied (0 when dead or still spawning).
-func take_hit(damage: float, direction: Vector2, knockback: float) -> float:
+## Returns damage actually applied (0 when dead, still spawning, or the hit
+## was blocked by blocks_hit, e.g. a shield). `source`: "melee", "deflect",
+## an ability id ... (CombatManager.apply_damage passes it on).
+func take_hit(damage: float, direction: Vector2, knockback: float, source := "") -> float:
 	if not hitbox_active():
+		return 0.0
+	if blocks_hit(direction, source):
+		Events.enemy_blocked.emit(self, direction)
 		return 0.0
 	health -= damage
 	flash_timer = 0.12
@@ -175,6 +181,12 @@ func step(delta: float) -> void:
 
 
 # ----- Hooks for subclasses -----
+
+## True when a hit from `direction` (the way the blow travels: (0, 1) is a
+## downward strike from above) must do nothing. Default: never.
+func blocks_hit(_direction: Vector2, _source: String) -> bool:
+	return false
+
 
 func _on_reset() -> void:
 	pass
