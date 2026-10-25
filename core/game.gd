@@ -38,6 +38,11 @@ const RESPAWN_FADE_TIME := 0.45
 ##   Health / Mana Potion  +max health / +max energy for good (collect_relic)
 ##   Spell Scroll          learns a spell (collect_scroll)
 ##   Meditation Altar      meditate to open a spell slot (meditate_at)
+##   AbilityPickup         a movement ability: double jump, dash, wall climb,
+##                         grappling hook (collect_ability); none at the start
+## The first time each of these happens, a full-screen tutorial explains it
+## (show_tutorial, TutorialPopup). learn_move / learn_jump / learn_heal /
+## learn_mana_discharge are ready for the basic actions but not called yet.
 ## DEFAULT_LOADOUT (Up, Side, Down) is the full kit the debug overlay grants
 ## and what a save from before progression loads with.
 const DEFAULT_LOADOUT: Array[String] = ["radiant_lance", "comet_dash", "meteor_slam"]
@@ -76,6 +81,11 @@ var secret_doorways: Array[SecretDoorway] = [] ## Type 2 secret walls in this ro
 var relics: Array[Relic] = [] ## Relics and potions (Potion extends Relic).
 var scrolls: Array[SpellScroll] = []
 var altars: Array[MeditationAltar] = []
+var ability_pickups: Array[AbilityPickup] = []
+## Full-screen tutorial popups (created in _ready). Set tutorials_enabled
+## false to never show them (tests that do not check them).
+var tutorial: TutorialPopup
+var tutorials_enabled := true
 var platforms: Array[Platform] = [] ## Platform objects (standard, moving, breakable) in this room.
 var grapple_pegs: Array[GrapplePeg] = []
 var playtime := 0.0
@@ -98,7 +108,12 @@ func _ready() -> void:
 	ultimates.setup(UltimateContext.new(player, combat, effects, input), player_data)
 	for ability in UltimateRegistry.create_default():
 		ultimates.register(ability)
-	# New game: no equippable spell known, every directional slot locked.
+	# New game: no equippable spell known, every directional slot locked,
+	# no movement ability (Player.can_use asks player_data).
+	player.data = player_data
+	tutorial = TutorialPopup.new()
+	tutorial.name = "Tutorial"
+	add_child(tutorial)
 	feedback.setup(camera, effects)
 	hud.setup(player, ultimates, player_data)
 	hud.boss_provider = active_boss
@@ -141,6 +156,11 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	input.poll()
+	# A tutorial popup pauses everything; the key that closes it does nothing.
+	if tutorial.blocks_step():
+		effects.set_paused(true)
+		input.end_step()
+		return
 	_handle_meta_input()
 	Engine.time_scale = Config.debug.time_scale
 
@@ -243,6 +263,7 @@ func _load_room_scene(id: String) -> void:
 	relics.clear()
 	scrolls.clear()
 	altars.clear()
+	ability_pickups.clear()
 	platforms.clear()
 	grapple_pegs.clear()
 	current_checkpoint = null
@@ -291,6 +312,10 @@ func _load_room_scene(id: String) -> void:
 			scrolls.append(node)
 			if player_data.is_unlocked(node.spell_id):
 				node.collect() # Its spell is known: the scroll is gone.
+		if node is AbilityPickup:
+			ability_pickups.append(node)
+			if player_data.has_movement(node.ability):
+				node.collect() # Already learned: the item is gone.
 		if node is MeditationAltar:
 			altars.append(node)
 			node.set_spent(player_data.is_slot_open(node.get_slot()))
@@ -675,6 +700,9 @@ func _update_pickups(delta: float) -> void:
 	for scroll in scrolls:
 		if not scroll.collected and scroll.get_rect().intersects(pr):
 			collect_scroll(scroll)
+	for pickup in ability_pickups:
+		if not pickup.collected and pickup.get_rect().intersects(pr):
+			collect_ability(pickup)
 
 
 ## Permanent upgrade: raises max health or max energy for this save. Potions
@@ -692,6 +720,7 @@ func collect_relic(relic: Relic) -> void:
 		player.health.full_heal()
 	if relic is Potion:
 		Events.potion_collected.emit(relic.relic_id, relic.stat, relic.global_position)
+		show_tutorial("mana_potion" if relic.stat == "max_energy" else "health_potion")
 	else:
 		Events.relic_collected.emit(relic.relic_id, relic.global_position)
 	write_save()
@@ -703,7 +732,47 @@ func collect_scroll(scroll: SpellScroll) -> void:
 	scroll.collect()
 	ultimates.learn(scroll.spell_id)
 	Events.scroll_collected.emit(scroll.spell_id, scroll.global_position)
+	show_tutorial("spell_scroll")
 	write_save()
+
+
+## A movement item: the ability works from now on, for good.
+func collect_ability(pickup: AbilityPickup) -> void:
+	pickup.collect()
+	player_data.learn_movement(pickup.ability)
+	Events.movement_learned.emit(pickup.ability, pickup.global_position)
+	show_tutorial(pickup.ability)
+	write_save()
+
+
+# ---------- Tutorials ----------
+
+## Shows the full-screen tutorial `id` (TutorialPopup.TITLES) the first time
+## only; it is remembered in the save. Returns true if it opened.
+func show_tutorial(id: String) -> bool:
+	if not tutorials_enabled or player_data.seen_tutorials.has(id):
+		return false
+	player_data.seen_tutorials.append(id)
+	tutorial.open(id)
+	return true
+
+
+## Learning hooks for the basic actions. Not called anywhere yet: a future
+## opening sequence can call them where each action is first needed.
+func learn_move() -> bool:
+	return show_tutorial("move")
+
+
+func learn_jump() -> bool:
+	return show_tutorial("jump")
+
+
+func learn_heal() -> bool:
+	return show_tutorial("heal")
+
+
+func learn_mana_discharge() -> bool:
+	return show_tutorial("mana_discharge")
 
 
 # ---------- Meditation altars ----------
@@ -716,6 +785,7 @@ func meditate_at(altar: MeditationAltar) -> void:
 	var slot := altar.get_slot()
 	altar.busy = true
 	Events.meditation_started.emit(altar)
+	show_tutorial("meditation") # The first time: pauses before the meditation runs.
 	player.begin_meditation(altar.get_meditation_position(), Config.progression.meditation_time,
 		func() -> void: _finish_meditation(altar, slot),
 		func() -> void:
@@ -735,11 +805,19 @@ func _refresh_progression_objects() -> void:
 			scroll.visible = true
 	for altar in altars:
 		altar.set_spent(player_data.is_slot_open(altar.get_slot()))
+	for pickup in ability_pickups:
+		if player_data.has_movement(pickup.ability) != pickup.collected:
+			if pickup.collected:
+				pickup.restore()
+			else:
+				pickup.collect()
 
 
-## Debug / tests: every spell known, every slot open, DEFAULT_LOADOUT equipped.
-## Max health and energy are not touched.
+## Debug / tests: every movement ability, every spell known, every slot open,
+## DEFAULT_LOADOUT equipped. Max health and energy are not touched.
 func grant_full_kit() -> void:
+	for ability_id in PlayerData.MOVEMENT:
+		player_data.learn_movement(ability_id)
 	for slot in PlayerData.SLOT_COUNT:
 		player_data.open_slot(slot)
 	for ability_id in ultimates.abilities:
@@ -892,6 +970,8 @@ func make_save_data() -> Dictionary:
 		"unlocked": player_data.unlocked.duplicate(),
 		"equipped": player_data.equipped.duplicate(), # [up, side, down]
 		"open_slots": player_data.open_slots.duplicate(), # [up, side, down], true = unlocked
+		"movement": player_data.movement.duplicate(),
+		"tutorials": player_data.seen_tutorials.duplicate(),
 		"max_health_bonus": player.health.max_health_bonus,
 		"max_energy_bonus": player.health.max_energy_bonus,
 		"playtime": playtime,
@@ -919,6 +999,16 @@ func apply_save_data(data: Dictionary) -> void:
 	for i in PlayerData.SLOT_COUNT:
 		open_slots[i] = bool(saved_open[i]) if saved_open.size() == PlayerData.SLOT_COUNT else data.has("unlocked")
 	player_data.open_slots = open_slots
+	# Movement abilities. A save from before the movement items stores none
+	# but already used them all: it keeps them.
+	var movement: Array[String] = []
+	for id in data.get("movement", PlayerData.MOVEMENT if data.has("unlocked") else []):
+		movement.append(String(id))
+	player_data.movement = movement
+	var seen: Array[String] = []
+	for id in data.get("tutorials", []):
+		seen.append(String(id))
+	player_data.seen_tutorials = seen
 	var equipped := PlayerData.empty_slots()
 	var saved_equipped: Array = data.get("equipped", [])
 	if saved_equipped.size() == PlayerData.SLOT_COUNT:

@@ -7,7 +7,7 @@ extends PlayerState
 
 func step(delta: float) -> void:
 	var m = Config.movement
-	var up = Config.upgrades
+	var wall_climb := p.can_use("wall_climb") # Collected items (AbilityPickup) + debug switches.
 	var input := p.input
 	var ix := input.axis_x()
 
@@ -28,10 +28,10 @@ func step(delta: float) -> void:
 
 	# --- Walls ---
 	p.wall_dir = 1 if p.touching_wall(1) else (-1 if p.touching_wall(-1) else 0)
-	if up.wall_jump and not p.grounded and p.wall_dir != 0:
+	if wall_climb and not p.grounded and p.wall_dir != 0:
 		p.last_wall_dir = p.wall_dir
 		p.wall_coyote_timer = m.wall_coyote_time
-	p.wall_sliding = up.wall_jump and not p.grounded and p.wall_dir != 0 \
+	p.wall_sliding = wall_climb and not p.grounded and p.wall_dir != 0 \
 		and ix == p.wall_dir and p.velocity.y > 0.0
 	if p.wall_sliding:
 		p.air_jumps_used = 0
@@ -48,9 +48,9 @@ func step(delta: float) -> void:
 	if p.jump_buffer_timer > 0.0:
 		if p.grounded or p.coyote_timer > 0.0:
 			p.jump(m.jump_velocity, "ground")
-		elif up.wall_jump and (p.wall_dir != 0 or p.wall_coyote_timer > 0.0):
+		elif wall_climb and (p.wall_dir != 0 or p.wall_coyote_timer > 0.0):
 			p.wall_jump(p.wall_dir if p.wall_dir != 0 else p.last_wall_dir)
-		elif up.double_jump and p.air_jumps_used < 1:
+		elif p.can_use("double_jump") and p.air_jumps_used < 1:
 			p.air_jumps_used += 1
 			p.jump(m.double_jump_velocity, "double")
 
@@ -65,7 +65,7 @@ func step(delta: float) -> void:
 	p.apply_gravity(delta, m.wall_slide_speed if p.wall_sliding else m.max_fall_speed)
 
 	# --- Transitions ---
-	if up.dash and input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
+	if p.can_use("dash") and input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
 		p.fsm.change("dash")
 		return
 	if p.grounded and input.is_down(&"heal") and p.health.can_start_heal_chunk():

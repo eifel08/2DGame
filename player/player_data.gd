@@ -15,6 +15,9 @@ extends RefCounted
 ## Progression: a new game knows NO equippable spell and every directional
 ## slot is LOCKED. Spell Scrolls teach spells (unlock), Meditation Altars
 ## open slots (open_slot). A locked slot holds nothing and casts nothing.
+##
+## Movement abilities (MOVEMENT) are found in the world too (AbilityPickup):
+## a new game has none. Seen tutorials are kept so each popup shows once.
 
 const SLOT_UP := 0
 const SLOT_SIDE := 1
@@ -22,11 +25,16 @@ const SLOT_DOWN := 2
 const SLOT_COUNT := 3
 const SLOT_NAMES: Array[String] = ["up", "side", "down"]
 const NEUTRAL_SPELL := "mana_discharge"
+## Movement abilities found as items: double jump, dash, wall climb / slide
+## (incl. wall jumps), grappling hook.
+const MOVEMENT: Array[String] = ["double_jump", "dash", "wall_climb", "grapple"]
 
 var currency := 0
 var unlocked: Array[String] = [] ## Every equippable spell the player has discovered.
 var equipped: Array[String] = empty_slots() ## Spell id per directional slot ("" = empty).
 var open_slots: Array[bool] = locked_slots() ## Per directional slot: true once a Meditation Altar opened it.
+var movement: Array[String] = [] ## Movement abilities collected (MOVEMENT ids).
+var seen_tutorials: Array[String] = [] ## Tutorial popups already shown (TutorialPopup ids).
 
 
 static func empty_slots() -> Array[String]:
@@ -57,6 +65,18 @@ func open_slot(slot: int) -> bool:
 
 func open_slot_count() -> int:
 	return open_slots.count(true)
+
+
+func has_movement(ability_id: String) -> bool:
+	return movement.has(ability_id)
+
+
+## Learns a movement ability for good. Returns false if unknown or known.
+func learn_movement(ability_id: String) -> bool:
+	if not MOVEMENT.has(ability_id) or movement.has(ability_id):
+		return false
+	movement.append(ability_id)
+	return true
 
 
 func add_currency(amount: int) -> void:

@@ -32,12 +32,14 @@ func _run() -> void:
 		Saves.delete_slot(i)
 	game = load("res://scenes/game.tscn").instantiate()
 	game.start_in_trance = false
+	game.tutorials_enabled = false # The popups are checked on their own (_test_tutorials).
 	add_child(game)
 	await _frames(30)
 	var p: Player = game.player
 
 	# --- A new game: low stats, no spells, locked slots, Mana Discharge only ---
 	await _test_starting_state()
+	await _test_no_movement_at_start()
 	_grant_test_kit() # The checks below use the full kit and 100 / 100.
 	await _frames(2)
 	_check("scrolls of known spells and altars of open slots are gone",
@@ -284,6 +286,9 @@ func _run() -> void:
 
 	# --- Progression: potions, spell scrolls, meditation altars, saves ---
 	await _test_progression()
+
+	# --- Movement items and full-screen tutorial popups ---
+	await _test_tutorials()
 
 	# --- Contact damage + i-frames ---
 	await _reset()
@@ -3788,3 +3793,211 @@ func _poly_bounds(points: PackedVector2Array) -> Rect2:
 	for pt in points:
 		r = r.expand(pt)
 	return r
+
+
+# ---------- Movement items and tutorial popups ----------
+
+## A new game has no movement ability: no double jump, dash, wall slide or hook.
+func _test_no_movement_at_start() -> void:
+	var p: Player = game.player
+	var data: PlayerData = game.player_data
+	_check("a new game knows no movement ability", data.movement.is_empty()
+		and PlayerData.MOVEMENT.all(func(id: String) -> bool: return not p.can_use(id)), data.movement)
+	await _reset()
+	await _hold(&"dash", 2)
+	_check("without the Dash item, Dash does nothing", p.state_name() != "dash", p.state_name())
+	Input.action_press(&"jump")
+	await _frames(15)
+	Input.action_release(&"jump")
+	await _frames(3)
+	Input.action_press(&"jump")
+	await _frames(2)
+	Input.action_release(&"jump")
+	_check("without the Double Jump item, there is no second jump", p.air_jumps_used == 0, p.air_jumps_used)
+	await _frames(90)
+	p.global_position = Vector2(32 + Player.WIDTH / 2.0 + 1.0, 320) # Next to the left wall.
+	p.velocity = Vector2.ZERO
+	Input.action_press(&"move_left")
+	await _frames(20)
+	_check("without the Wall Climb item, there is no wall slide", not p.wall_sliding and p.velocity.y > Config.movement.wall_slide_speed, [p.wall_sliding, p.velocity.y])
+	Input.action_release(&"move_left")
+	await _frames(90)
+	await _reset()
+	await _hold(&"grapple", 2)
+	_check("without the Grappling Hook item, the hook stays home", game.combat.grapple.phase == "idle" and p.state_name() == "normal", game.combat.grapple.phase)
+	await _frames(10)
+
+
+## Opens the popup through real play and checks the rules: full screen, the
+## game paused, a drawing for it, ANY key closes it (after the short guard),
+## and that key does nothing in the game.
+func _expect_tutorial(id: String, label: String) -> void:
+	var p: Player = game.player
+	var pop: TutorialPopup = game.tutorial
+	_check("%s opens the '%s' tutorial" % [label, id], pop.is_open() and pop.current == id, pop.current)
+	if not pop.is_open():
+		return
+	var vp := pop.screen.get_viewport_rect().size
+	_check("the '%s' tutorial covers the whole screen with a drawing" % id,
+		pop.screen.visible and pop.screen.size.is_equal_approx(vp) and pop.has_method("_draw_" + id), [pop.screen.size, vp])
+	var x := p.global_position.x
+	var t: float = game.playtime
+	Input.action_press(&"move_right")
+	await _frames(20)
+	Input.action_release(&"move_right")
+	_check("the game is paused under the '%s' tutorial" % id, is_equal_approx(p.global_position.x, x) and is_equal_approx(game.playtime, t), p.global_position.x)
+	await _frames(5)
+	var y := p.global_position.y
+	_key_event(KEY_SPACE, true) # Jump's key: closes the popup and must not jump.
+	await _frames(3)
+	_key_event(KEY_SPACE, false)
+	await _frames(3)
+	_check("any key closes the '%s' tutorial, and that key does nothing else" % id,
+		not pop.is_open() and not p.is_jumping and p.global_position.y >= y - 1.0, [pop.is_open(), p.global_position.y - y])
+	await _frames(5)
+
+
+func _pickup_for(ability: String) -> AbilityPickup:
+	for pk in game.ability_pickups:
+		if pk.ability == ability:
+			return pk
+	return null
+
+
+func _test_tutorials() -> void:
+	var p: Player = game.player
+	var h := p.health
+	var data: PlayerData = game.player_data
+	var pop: TutorialPopup = game.tutorial
+	var seen_before := data.seen_tutorials.duplicate()
+	_check("no tutorial showed while tutorials were off", seen_before.is_empty() and not pop.is_open(), seen_before)
+	_check("the learning hooks exist for move, jump, heal and Mana Discharge",
+		game.has_method("learn_move") and game.has_method("learn_jump") and game.has_method("learn_heal") and game.has_method("learn_mana_discharge")
+		and ["move", "jump", "heal", "mana_discharge"].all(func(id: String) -> bool: return pop.TITLES.has(id) and pop.has_method("_draw_" + id)))
+
+	# Every movement item exists once in the world.
+	var found := []
+	for rid in game.ROOM_SCENES:
+		var scene_root: Node = (game.ROOM_SCENES[rid] as PackedScene).instantiate()
+		for node in scene_root.get_node("Objects").get_children():
+			if node is AbilityPickup:
+				found.append(node.ability)
+		scene_root.free()
+	found.sort()
+	var expected := PlayerData.MOVEMENT.duplicate()
+	expected.sort()
+	_check("one item per movement ability is placed in the world", found == expected, found)
+
+	game.new_game()
+	await _reset()
+	game.tutorials_enabled = true
+	data.movement.clear()
+	Events.loadout_changed.emit()
+	await _frames(2)
+	_check("items of unknown abilities are back", _pickup_for("dash") != null and not _pickup_for("dash").collected)
+
+	# --- The three movement items in the Testing Halls ---
+	for ability in ["wall_climb", "double_jump", "dash"]:
+		await _reset()
+		var pk := _pickup_for(ability)
+		p.global_position = pk.global_position
+		await _frames(3)
+		_check("collecting the item teaches %s" % ability, pk.collected and data.has_movement(ability) and p.can_use(ability))
+		await _expect_tutorial(ability, "the %s item" % ability)
+	# The guard: a key pressed right away does not skip the popup unseen.
+	data.seen_tutorials.erase("dash")
+	game.show_tutorial("dash")
+	_key_event(KEY_Z, true)
+	await _frames(2)
+	_key_event(KEY_Z, false)
+	_check("a key pressed in the first instant does not skip the popup", pop.is_open())
+	await _frames(20)
+	_key_event(KEY_Z, true)
+	await _frames(2)
+	_key_event(KEY_Z, false)
+	_check("an unbound key closes it too (any key)", not pop.is_open())
+	await _frames(5)
+	# Only the first time.
+	data.movement.erase("dash")
+	Events.loadout_changed.emit()
+	await _reset()
+	p.global_position = _pickup_for("dash").global_position
+	await _frames(3)
+	_check("the second time, no popup", data.has_movement("dash") and not pop.is_open())
+	await _reset()
+	await _hold(&"dash", 2)
+	_check("the collected Dash works", p.state_name() == "dash", p.state_name())
+	await _frames(30)
+
+	# --- The Grappling Hook item in the Upper Galleries ---
+	game.load_room("upper_room", "floor")
+	await _frames(60)
+	var hook := _pickup_for("grapple")
+	p.global_position = hook.global_position
+	await _frames(3)
+	_check("collecting the Grappling Hook item teaches the hook", data.has_movement("grapple") and p.can_use("grapple"))
+	await _expect_tutorial("grapple", "the Grappling Hook item")
+
+	# --- Potions, scroll and altar (fresh progression in the Testing Halls) ---
+	game.new_game()
+	game.ultimates.set_known("nova_burst", false)
+	data.open_slots[PlayerData.SLOT_UP] = false
+	Events.loadout_changed.emit()
+	await _reset()
+	for relic in game.relics:
+		if relic is Potion and relic.stat == "max_health":
+			p.global_position = relic.global_position
+			break
+	await _frames(3)
+	await _expect_tutorial("health_potion", "the first Health Potion")
+	for relic in game.relics:
+		if relic is Potion and relic.stat == "max_energy":
+			p.global_position = relic.global_position
+			break
+	await _frames(3)
+	await _expect_tutorial("mana_potion", "the first Mana Potion")
+	await _reset()
+	for s in game.scrolls:
+		if s.spell_id == "nova_burst":
+			p.global_position = s.global_position
+	await _frames(3)
+	await _expect_tutorial("spell_scroll", "the first Spell Scroll")
+	await _reset()
+	var altar: MeditationAltar = game.altars[0]
+	p.global_position = altar.global_position
+	await _frames(3)
+	await _hold(&"interact", 2)
+	_check("the first meditation opens the concentration tutorial and waits", pop.current == "meditation" and p.state_name() == "meditate"
+		and not data.is_slot_open(PlayerData.SLOT_UP), [pop.current, p.state_name()])
+	await _expect_tutorial("meditation", "the first altar")
+	await _frames(int(Config.progression.meditation_time * 60.0) + 20)
+	_check("after the tutorial the meditation completes", data.is_slot_open(PlayerData.SLOT_UP) and p.state_name() == "normal", p.state_name())
+
+	# --- Saves ---
+	var saved: Dictionary = game.make_save_data()
+	_check("a save stores the movement abilities and the seen tutorials",
+		(saved.get("movement", []) as Array).has("grapple") and (saved.get("tutorials", []) as Array).has("meditation"))
+	data.movement.clear()
+	data.seen_tutorials.clear()
+	game.apply_save_data(saved)
+	await _frames(3)
+	p.fsm.change("normal")
+	_check("loading restores the movement abilities and the seen tutorials", data.has_movement("dash") and data.seen_tutorials.has("spell_scroll"))
+	var old_save := saved.duplicate()
+	old_save.erase("movement")
+	game.apply_save_data(old_save)
+	await _frames(3)
+	p.fsm.change("normal")
+	_check("a save from before the movement items keeps every movement ability",
+		PlayerData.MOVEMENT.all(func(id: String) -> bool: return data.has_movement(id)), data.movement)
+	_check("the basic-action hooks were never invoked in play",
+		not ["move", "jump", "heal", "mana_discharge"].any(func(id: String) -> bool: return data.seen_tutorials.has(id)), data.seen_tutorials)
+
+	# Back to the full kit, tutorials off.
+	game.tutorials_enabled = false
+	game.new_game()
+	_grant_test_kit()
+	h.max_health_bonus = 0.0
+	h.max_energy_bonus = 0.0
+	h.full_heal()
+	await _reset()

@@ -24,6 +24,9 @@ const ONE_WAY_LAYER := 3 ## Physics layer number used by one-way platforms.
 @onready var flip: Node2D = $Flip
 
 var input: InputState
+## Progression (set by Game). Movement abilities need to be collected first;
+## without data (e.g. a lone test scene) everything is allowed.
+var data: PlayerData
 var room: Room
 var spawn_position := Vector2.ZERO
 var safe_point := Vector2.ZERO ## Last safe ground position (hazard respawn target).
@@ -150,6 +153,15 @@ func add_hit_guard(id: String, guard: Callable) -> void:
 
 func remove_hit_guard(id: String) -> void:
 	hit_guards.erase(id)
+
+
+## True when a movement ability may be used: collected (PlayerData) and not
+## switched off in the debug overlay (Config.upgrades).
+## Ids: "double_jump", "dash", "wall_climb", "grapple".
+func can_use(ability_id: String) -> bool:
+	var up = Config.upgrades
+	var allowed: bool = {"double_jump": up.double_jump, "dash": up.dash, "wall_climb": up.wall_jump, "grapple": up.grapple}.get(ability_id, true)
+	return allowed and (data == null or data.has_movement(ability_id))
 
 
 func can_attack() -> bool:

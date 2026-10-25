@@ -111,6 +111,11 @@ func _actions() -> Array:
 		["Reset Growth", func() -> void:
 			game.player.health.max_health_bonus = 0.0
 			game.player.health.max_energy_bonus = 0.0],
+		["Learn Movement", func() -> void:
+			for ability_id in PlayerData.MOVEMENT:
+				game.player_data.learn_movement(ability_id)
+			Events.loadout_changed.emit()],
+		["Reset Tutorials", func() -> void: game.player_data.seen_tutorials.clear()],
 		["Reset Player", func() -> void: game.reset_player()],
 		["Reset Room", func() -> void: game.reset_room()],
 		["Restore Defaults", func() -> void: game.restore_defaults()],
@@ -377,6 +382,7 @@ func _process(delta: float) -> void:
 		"spells       %s" % " ".join(slots),
 		"known        %s" % ", ".join(PackedStringArray(game.player_data.unlocked)),
 		"open slots   %s" % str(game.player_data.open_slots),
+		"movement     %s" % (", ".join(PackedStringArray(game.player_data.movement)) if not game.player_data.movement.is_empty() else "-"),
 		"running      %s" % (", ".join(PackedStringArray(running)) if not running.is_empty() else "-"),
 		"shards       %d" % game.player_data.currency,
 		"checkpoint   %s  at checkpoint %s" % [cp.name if cp else "-", p.at_checkpoint],

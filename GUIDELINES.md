@@ -93,6 +93,7 @@ Feedback stays strictly environmental, and play continues at once:
 | Relic taken | A soft pickup sound (`pickup`) and a small puff (`relic_pickup`). The relic is gone. |
 | Potion or Spell Scroll taken | A soft pickup sound (`pickup`) and a small puff (`potion_pickup`, `scroll_pickup`). It is gone. |
 | Meditation completed | One low tone (`save`, pitched down). The altar dims. |
+| Movement item taken | A first-time **tutorial** popup (a full-screen drawing that teaches the controls). It is an explanation, not a celebration: no fanfare, flash or praise text. |
 | Hidden pocket found (Type 1) | Nothing at all. The disguise and the cover simply are no longer there. |
 | Secret doorway used (Type 2) | Nothing beyond an ordinary room transition. |
 
@@ -163,7 +164,7 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 7. A way back out of a secret room looks like an ordinary open doorway (**Rule E**).
 8. No celebration when anything in the room is won or found (**Rule F**).
 9. Lava? Floor only, ledges at the doorways (see "Lava" above).
-10. Progression objects? Potions (`h`, `e`), scrolls (`?`) and altars (`A`) sit on standable floor or a platform. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell in the whole world.
+10. Progression objects? Potions (`h`, `e`), scrolls (`?`), altars (`A`) and movement items (`j`, `d`, `c`, `g`) sit on standable floor or a platform. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell and one item per movement ability in the whole world, and make sure each is reachable with what the player can have found before it.
 11. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
 12. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
 13. Run the smoke test: `godot --headless --path . --fixed-fps 60 res://tests/smoke_test.tscn`.

@@ -32,6 +32,8 @@ const TS := 32
 ## "scrolls" entry gives its spell id), 'A' Meditation Altar (the room's
 ## "altars" entry gives its slot: "up", "side" or "down"). Both entries are
 ## keyed by the "col,row" of the cell.
+## Movement items (AbilityPickup): 'j' Double Jump, 'd' Dash, 'c' Wall Climb,
+## 'g' Grappling Hook. A new game has none of them.
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
 ## player on the last safe ground. Wall spikes ('<', right part of the room,
 ## rows 10-12) and ceiling spikes ('V', under the block in row 13) are there to
@@ -64,7 +66,7 @@ const ROOM_LAYOUT := [
 	"########.....##..=====..........................?K....+..........##...#",
 	"##.....#.....##................................####....................",
 	"##.....I.......................................####....................",
-	"##.*.*.I..W...T..S..?.N........A..U..$$.E.....C####..........E.....C..D",
+	"##.*.*.I..W.c.T..S..?.N........A..U..$$.E..j..C####..........E..d..C..D",
 	"#########################^^^^########################^^^^^^^###########",
 	"#######################################################################",
 ]
@@ -159,7 +161,7 @@ const UPPER_LAYOUT := [
 	"#...............................########",
 	"x...............................I......#",
 	"x...............................I......#",
-	"X..$.......AE..........G......E.I..*E*.#",
+	"X..$.......AE..........G..g...E.I..*E*.#",
 	"####....################################",
 	"####O...################################",
 ]
@@ -377,6 +379,8 @@ const POTION_SCENES := {
 }
 const SCROLL_SCENE := "res://world/objects/spell_scroll.tscn"
 const ALTAR_SCENE := "res://world/objects/meditation_altar.tscn"
+const ABILITY_PICKUP_SCENE := "res://world/objects/ability_pickup.tscn"
+const ABILITY_LETTERS := {"j": "double_jump", "d": "dash", "c": "wall_climb", "g": "grapple"}
 
 const TILES_PNG := "res://world/tiles/tiles.png"
 const TILESET := "res://world/tiles/tileset.tres"
@@ -1156,6 +1160,9 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 				"?":
 					_add_object(root, objects, counts, SCROLL_SCENE, "SpellScroll", feet,
 						{"spell_id": def.scrolls["%d,%d" % [x, y]]})
+				"j", "d", "c", "g":
+					_add_object(root, objects, counts, ABILITY_PICKUP_SCENE, "AbilityPickup", feet,
+						{"ability": ABILITY_LETTERS[ch]})
 				"A":
 					_add_object(root, objects, counts, ALTAR_SCENE, "MeditationAltar", feet,
 						{"slot_name": def.altars["%d,%d" % [x, y]]})

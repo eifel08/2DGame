@@ -117,6 +117,12 @@ signal meditation_started(altar: Node)
 signal meditation_finished(altar: Node, slot: int) ## slot: PlayerData.SLOT_*, or -1 if interrupted.
 @warning_ignore("unused_signal")
 signal spell_slot_opened(slot: int) ## A directional slot (PlayerData.SLOT_*) was unlocked for good.
+@warning_ignore("unused_signal")
+signal movement_learned(ability_id: String, position: Vector2) ## An AbilityPickup was collected.
+@warning_ignore("unused_signal")
+signal tutorial_opened(tutorial_id: String)
+@warning_ignore("unused_signal")
+signal tutorial_closed(tutorial_id: String)
 
 # Animation (frame events from method tracks, e.g. "footstep", "swing")
 @warning_ignore("unused_signal")

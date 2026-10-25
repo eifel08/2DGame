@@ -226,7 +226,7 @@ func _release_swing(reason: String) -> void:
 		elif p.jump_buffer_timer > 0.0:
 			_jump_off()
 			return
-		elif Config.upgrades.dash and p.input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
+		elif p.can_use("dash") and p.input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
 			p.fsm.change("dash")
 			return
 	p.fsm.change("normal")
@@ -252,7 +252,7 @@ func _step_peg_hold(delta: float) -> void:
 			p.input.consume(&"grapple") # Lets go; does not fire a new hook this step.
 		if action == &"jump":
 			_jump_off()
-		elif action == &"dash" and Config.upgrades.dash and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
+		elif action == &"dash" and p.can_use("dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
 			p.fsm.change("dash")
 		else:
 			p.fsm.change("normal") # Attack, Spell, Up / Down, ...: from normal movement.
@@ -268,7 +268,7 @@ func _cancelled() -> bool:
 		_settle()
 		p.fsm.change("normal")
 		return true
-	if Config.upgrades.dash and p.input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
+	if p.can_use("dash") and p.input.was_pressed(&"dash") and p.dash_cooldown_timer <= 0.0 and not p.air_dash_used:
 		_settle()
 		p.fsm.change("dash")
 		return true

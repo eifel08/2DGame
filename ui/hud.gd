@@ -111,7 +111,7 @@ func _draw() -> void:
 	draw_string(font, CROSS_POS + Vector2(1, 11), spell_key_label(), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(1, 1, 1, 0.8))
 
 	# Dash cooldown pip (no text), under the energy bar.
-	if Config.upgrades.dash:
+	if player.can_use("dash"):
 		var cd := clampf(player.dash_cooldown_timer / maxf(0.001, Config.movement.dash_cooldown), 0.0, 1.0)
 		var dy := ey + 26.0
 		draw_rect(Rect2(bx, dy, 40, 3), Color(1, 1, 1, 0.12))

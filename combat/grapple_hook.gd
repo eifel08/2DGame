@@ -167,7 +167,7 @@ static func aim_vector(aim: Aim, side: int) -> Vector2:
 # ---------- Per-step update ----------
 
 func can_fire(p: Player) -> bool:
-	return Config.upgrades.grapple and phase == "idle" and cooldown <= 0.0 \
+	return p.can_use("grapple") and phase == "idle" and cooldown <= 0.0 \
 		and p.fsm.is_in("normal") and combat.attack.is_empty()
 
 
