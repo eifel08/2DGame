@@ -164,6 +164,14 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 - Only melee deflects or parries. Spells never do.
 - Each new enemy type also gets a chamber in the Bestiary (`BESTIARY_LAYOUT` in `tools/build_assets.gd`, one chamber per type).
 
+## Pouches and tools — hidden numbers, untouched platforming
+
+- Tool lore, pouch descriptions and curse texts are flavour only: **no numbers** (no digits, no "%"). The exact values live in the `GearEffect`s (`gear/gear_registry.gd`). The smoke test fails otherwise.
+- Gear never changes jump velocity, gravity, wall jumps or other platforming physics. Movement tools change only the running speed (`run_speed_mul`); a curse may cost energy, health or time, never a jump.
+- A slot takes its own tier or lower (Strong ⊃ Medium ⊃ Weak). Keep this rule in `GearTier.can_hold()` only.
+- Hazards stay hazards: gear does not scale hazard damage, and nothing protects against it (see *Damage sources*).
+- Taking or equipping gear is not a celebration (Rule F).
+
 ## Map — every room on one zone map
 
 - Every room scene is on exactly one zone map (`map/map_atlas.gd`, `WORLD`), with a rect in map cells and **one exit per door** (same `door_id`, target room and target door, and `secret` for a breakable wall or a secret doorway). The smoke test fails otherwise.

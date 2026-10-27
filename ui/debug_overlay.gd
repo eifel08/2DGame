@@ -68,6 +68,7 @@ const SLIDERS := [
 	{"path": "vitals.heal_chunk_energy", "label": "Heal Chunk Energy", "min": 5, "max": 100, "step": 1},
 	{"path": "vitals.heal_chunk_time", "label": "Heal Chunk Time", "min": 0.2, "max": 3, "step": 0.05},
 	{"path": "vitals.heal_chunk_pause", "label": "Heal Pause", "min": 0.05, "max": 1.5, "step": 0.05},
+	{"path": "vitals.energy_leak_rate", "label": "Energy Leak /s", "min": 0, "max": 10, "step": 0.1},
 	{"group": "Camera"},
 	{"path": "camera.look_delay", "label": "Look Delay", "min": 0, "max": 1, "step": 0.05},
 	{"path": "camera.look_distance", "label": "Look Distance", "min": 0, "max": 300, "step": 5},
@@ -154,6 +155,20 @@ func _map_actions() -> Array:
 	]
 
 
+## Buttons of the Pouches & Tools section.
+func _gear_actions() -> Array:
+	var gear: GearManager = game.gear
+	return [
+		["Grant All Gear", func() -> void: gear.grant_all()],
+		["Equip All Pouches", func() -> void:
+			gear.grant_all()
+			for pouch_id in gear.pouches:
+				gear.equip_pouch(pouch_id)],
+		["Auto-Fill Tools", func() -> void: gear.auto_fill()],
+		["Clear Gear", func() -> void: gear.clear_all()],
+	]
+
+
 # ---------- UI construction ----------
 
 func _build() -> void:
@@ -207,6 +222,11 @@ func _build() -> void:
 
 	# Spells: known pool, quick loadout tools
 	box.add_child(_build_spells())
+
+	# Pouches & tools: the pouch limit and loadout shortcuts
+	box.add_child(_header("Pouches & Tools"))
+	box.add_child(_slider({"path": "gear.max_equipped_pouches", "label": "Max Pouches", "min": 1, "max": 5, "step": 1}))
+	box.add_child(_button_grid(_gear_actions()))
 
 	# Ultimates: per-ability energy cost
 	box.add_child(_header("Ultimate Costs"))
@@ -425,6 +445,7 @@ func _process(delta: float) -> void:
 		"health       %.1f / %.0f  pending %.1f" % [h.health, h.get_max_health(), h.pending_heal],
 		"energy       %.1f / %.0f" % [h.energy, h.get_max_energy()],
 		"i-frames     %.2f  invuln %s %s" % [maxf(0.0, h.iframe_timer), h.is_invulnerable(), h.invuln_flags.keys()],
+		"gear         %s" % _gear_readout(),
 		"modifiers    %s" % (", ".join(PackedStringArray(p.modifiers.keys())) if not p.modifiers.is_empty() else "-"),
 		"spells       %s" % " ".join(slots),
 		"known        %s" % ", ".join(PackedStringArray(game.player_data.unlocked)),
@@ -438,3 +459,15 @@ func _process(delta: float) -> void:
 		"world        dead %s  bosses %s  arenas %s" % [game.world.dead_enemies, game.world.defeated_bosses.keys(), game.world.cleared_arenas.keys()],
 	])
 
+
+## Equipped pouches (active count / limit) with their slotted tools.
+func _gear_readout() -> String:
+	var gear: GearManager = game.gear
+	var parts := PackedStringArray()
+	for pouch in gear.active_pouches():
+		var slots := PackedStringArray()
+		for i in pouch.slot_count():
+			var tool := gear.tool_in(pouch.id, i)
+			slots.append("%s:%s" % [GearTier.name_of(pouch.slots[i])[0], tool.id if tool else "-"])
+		parts.append("%s[%s]" % [pouch.id, " ".join(slots)])
+	return "%d/%d %s" % [gear.active_pouches().size(), gear.max_pouches(), " ".join(parts) if not parts.is_empty() else "-"]

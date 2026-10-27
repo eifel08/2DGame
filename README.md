@@ -216,6 +216,34 @@ Each movement ability is a glowing orb with its symbol (`world/objects/ability_p
 - A save from before the items keeps every movement ability.
 - Debug overlay: *Learn Movement*, and *Full Kit* (movement, spells and slots).
 
+### Pouches and tools (gear)
+> **Foundation only:** the data, rules, effects, saves and debug controls are in. There is no pickup or inventory screen for gear yet; use the debug overlay (*Pouches & Tools*).
+
+**Tools** are small charms with a tier: **Weak**, **Medium** or **Strong**. Each has a hidden effect and a lore text that never states a number (`gear/gear_registry.gd`):
+
+| Tool | Tier | Hidden effect |
+| --- | --- | --- |
+| Longreach Ribbon | Weak | Normal attack range +10 % (`attack_range_mul`) |
+| Wayfarer's Anklet | Weak | Running speed +5 % (`run_speed_mul`; jumps and dash speed unchanged) |
+| Scar Lantern | Medium | 15 % of the health lost comes back as energy |
+| Quickening Hourglass | Medium | Dash and grappling-hook cooldowns 15 % shorter (`cooldown_mul`) |
+| Brimming Crest | Strong | With a completely full energy meter, every basic swing also sends a shockwave ahead of it for +30 % of the swing's damage (no energy gain, no deflect, no pogo; effect `tool_shockwave`) |
+
+**Pouches** hold tools. Each slot has a tier and takes tools of that tier or lower: a Strong slot takes Strong, Medium or Weak; a Medium slot Medium or Weak; a Weak slot Weak only. Every pouch carries a **curse** that is active while it is equipped, filled or not:
+
+| Pouch | Slots | Curse (hidden value) |
+| --- | --- | --- |
+| Patched Satchel | Weak, Weak | Spells and heal chunks cost 5 % more energy (`energy_cost_mul`). Energy only: jumps and platforming are untouched. |
+| Hollow Reliquary | Medium, Medium | Passive energy leak +12 % (`energy_leak_mul`). The base leak is `Config.vitals.energy_leak_rate`, **0 by default** (no leak), so this curse only bites once a base leak is set. |
+| Bloodbound Coffer | Strong, Medium, Weak | Damage from enemies and projectiles +20 % (`damage_taken_mul`). Hazards are not affected. |
+
+- Up to `Config.gear.max_equipped_pouches` pouches can be equipped at once: **4** by default, 1–5 in the debug overlay. If the limit is lowered below what is equipped, only the first pouches in equip order count.
+- A tool sits in one slot at a time; slotting it again moves it. Tools stay in a pouch when it is unequipped, but only work while their pouch is equipped.
+- Saved in the slot as `"gear"` (owned tools and pouches, equipped pouches, slot contents). An older save loads with no gear.
+- Debug overlay, *Pouches & Tools*: *Max Pouches* slider, *Grant All Gear*, *Equip All Pouches*, *Auto-Fill Tools*, *Clear Gear*; the live readout shows the active pouches and their slots. *Vitals & Energy* has *Energy Leak /s*.
+- **Fusion (future):** a tool's whole gameplay is a list of `GearEffect` resources. `ToolFusion.fuse(id, name, lore, parts)` makes a fused `ToolData` with every part's effects, at the highest part tier, remembering its parts in `fused_from`. It slots and works like any tool; nothing calls it in the game yet.
+- **New tool or pouch:** add it to `GearRegistry` (or make a `.tres` in the editor and `GearManager.add_tool` / `add_pouch` it). Reuse `StatGearEffect` for a stat multiplier, or extend `GearEffect` with an `on_*` hook. Keep lore and curse texts free of numbers (the smoke test checks it).
+
 ### Tutorial popups (discovery)
 The first time something new happens, a **full-screen** window explains it with an animated drawing and the player's own key caps. The only text is the title and "any key" (`ui/tutorial_popup.gd`, drawings in `ui/ability_art.gd`).
 
@@ -586,6 +614,8 @@ ui/                      HUD, dialogue box, inventory, debug overlay, title, pau
                          map_view (one zone map with its fog of war), map_overlay (the hold-Tab quick view)
 tools/build_assets.gd    regenerates rigs, animations, TileSet, room and input map
 core/world_state.gd      dead enemies, bosses, arenas, collected shards
+gear/                    pouches and tools: GearTier, ToolData, PouchData, GearRegistry (the tools and pouches),
+                         GearManager (loadout, slot rules, effects), ToolFusion; effects/ (GearEffect and kinds)
 map/                     zone maps: MapAtlas (zones, room -> zone, anomalies), MapZone, MapRoom, MapExit,
                          MapState (fog of war: owned maps, outlined / filled / pending rooms)
 core/arena_director.gd   arena waves: start, next wave, clear, abort
@@ -603,6 +633,7 @@ tests/smoke_test.tscn    automated headless test (754 checks)
     - `Player.add_hit_guard(id, callable)`: intercept incoming enemy and projectile hits (counters, shields). The callable gets `(damage, attacker, source)`; check `source` (`Damage.Source`).
     - `Player.begin_ability_control(self)`: take over movement (Comet Dash, Meteor Slam). Set `invulnerable` for i-frames.
     - `Enemy.freeze(duration)` and `ProjectileSystem.freeze_in_circle(...)`: crowd control.
+- **New tool or pouch:** see *Pouches and tools* above.
 - **New lore or NPC:** create a `DialogueData` resource and assign it to an instance of `world/objects/lore_stone.tscn` or `npc.tscn` under `TestRoom/Objects`.
 - **New interactable:** extend `Interactable` and override `interact(game)`. Put the node under `Objects`.
 - **Real sprites, effects and sounds:** see *Placeholder art, animation and sound* above.

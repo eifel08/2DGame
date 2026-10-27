@@ -44,6 +44,9 @@ var is_channeling_heal := false
 var attack_dir := "" ## Written by CombatManager: "", "left", "right", "up", "down".
 var facing_locked := false ## Written by CombatManager during attacks.
 var modifiers := {} ## id -> {stat_name: multiplier}
+## Like `modifiers`, but kept through reset() (deaths, respawns): equipped
+## gear (GearManager, id "gear"). Its owner sets and clears it.
+var persistent_modifiers := {}
 ## id -> Callable(damage: float, attacker: Node, source: Damage.Source) -> bool.
 ## Asked before an enemy or projectile hit lands; returning true negates it
 ## (e.g. a counter shield). Hazards never ask the guards.
@@ -86,6 +89,7 @@ func _ready() -> void:
 	fsm.add("meditate", MeditateState.new(self))
 	fsm.add("map_read", MapReadState.new(self))
 	health.energy_gain_source = func() -> float: return stat("energy_gain_mul")
+	health.stat_source = stat
 	animator.setup(self)
 
 
@@ -146,7 +150,17 @@ func stat(key: String) -> float:
 	var value := 1.0
 	for mod in modifiers.values():
 		value *= mod.get(key, 1.0)
+	for mod in persistent_modifiers.values():
+		value *= mod.get(key, 1.0)
 	return value
+
+
+## A modifier that survives reset(); an empty `mods` removes it.
+func set_persistent_modifier(id: String, mods: Dictionary) -> void:
+	if mods.is_empty():
+		persistent_modifiers.erase(id)
+	else:
+		persistent_modifiers[id] = mods
 
 
 func add_modifier(id: String, mods: Dictionary) -> void:
@@ -359,6 +373,8 @@ func receive_hit(damage: float, source_x: float, knock_up := false, force := fal
 		for guard: Callable in hit_guards.values():
 			if guard.call(damage, attacker, source):
 				return false
+	if source != Damage.Source.HAZARD:
+		damage *= stat("damage_taken_mul") # Pouch curses (GearManager); hazards are never scaled.
 	health.take_damage(damage)
 	map_request = false # A hit closes the map quick view; it needs a fresh press.
 	var dir := 1 if global_position.x >= source_x else -1

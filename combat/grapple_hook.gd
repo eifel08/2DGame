@@ -446,7 +446,7 @@ func _step_retract(delta: float, p: Player) -> void:
 	var dist := Config.grapple.retract_speed * delta
 	if to.length() <= dist:
 		phase = "idle"
-		cooldown = Config.grapple.cooldown
+		cooldown = Config.grapple.cooldown * p.stat("cooldown_mul") # Tools (GearManager) can shorten it.
 		_play("")
 		return
 	tip += to.normalized() * dist

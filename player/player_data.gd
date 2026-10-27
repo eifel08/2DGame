@@ -35,6 +35,11 @@ var equipped: Array[String] = empty_slots() ## Spell id per directional slot (""
 var open_slots: Array[bool] = locked_slots() ## Per directional slot: true once a Meditation Altar opened it.
 var movement: Array[String] = [] ## Movement abilities collected (MOVEMENT ids).
 var seen_tutorials: Array[String] = [] ## Tutorial popups already shown (TutorialPopup ids).
+## Pouches and tools (rules in GearManager). A tool sits in at most one slot.
+var owned_tools: Array[String] = []
+var owned_pouches: Array[String] = []
+var equipped_pouches: Array[String] = [] ## Equip order; only the first Config.gear.max_equipped_pouches are active.
+var pouch_contents := {} ## pouch id -> Array[String], one tool id per slot ("" = empty). Kept while unequipped.
 
 
 static func empty_slots() -> Array[String]:
@@ -127,3 +132,32 @@ func equip(slot: int, ability_id: String) -> bool:
 		equipped[other] = equipped[slot]
 	equipped[slot] = ability_id
 	return true
+
+
+# ---------- Gear (pouches and tools) ----------
+
+func gear_to_dict() -> Dictionary:
+	return {
+		"tools": owned_tools.duplicate(),
+		"pouches": owned_pouches.duplicate(),
+		"equipped": equipped_pouches.duplicate(),
+		"contents": pouch_contents.duplicate(true),
+	}
+
+
+## A save from before gear stores none: no tools, no pouches.
+func gear_from_dict(d: Dictionary) -> void:
+	owned_tools = _strings(d.get("tools", []))
+	owned_pouches = _strings(d.get("pouches", []))
+	equipped_pouches = _strings(d.get("equipped", []))
+	pouch_contents = {}
+	var contents: Dictionary = d.get("contents", {})
+	for pouch_id in contents:
+		pouch_contents[String(pouch_id)] = _strings(contents[pouch_id])
+
+
+static func _strings(list: Array) -> Array[String]:
+	var out: Array[String] = []
+	for v in list:
+		out.append(String(v))
+	return out

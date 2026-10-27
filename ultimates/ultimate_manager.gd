@@ -30,6 +30,7 @@ func setup(p_ctx: UltimateContext, p_data: PlayerData) -> void:
 
 func register(ability: UltimateAbility) -> void:
 	abilities[ability.id] = ability
+	ability.cost_scale = func() -> float: return ctx.player.stat("energy_cost_mul") if ctx else 1.0
 
 
 func get_ability(ability_id: String) -> UltimateAbility:

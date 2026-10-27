@@ -607,6 +607,7 @@ const FX := {
 	"wall_hit": [{"amount": 8, "color": "#56649a", "speed": 220.0, "size": 4.0, "life": 0.4}],
 	"wall_break": [{"amount": 40, "color": "#3a4370", "speed": 320.0, "size": 6.0, "life": 0.7}], # Debris only (no flash).
 	"relic_pickup": [{"amount": 8, "color": "#ff9aae", "speed": 90.0, "gravity": 0.0, "life": 0.3, "size": 3.0}], # A small puff (no flare).
+	"tool_shockwave": [{"amount": 16, "color": "#ffe08a", "speed": 360.0, "angle": 0.0, "spread": 18.0, "gravity": 0.0, "life": 0.22, "size": 4.0}],
 	"nova_burst": [{"amount": 40, "color": "#ffffff", "speed": 520.0, "size": 5.0, "gravity": 0.0, "life": 0.45}],
 	"volley_muzzle": [{"amount": 3, "color": "#ffffff", "speed": 120.0, "gravity": 0.0, "life": 0.2, "size": 3.0}],
 	"ascendant_ring": [{"ring": 120.0, "color": "#ffffff", "width": 8.0, "life": 0.5}],

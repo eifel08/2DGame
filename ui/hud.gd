@@ -159,7 +159,7 @@ func _draw_thresholds(_font: Font, bx: float, ey: float, h: HealthEnergy) -> voi
 
 ## True when the energy meter holds enough for one full heal chunk.
 func heal_ready() -> bool:
-	return player != null and player.health.energy >= Config.vitals.heal_chunk_energy - 0.0001
+	return player != null and player.health.energy >= player.health.heal_chunk_cost() - 0.0001
 
 
 ## Heal readiness: a pulsing green glow around the energy bar plus a light
@@ -177,7 +177,7 @@ func _draw_heal_glow(bar: Rect2, h: HealthEnergy) -> void:
 	if x1 > x0:
 		draw_rect(Rect2(x0, bar.position.y, x1 - x0, bar.size.y), Color(1, 1, 1, 0.35))
 	# Mark where a heal chunk's cost sits on the bar.
-	var cx := bar.position.x + bar.size.x * clampf(Config.vitals.heal_chunk_energy / h.get_max_energy(), 0.0, 1.0)
+	var cx := bar.position.x + bar.size.x * clampf(h.heal_chunk_cost() / h.get_max_energy(), 0.0, 1.0)
 	draw_rect(Rect2(cx - 1.0, bar.end.y + 2.0, 3.0, 3.0), Color(glow, 0.9))
 
 

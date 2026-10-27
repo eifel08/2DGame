@@ -25,6 +25,9 @@ var max_health_bonus := 0.0
 var max_energy_bonus := 0.0
 ## Extra multiplier for energy gain (wired to the owner's stat modifiers).
 var energy_gain_source: Callable = func() -> float: return 1.0
+## The owner's stat lookup (Player.stat): "energy_cost_mul" scales the heal
+## chunk cost, "energy_leak_mul" the passive leak. Gear (pouch curses) sets them.
+var stat_source: Callable = func(_key: String) -> float: return 1.0
 
 
 func get_max_health() -> float:
@@ -59,6 +62,10 @@ func reset() -> void:
 func step(delta: float) -> void:
 	if iframe_timer > 0.0:
 		iframe_timer -= delta
+	# Passive leak (Config.vitals.energy_leak_rate, 0 = none), scaled by gear.
+	var leak: float = Config.vitals.energy_leak_rate * stat_source.call("energy_leak_mul")
+	if leak > 0.0 and energy > 0.0:
+		set_energy(energy - leak * delta)
 	# Keep values valid if max values are tweaked in the debug overlay.
 	health = minf(health, get_max_health())
 	energy = minf(energy, get_max_energy())
@@ -123,8 +130,13 @@ var pending_heal := 0.0 ## Health shown in white while a chunk is channeling.
 var _chunk_drained := 0.0
 
 
+## Energy one heal chunk drains (Config.vitals.heal_chunk_energy, scaled by gear).
+func heal_chunk_cost() -> float:
+	return Config.vitals.heal_chunk_energy * stat_source.call("energy_cost_mul")
+
+
 func can_start_heal_chunk() -> bool:
-	return health < get_max_health() and energy >= Config.vitals.heal_chunk_energy - 0.0001
+	return health < get_max_health() and energy >= heal_chunk_cost() - 0.0001
 
 
 func start_heal_chunk() -> void:
@@ -135,7 +147,7 @@ func start_heal_chunk() -> void:
 ## Advances the current chunk to `progress` (0..1), draining energy in step.
 func channel_heal_chunk(progress: float) -> void:
 	var v = Config.vitals
-	var target_drain: float = v.heal_chunk_energy * clampf(progress, 0.0, 1.0)
+	var target_drain: float = heal_chunk_cost() * clampf(progress, 0.0, 1.0)
 	var drain := minf(target_drain - _chunk_drained, energy)
 	if drain > 0.0:
 		_chunk_drained += drain

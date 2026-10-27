@@ -299,6 +299,9 @@ func _run() -> void:
 	# --- Map: zones, fog of war, anomaly, quick view, marker, inventory tab ---
 	await _test_map()
 
+	# --- Pouches and tools: tiers, slots, limit, effects, curses, saves, fusion ---
+	await _test_gear()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -5189,4 +5192,199 @@ func _test_map() -> void:
 	Input.action_release(&"inventory")
 	await _frames(2)
 	_check("inventory: closes again", not inv.is_open())
+	await _reset()
+
+
+# ---------- Pouches and tools (gear/) ----------
+
+func _test_gear() -> void:
+	var p: Player = game.player
+	var h := p.health
+	var gear: GearManager = game.gear
+	var data: PlayerData = game.player_data
+	await _reset()
+	gear.clear_all()
+
+	# Data: five tools in three tiers, three pouches with the right slots.
+	var tiers := {}
+	for t: ToolData in gear.tools.values():
+		tiers[t.tier] = tiers.get(t.tier, 0) + 1
+	_check("five tools: two weak, two medium, one strong", gear.tools.size() == 5 and tiers.get(GearTier.Tier.WEAK, 0) == 2
+		and tiers.get(GearTier.Tier.MEDIUM, 0) == 2 and tiers.get(GearTier.Tier.STRONG, 0) == 1, tiers)
+	var W := GearTier.Tier.WEAK
+	var M := GearTier.Tier.MEDIUM
+	var S := GearTier.Tier.STRONG
+	_check("three pouches: (weak, weak), (medium, medium), (strong, medium, weak)",
+		gear.get_pouch("patched_satchel").slots == [W, W] and gear.get_pouch("hollow_reliquary").slots == [M, M]
+		and gear.get_pouch("bloodbound_coffer").slots == [S, M, W])
+	var numbered := []
+	var digits := RegEx.create_from_string("[0-9%]")
+	for t: ToolData in gear.tools.values():
+		if t.lore == "" or digits.search(t.lore + t.display_name):
+			numbered.append(t.id)
+	for pouch: PouchData in gear.pouches.values():
+		if pouch.curse_lore == "" or digits.search(pouch.description + pouch.curse_lore + pouch.display_name):
+			numbered.append(pouch.id)
+	_check("every tool lore and pouch curse is text without numbers", numbered.is_empty(), numbered)
+
+	# Slot hierarchy.
+	_check("a strong slot holds strong, medium and weak tools", GearTier.can_hold(S, S) and GearTier.can_hold(S, M) and GearTier.can_hold(S, W))
+	_check("a medium slot holds medium and weak tools, not strong", GearTier.can_hold(M, M) and GearTier.can_hold(M, W) and not GearTier.can_hold(M, S))
+	_check("a weak slot holds only weak tools", GearTier.can_hold(W, W) and not GearTier.can_hold(W, M) and not GearTier.can_hold(W, S))
+	_check("nothing can be slotted or equipped before it is owned",
+		not gear.slot_tool("patched_satchel", 0, "longreach_ribbon") and not gear.equip_pouch("patched_satchel"))
+	gear.grant_all()
+	_check("a weak slot refuses a medium tool", not gear.slot_tool("patched_satchel", 0, "scar_lantern"))
+	_check("a medium slot refuses the strong tool", not gear.slot_tool("hollow_reliquary", 0, "brimming_crest"))
+	_check("the coffer's strong slot takes the strong tool, its weak slot a weak one",
+		gear.slot_tool("bloodbound_coffer", 0, "brimming_crest") and gear.slot_tool("bloodbound_coffer", 2, "wayfarer_anklet"))
+	_check("the coffer's medium slot takes a weak tool", gear.slot_tool("bloodbound_coffer", 1, "longreach_ribbon"))
+	gear.slot_tool("patched_satchel", 0, "longreach_ribbon")
+	_check("slotting a tool again moves it (one slot per tool)",
+		gear.tool_in("bloodbound_coffer", 1) == null and gear.tool_in("patched_satchel", 0).id == "longreach_ribbon")
+	_check("tools in an unequipped pouch do nothing", gear.active_tools().is_empty() and p.stat("attack_range_mul") == 1.0)
+	gear.clear_all()
+
+	# Pouch limit (debug overlay): default 4, adjustable to 5.
+	_check("the pouch limit defaults to 4", gear.max_pouches() == 4, gear.max_pouches())
+	Config.set_value("gear.max_equipped_pouches", 5.0) # As the debug slider sets it.
+	_check("the pouch limit can be raised to 5", gear.max_pouches() == 5, gear.max_pouches())
+	Config.set_value("gear.max_equipped_pouches", 1.0)
+	_check("with a limit of 1 a second pouch is refused", gear.equip_pouch("patched_satchel") and not gear.equip_pouch("hollow_reliquary"))
+	Config.set_value("gear.max_equipped_pouches", 4.0)
+	_check("the debug overlay has the pouch limit slider",
+		game.debug_overlay._bindings.any(func(b: Dictionary) -> bool: return b.path == "gear.max_equipped_pouches"))
+	gear.clear_all()
+
+	# Weak tools: attack range +10 %, run speed +5 %.
+	var box: Rect2 = game.combat.get_attack_hitbox("right")
+	gear.equip_pouch("patched_satchel")
+	gear.slot_tool("patched_satchel", 0, "longreach_ribbon")
+	gear.slot_tool("patched_satchel", 1, "wayfarer_anklet")
+	var wide: Rect2 = game.combat.get_attack_hitbox("right")
+	_check("Longreach Ribbon: the attack reaches 10 % farther", is_equal_approx(wide.size.x, box.size.x * 1.1), [box.size.x, wide.size.x])
+	await _reset()
+	Input.action_press(&"move_right")
+	await _frames(30)
+	Input.action_release(&"move_right")
+	_check("Wayfarer's Anklet: top run speed +5 %", is_equal_approx(p.velocity.x, Config.movement.max_run_speed * 1.05), p.velocity.x)
+	_check("gear stays on through a player reset", p.stat("run_speed_mul") > 1.0)
+
+	# Patched Satchel curse: spells and heals cost 5 % more energy, jumps untouched.
+	var lance: UltimateAbility = game.ultimates.get_ability("radiant_lance")
+	_check("Satchel curse: spells cost 5 % more energy", is_equal_approx(lance.get_cost(), Config.ultimates.radiant_lance.cost * 1.05), lance.get_cost())
+	_check("Satchel curse: a heal chunk costs 5 % more energy", is_equal_approx(h.heal_chunk_cost(), Config.vitals.heal_chunk_energy * 1.05), h.heal_chunk_cost())
+	var cursed_jump := await _jump_height(25)
+	gear.clear_all()
+	var plain_jump := await _jump_height(25)
+	_check("Satchel curse never changes the jump", absf(cursed_jump - plain_jump) < 0.5, [cursed_jump, plain_jump])
+	_check("without gear, costs are back to normal", is_equal_approx(lance.get_cost(), Config.ultimates.radiant_lance.cost))
+
+	# Medium tools in the Hollow Reliquary: damage into energy, faster recovery; leak curse.
+	await _reset()
+	Config.upgrades.god_mode = false
+	gear.equip_pouch("hollow_reliquary")
+	gear.slot_tool("hollow_reliquary", 0, "scar_lantern")
+	gear.slot_tool("hollow_reliquary", 1, "quickening_hourglass")
+	h.set_energy(0.0)
+	var hp := h.health
+	p.receive_hit(20.0, p.global_position.x - 10.0, false, true)
+	_check("Scar Lantern: 15 % of the damage taken comes back as energy", is_equal_approx(h.energy, (hp - h.health) * 0.15), [hp - h.health, h.energy])
+	await _reset()
+	Input.action_press(&"dash")
+	await _frames(2)
+	Input.action_release(&"dash")
+	await _until(func() -> bool: return not p.fsm.is_in("dash"), 30)
+	_check("Quickening Hourglass: the dash recovers 15 % faster",
+		p.dash_cooldown_timer <= Config.movement.dash_cooldown * 0.85 + 0.0001 and p.dash_cooldown_timer > Config.movement.dash_cooldown * 0.85 - 0.05, p.dash_cooldown_timer)
+	_check("Quickening Hourglass: the hook recovers 15 % faster too", is_equal_approx(p.stat("cooldown_mul"), 0.85))
+	Config.vitals.energy_leak_rate = 3.0
+	h.set_energy(50.0)
+	await _frames(60)
+	var cursed_leak := 50.0 - h.energy
+	gear.unequip_pouch("hollow_reliquary")
+	h.set_energy(50.0)
+	await _frames(60)
+	var plain_leak := 50.0 - h.energy
+	Config.vitals.energy_leak_rate = 0.0
+	_check("Reliquary curse: energy leaks 12 % faster", plain_leak > 0.0 and absf(cursed_leak / plain_leak - 1.12) < 0.02, [cursed_leak, plain_leak])
+	h.set_energy(50.0)
+	await _frames(10)
+	_check("with no leak rate set, energy does not leak", is_equal_approx(h.energy, 50.0), h.energy)
+
+	# Bloodbound Coffer: enemy damage +20 %, hazards unchanged; the Brimming Crest's shockwave.
+	await _reset()
+	gear.equip_pouch("bloodbound_coffer")
+	gear.slot_tool("bloodbound_coffer", 0, "brimming_crest")
+	hp = h.health
+	p.receive_hit(10.0, p.global_position.x - 10.0, false, true)
+	_check("Coffer curse: enemy damage +20 %", is_equal_approx(hp - h.health, 12.0), hp - h.health)
+	hp = h.health
+	p.receive_hit(10.0, p.global_position.x - 10.0, false, true, null, Damage.Source.PROJECTILE)
+	_check("Coffer curse: projectile damage +20 %", is_equal_approx(hp - h.health, 12.0), hp - h.health)
+	await _reset()
+	hp = h.health
+	p.hazard_respawn(10.0)
+	_check("Coffer curse: hazards hurt as usual", is_equal_approx(hp - h.health, 10.0), hp - h.health)
+
+	await _reset()
+	Config.upgrades.god_mode = true
+	var dummy: DummyEnemy = _first_enemy(false)
+	dummy.patrol = false
+	var shock_hits := []
+	var on_hit := func(info: Dictionary) -> void:
+		if info.source == "tool_shockwave":
+			shock_hits.append(info.damage)
+	Events.hit_landed.connect(on_hit)
+	await _frames(5)
+	p.global_position = dummy.global_position + Vector2(-40, 0)
+	p.facing = 1
+	h.set_energy(h.get_max_energy() - 1.0)
+	Input.action_press(&"attack")
+	await _frames(20)
+	Input.action_release(&"attack")
+	await _frames(15)
+	_check("Brimming Crest: no shockwave below full energy", shock_hits.is_empty(), shock_hits)
+	h.set_energy(h.get_max_energy())
+	var fx_before: int = game.effects.count("tool_shockwave")
+	Input.action_press(&"attack")
+	await _frames(20)
+	Input.action_release(&"attack")
+	_check("Brimming Crest: with full energy a swing sends a shockwave for 30 % bonus damage",
+		shock_hits.size() == 1 and is_equal_approx(shock_hits[0], Config.combat.attack_damage * 0.3), shock_hits)
+	_check("the shockwave plays its effect", game.effects.count("tool_shockwave") == fx_before + 1)
+	Events.hit_landed.disconnect(on_hit)
+	Config.upgrades.god_mode = false
+
+	# Saves keep the gear; an older save has none.
+	var saved: Dictionary = game.make_save_data()
+	var copy := PlayerData.new()
+	copy.gear_from_dict(JSON.parse_string(JSON.stringify(saved.gear)))
+	_check("saves keep owned, equipped and slotted gear", copy.owned_tools.size() == 5 and copy.equipped_pouches == data.equipped_pouches
+		and copy.pouch_contents["bloodbound_coffer"][0] == "brimming_crest")
+	copy.gear_from_dict({})
+	_check("a save from before gear loads with none", copy.owned_tools.is_empty() and copy.equipped_pouches.is_empty())
+
+	# Fusion: a fused tool carries every part's effects at the highest tier.
+	var ribbon := gear.get_tool("longreach_ribbon")
+	var anklet := gear.get_tool("wayfarer_anklet")
+	var lantern := gear.get_tool("scar_lantern")
+	var fused := ToolFusion.fuse("test_fused", "Test Fusion", "A test.", [ribbon, anklet])
+	_check("fusing two weak tools gives a weak tool with both effects", fused.tier == W and fused.effects.size() == 2 and fused.fused_from == ["longreach_ribbon", "wayfarer_anklet"])
+	_check("fusing with a medium tool gives a medium tool", ToolFusion.fuse("test_fused2", "x", "x", [ribbon, lantern]).tier == M)
+	gear.clear_all()
+	gear.add_tool(fused)
+	data.owned_tools.append(fused.id)
+	gear.equip_pouch("patched_satchel")
+	_check("a fused tool slots and works like any tool", gear.slot_tool("patched_satchel", 0, fused.id)
+		and is_equal_approx(p.stat("attack_range_mul"), 1.1) and is_equal_approx(p.stat("run_speed_mul"), 1.05))
+
+	# Clean up: no gear for the checks that follow.
+	gear.clear_all()
+	gear.tools.erase(fused.id)
+	data.owned_tools.clear()
+	data.owned_pouches.clear()
+	data.pouch_contents.clear()
+	gear.refresh()
+	_check("cleared gear leaves no modifier", not p.persistent_modifiers.has(GearManager.MODIFIER_ID))
 	await _reset()

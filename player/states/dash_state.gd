@@ -39,7 +39,7 @@ func step(delta: float) -> void:
 
 
 func exit() -> void:
-	var max_speed: float = Config.movement.max_run_speed * p.stat("speed_mul")
+	var max_speed: float = Config.movement.max_run_speed * p.stat("speed_mul") * p.stat("run_speed_mul")
 	p.velocity.x = clampf(p.velocity.x, -max_speed, max_speed)
 	p.health.set_invulnerable("dash", false)
-	p.dash_cooldown_timer = Config.movement.dash_cooldown
+	p.dash_cooldown_timer = Config.movement.dash_cooldown * p.stat("cooldown_mul") # Tools (GearManager) can shorten it.

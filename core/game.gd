@@ -14,6 +14,9 @@ extends Node2D
 ## MapOverlay); the inventory has a Map tab. Rooms with a spatial anomaly get
 ## their suppressed doorway sealed here (_apply_map_anomalies).
 ##
+## Gear: `gear` (GearManager, gear/) owns pouches and tools; equipped gear
+## is a persistent player modifier plus event hooks. Saved in "gear".
+##
 ## Save slots: when started from the title screen, Saves.active_slot is set
 ## and the slot is written at every checkpoint save and on lasting progress
 ## (boss, arena, secret, relic). Running this scene directly starts a new
@@ -89,6 +92,7 @@ var input := InputState.new()
 var player_data := PlayerData.new()
 var world := WorldState.new()
 var arena_director := ArenaDirector.new()
+var gear := GearManager.new() ## Pouches and tools (gear/gear_manager.gd).
 var atlas := MapAtlas.create_default() ## Every zone map: rooms, layout, exits.
 var map_state := MapState.new(atlas) ## Fog of war: owned maps, outlined and filled rooms.
 var room: Room
@@ -134,6 +138,7 @@ func _ready() -> void:
 	ultimates.setup(UltimateContext.new(player, combat, effects, input), player_data)
 	for ability in UltimateRegistry.create_default():
 		ultimates.register(ability)
+	gear.setup(ultimates.ctx, player_data)
 	# New game: no equippable spell known, every directional slot locked,
 	# no movement ability (Player.can_use asks player_data).
 	player.data = player_data
@@ -227,6 +232,7 @@ func _physics_process(delta: float) -> void:
 		enemy.step(delta)
 	combat.step(delta)
 	ultimates.step(delta)
+	gear.step(delta)
 	arena_director.step(delta)
 	_update_doors()
 	_update_checkpoints()
@@ -1099,6 +1105,7 @@ func make_save_data() -> Dictionary:
 		"max_energy_bonus": player.health.max_energy_bonus,
 		"playtime": playtime,
 		"map": map_state.to_dict(),
+		"gear": player_data.gear_to_dict(), # Pouches and tools: owned, equipped, slot contents.
 	})
 	return data
 
@@ -1146,6 +1153,8 @@ func apply_save_data(data: Dictionary) -> void:
 	player_data.equipped = equipped
 	player.health.max_health_bonus = float(data.get("max_health_bonus", 0.0))
 	player.health.max_energy_bonus = float(data.get("max_energy_bonus", 0.0))
+	player_data.gear_from_dict(data.get("gear", {})) # A save from before gear: none.
+	gear.refresh()
 	playtime = float(data.get("playtime", 0.0))
 	var pos: Array = data.get("position", [])
 	respawn = {

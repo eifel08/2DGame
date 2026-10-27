@@ -111,6 +111,9 @@ class Vitals:
 	var heal_chunk_energy := 33.0
 	var heal_chunk_time := 0.9
 	var heal_chunk_pause := 0.4 ## Safe window after a chunk before the next one starts.
+	## Passive energy leak per second while the meter is not empty. 0 = none
+	## (the default game). Gear can scale it ("energy_leak_mul", pouch curses).
+	var energy_leak_rate := 0.0
 
 
 ## Progression pickups and altars (Potion, SpellScroll, MeditationAltar).
@@ -151,6 +154,11 @@ class MapCfg:
 	var quick_view_decel := 3400.0 ## How fast the player stops when the quick view opens.
 
 
+## Pouches and tools (gear/, GearManager).
+class GearCfg:
+	var max_equipped_pouches := 4 ## How many pouches can be equipped at once (debug overlay: 1-5).
+
+
 class DebugFlags:
 	var show_hitboxes := false
 	var show_anim_labels := false
@@ -169,6 +177,7 @@ var progression: Progression
 var debug: DebugFlags
 var camera: CameraCfg
 var map: MapCfg
+var gear: GearCfg
 ## One block per ultimate, keyed by ability id. `cost` is fully configurable.
 var ultimates: Dictionary
 
@@ -187,6 +196,7 @@ func restore_defaults() -> void:
 	debug = DebugFlags.new()
 	camera = CameraCfg.new()
 	map = MapCfg.new()
+	gear = GearCfg.new()
 	ultimates = {
 		# Mana Discharge (the neutral spell): always drains ALL energy. `cost`
 		# is the least energy for a real wave; below it the wave fizzles out

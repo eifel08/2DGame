@@ -12,7 +12,7 @@ func step(delta: float) -> void:
 	var ix := input.axis_x()
 
 	# --- Horizontal: crisp accel/decel with a turnaround boost ---
-	var max_speed: float = m.max_run_speed * p.stat("speed_mul")
+	var max_speed: float = m.max_run_speed * p.stat("speed_mul") * p.stat("run_speed_mul")
 	var accel: float
 	if p.grounded:
 		accel = m.ground_accel if ix != 0 else m.ground_decel

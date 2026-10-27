@@ -23,6 +23,7 @@ When this file and the code disagree, the code wins — update this file.
 | `ultimates/` | `ultimate_ability.gd` (spell base), `ultimate_manager.gd` (Spell+direction, loadout, casting), `ultimate_registry.gd` (list of spells), `ultimate_context.gd`, `abilities/*.gd` (Mana Discharge + 8 equippable spells) |
 | `enemies/` | `enemy.gd` (shared contract: tier, health, contact damage, `blocks_hit`, freeze), `base_enemy.gd` (BaseEnemy: mini-FSM, senses, movement, shoot/strike, telegraph, poise), `enemy_rig.gd` (placeholder drawings per `look`), `dummy_enemy.gd` (+ `dummy/strong/flying` scenes), `boss_sentinel.gd` (Hollow Sentinel), `bestiary/<kind>.gd/.tscn` (13 kinds), `*_rig.tscn` + `*_animations.tres` |
 | `world/` | `room.gd` (world queries), one `.tscn` per room, `objects/` (all room objects), `tiles/` (tileset + atlas png) |
+| `gear/` | Pouches and tools: `gear_tier.gd` (tiers + `can_hold`), `tool_data.gd`, `pouch_data.gd`, `gear_registry.gd` (the 5 tools and 3 pouches), `gear_manager.gd` (ownership, loadout, slot rules, effect dispatch), `tool_fusion.gd`, `effects/` (`GearEffect`, `StatGearEffect`, `DamageToEnergyEffect`, `FullEnergyShockwaveEffect`) |
 | `map/` | `map_atlas.gd` (`WORLD` data: zones, room rects, exits, anomaly resolution), `map_zone.gd`, `map_room.gd`, `map_exit.gd`, `map_state.gd` (fog of war) |
 | `ui/` | `hud.gd`, `spell_cross.gd`/`spell_node_view.gd`, `energy_gauge.gd`, `stat_bar.gd`, `inventory_menu.gd`, `map_view.gd`, `map_overlay.gd`, `pause_menu.gd`, `settings_panel.gd`, `title_screen.gd`, `dialogue_box.gd`, `tutorial_popup.gd`, `ability_art.gd`/`ability_icon.gd`/`ability_card.gd`, `menu_kit.gd`, `debug_overlay.gd` (F1), `background.gd` |
 | `effects/` | `effects.gd` (play fx scenes by name), `feedback.gd` (Events → hitstop/shake/fx/sfx), `fx/<name>.tscn` (one `FxPlayer` scene per effect), `fx/placeholders/` |
@@ -133,6 +134,13 @@ Map zones: `halls` (Testing Halls, Arena, Proving Grounds, Hidden Shrine [secret
 - Saved on: checkpoint save, arena clear, boss defeat, secret broken, relic/potion, scroll, movement item, meditation. Loading → saved checkpoint, trance, 0 energy, enemies reset.
 - Old-save compatibility paths exist (all slots open, full movement, default loadout); keep them when changing the schema.
 - Placed coins are saved **by node name** — don't rename them (pocket coins use `*` → `PocketCoinN` for that reason).
+
+### Pouches & tools (`gear/`, `Game.gear`)
+- `GearManager` (RefCounted, set up in `Game._ready` with the spells' `UltimateContext`, stepped after `ultimates.step`). State lives in `PlayerData` (`owned_tools`, `owned_pouches`, `equipped_pouches`, `pouch_contents`), saved as `"gear"`.
+- Active gear = first `Config.gear.max_equipped_pouches` (default 4, debug 1–5) equipped pouches; their curses always apply, slotted tools only if the slot tier fits.
+- Effects are `GearEffect` resources: `stat_mods()` merged into one **persistent** player modifier `"gear"` (`Player.persistent_modifiers`, survives `reset()`, read through `Player.stat()`), plus `on_player_damaged` (from `Events.health_damaged`) and `on_attack_swung` (from `Events.attack_swung`) hooks.
+- Stat keys read by gameplay: `attack_range_mul` (melee hitbox), `run_speed_mul` (normal/dash-exit run cap only), `cooldown_mul` (dash, hook), `energy_cost_mul` (`UltimateAbility.get_cost` via `cost_scale`, `HealthEnergy.heal_chunk_cost`), `energy_leak_mul` (× `Config.vitals.energy_leak_rate`, default 0), `damage_taken_mul` (`Player.receive_hit`, not hazards).
+- Fusion: `ToolFusion.fuse(...)` concatenates part effects (highest tier, `fused_from`); fused tools are plain `ToolData`.
 
 ### Map & fog of war (`map/`)
 - `MapAtlas.WORLD` is data: zones (`world_origin`, `color`), rooms (rect in map cells, `base`, `hidden`), exits (one per door: `door_id`, target room/door, `secret`). `MapState`: owned maps, outlined/filled/pending rooms. Without a zone's map nothing of that zone is shown ("No Map").

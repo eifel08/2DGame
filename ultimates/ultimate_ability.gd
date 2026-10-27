@@ -22,6 +22,9 @@ var description := ""
 ## they never appear in the equippable pool and cannot be unequipped.
 var fixed := false
 var is_running := false
+## Multiplier on the energy cost, set by UltimateManager.register (gear:
+## Player.stat("energy_cost_mul")).
+var cost_scale: Callable = func() -> float: return 1.0
 
 
 ## Reads a live value from Config.ultimates[id].
@@ -30,7 +33,7 @@ func cfg(key: String) -> float:
 
 
 func get_cost() -> float:
-	return cfg("cost")
+	return cfg("cost") * cost_scale.call()
 
 
 func get_cast_time() -> float:
