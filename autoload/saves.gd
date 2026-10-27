@@ -15,6 +15,9 @@ const ROOM_NAMES := {
 	"secret_room": "Hidden Shrine",
 	"upper_room": "Upper Galleries",
 	"bestiary": "Bestiary",
+	"hidden_vault": "Hidden Vault",
+	"lava_room": "Ember Crossing",
+	"gear_room": "Tinker's Loft",
 }
 
 var save_dir := "user://saves"

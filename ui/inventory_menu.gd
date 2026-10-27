@@ -1,9 +1,11 @@
 class_name InventoryMenu
 extends CanvasLayer
-## Inventory window (I / Esc, gamepad Back) with three tabs:
+## Inventory window (I / Esc, gamepad Back) with four tabs:
 ##   Status    - shards (the only number), health and energy as bars
 ##   Abilities - the spell cross (left, a D-pad: SpellCross) and every
 ##               equippable spell the player knows (right)
+##   Gear      - worn pouches and the tools in their slots (GearTab, same
+##               keyboard flow; changes only at the saved checkpoint)
 ##   Map       - the world map with its fog of war (MapView). It opens
 ##               zoomed out on the whole world. Down from the tab row focuses
 ##               it; arrows select a zone (or pan to the next one once zoomed
@@ -31,7 +33,8 @@ extends CanvasLayer
 
 const STATUS_TAB := 0
 const ABILITIES_TAB := 1
-const MAP_TAB := 2
+const GEAR_TAB := 2
+const MAP_TAB := 3
 ## Corner tag of an equipped spell in the pool, per slot.
 const SLOT_TAGS: Array[String] = ["Up", "Side", "Down"]
 
@@ -51,6 +54,7 @@ var detail_desc: Label
 var detail_gauge: EnergyGauge
 var notice_label: Label
 var map_view: MapView
+var gear_tab: GearTab
 var pending_ability_id := "" ## Ability waiting for a slot choice.
 
 
@@ -74,7 +78,9 @@ func toggle() -> void:
 	if panel.visible:
 		_rebuild_pool()
 		map_view.show_world(true) # The Map tab always starts on the whole world.
+		gear_tab.open()
 		refresh()
+		_update_tab_entry(tabs.current_tab)
 		tab_bar.grab_focus() # Left / Right switches tabs right away.
 	else:
 		get_viewport().gui_release_focus()
@@ -91,6 +97,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		switch_tab(1)
 	elif event.is_action_pressed(&"menu_clear") and tabs.current_tab == ABILITIES_TAB:
 		_on_clear_pressed()
+	elif event.is_action_pressed(&"menu_clear") and tabs.current_tab == GEAR_TAB:
+		gear_tab.clear_pressed()
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -103,12 +111,23 @@ func switch_tab(step: int) -> void:
 
 func _on_tab_changed(tab: int) -> void:
 	pending_ability_id = ""
-	# Down from the tab row enters the tab's content.
-	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(map_view if tab == MAP_TAB else cross.card("Up"))
 	if tab == MAP_TAB:
 		map_view.show_world(true)
+	if tab == GEAR_TAB and is_open():
+		gear_tab.open()
+	_update_tab_entry(tab)
 	if is_open():
 		refresh()
+
+
+## Down from the tab row enters the tab's content.
+func _update_tab_entry(tab: int) -> void:
+	var entry: Control = cross.card("Up")
+	if tab == MAP_TAB:
+		entry = map_view
+	elif tab == GEAR_TAB:
+		entry = gear_tab.first_focus()
+	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(entry) if entry else NodePath("")
 
 
 # ---------- Loadout actions ----------
@@ -315,6 +334,9 @@ func _build() -> void:
 	root.add_child(tabs)
 	tabs.add_child(_build_status_tab())
 	tabs.add_child(_build_abilities_tab())
+	gear_tab = GearTab.new()
+	tabs.add_child(gear_tab)
+	gear_tab.setup(game, tab_bar)
 	tabs.add_child(_build_map_tab())
 	map_view.focus_neighbor_top = map_view.get_path_to(tab_bar) # Up from the map returns to the tabs.
 	tab_bar.focus_neighbor_bottom = tab_bar.get_path_to(cross.card("Up")) # Down from the tabs enters the cross.

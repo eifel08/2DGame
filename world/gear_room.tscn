@@ -1,0 +1,89 @@
+[gd_scene format=4]
+
+[ext_resource type="Script" path="res://world/room.gd" id="1_h4s5r"]
+[ext_resource type="TileSet" path="res://world/tiles/tileset.tres" id="2_30f3d"]
+[ext_resource type="PackedScene" path="res://world/objects/gear_pickup.tscn" id="3_04s86"]
+[ext_resource type="Script" path="res://world/objects/gear_pickup.gd" id="4_xtom4"]
+[ext_resource type="PackedScene" path="res://world/objects/checkpoint.tscn" id="5_c8og6"]
+[ext_resource type="Script" path="res://world/objects/checkpoint.gd" id="6_vrf0d"]
+[ext_resource type="PackedScene" path="res://world/objects/door.tscn" id="7_n64ys"]
+[ext_resource type="Script" path="res://world/objects/door.gd" id="8_4mtns"]
+
+[node name="GearRoom" type="Node2D"]
+script = ExtResource("1_h4s5r")
+room_id = "gear_room"
+
+[node name="Tiles" type="TileMapLayer" parent="."]
+tile_map_data = PackedByteArray("AAAAAAAAAAAAAAAAAAABAAAAAAAEAAAAAAACAAAAAAAEAAAAAAADAAAAAAAEAAAAAAAEAAAAAAAEAAAAAAAFAAAAAAAEAAAAAAAGAAAAAAAEAAAAAAAHAAAAAAAEAAAAAAAIAAAAAAAEAAAAAAAJAAAAAAAEAAAAAAAKAAAAAAAEAAAAAAALAAAAAAAEAAAAAAAMAAAAAAAEAAAAAAANAAAAAAAEAAAAAAAOAAAAAAAEAAAAAAAPAAAAAAAEAAAAAAAQAAAAAAAEAAAAAAARAAAAAAAEAAAAAAASAAAAAAAEAAAAAAATAAAAAAAEAAAAAAAUAAAAAAAEAAAAAAAVAAAAAAAEAAAAAAAWAAAAAAAEAAAAAAAXAAAAAAAEAAAAAAAYAAAAAAAEAAAAAAAZAAAAAAAEAAAAAAAaAAAAAAAEAAAAAAAbAAAAAAAEAAAAAAAcAAAAAAAEAAAAAAAdAAAAAAAEAAAAAAAeAAAAAAAEAAAAAAAfAAAAAAAEAAAAAAAgAAAAAAAEAAAAAAAhAAAAAAAEAAAAAAAiAAAAAAAEAAAAAAAjAAAAAAAEAAAAAAAkAAAAAAAEAAAAAAAlAAAAAAAEAAAAAAAmAAAAAAAEAAAAAAAnAAAAAAAEAAAAAAAoAAAAAAAEAAAAAAApAAAAAAAAAAAAAAAAAAEAAAACAAAAAAApAAEAAAAIAAAAAAAAAAIAAAACAAAAAAApAAIAAAAIAAAAAAAAAAMAAAACAAAAAAApAAMAAAAIAAAAAAAAAAQAAAACAAAAAAApAAQAAAAIAAAAAAAAAAUAAAACAAAAAAApAAUAAAAIAAAAAAAAAAYAAAACAAAAAAApAAYAAAAIAAAAAAAAAAcAAAACAAAAAAApAAcAAAAIAAAAAAAAAAgAAAACAAAAAAApAAgAAAAIAAAAAAAAAAkAAAACAAAAAAApAAkAAAAIAAAAAAAAAAoAAAACAAAAAAApAAoAAAAIAAAAAAAAAAsAAAACAAAAAAApAAsAAAAIAAAAAAAAAAwAAAACAAAAAAApAAwAAAAIAAAAAAAAAA0AAAACAAAAAAAGAA0AAAAQAAAAAAAHAA0AAAAQAAAAAAAIAA0AAAAQAAAAAAAJAA0AAAAQAAAAAAAKAA0AAAAQAAAAAAALAA0AAAAQAAAAAAAMAA0AAAAQAAAAAAANAA0AAAAQAAAAAAAOAA0AAAAQAAAAAAApAA0AAAAIAAAAAAAAAA4AAAACAAAAAAApAA4AAAAIAAAAAAAAAA8AAAACAAAAAAApAA8AAAAIAAAAAAAAABAAAAAAAAAAAAABABAAAAABAAAAAAACABAAAAABAAAAAAADABAAAAABAAAAAAAEABAAAAABAAAAAAAFABAAAAABAAAAAAAGABAAAAABAAAAAAAHABAAAAABAAAAAAAIABAAAAABAAAAAAAJABAAAAABAAAAAAAKABAAAAABAAAAAAALABAAAAABAAAAAAAMABAAAAABAAAAAAANABAAAAABAAAAAAAOABAAAAABAAAAAAAPABAAAAABAAAAAAAQABAAAAABAAAAAAARABAAAAABAAAAAAASABAAAAABAAAAAAATABAAAAABAAAAAAAUABAAAAABAAAAAAAVABAAAAABAAAAAAAWABAAAAABAAAAAAAXABAAAAABAAAAAAAYABAAAAABAAAAAAAZABAAAAABAAAAAAAaABAAAAABAAAAAAAbABAAAAABAAAAAAAcABAAAAABAAAAAAAdABAAAAABAAAAAAAeABAAAAABAAAAAAAfABAAAAABAAAAAAAgABAAAAABAAAAAAAhABAAAAADAAAAAAAmABAAAAAJAAAAAAAnABAAAAABAAAAAAAoABAAAAABAAAAAAApABAAAAAAAAAAAAAAABEAAAAAAAAAAAABABEAAAAAAAAAAAACABEAAAAAAAAAAAADABEAAAAAAAAAAAAEABEAAAAAAAAAAAAFABEAAAAAAAAAAAAGABEAAAAAAAAAAAAHABEAAAAAAAAAAAAIABEAAAAAAAAAAAAJABEAAAAAAAAAAAAKABEAAAAAAAAAAAALABEAAAAAAAAAAAAMABEAAAAAAAAAAAANABEAAAAAAAAAAAAOABEAAAAAAAAAAAAPABEAAAAAAAAAAAAQABEAAAAAAAAAAAARABEAAAAAAAAAAAASABEAAAAAAAAAAAATABEAAAAAAAAAAAAUABEAAAAAAAAAAAAVABEAAAAAAAAAAAAWABEAAAAAAAAAAAAXABEAAAAAAAAAAAAYABEAAAAAAAAAAAAZABEAAAAAAAAAAAAaABEAAAAAAAAAAAAbABEAAAAAAAAAAAAcABEAAAAAAAAAAAAdABEAAAAAAAAAAAAeABEAAAAAAAAAAAAfABEAAAAAAAAAAAAgABEAAAAAAAAAAAAhABEAAAACAAAAAAAmABEAAAAIAAAAAAAnABEAAAAAAAAAAAAoABEAAAAAAAAAAAApABEAAAAAAAAAAAA=")
+tile_set = ExtResource("2_30f3d")
+
+[node name="EnemySpawns" type="Node2D" parent="."]
+
+[node name="Objects" type="Node2D" parent="."]
+
+[node name="GearPickup1" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(272, 416)
+script = ExtResource("4_xtom4")
+gear_id = "longreach_ribbon"
+
+[node name="GearPickup2" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(400, 416)
+script = ExtResource("4_xtom4")
+gear_id = "wayfarer_anklet"
+
+[node name="GearPickup3" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(176, 512)
+script = ExtResource("4_xtom4")
+kind = "pouch"
+gear_id = "patched_satchel"
+
+[node name="GearPickup4" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(304, 512)
+script = ExtResource("4_xtom4")
+kind = "pouch"
+gear_id = "hollow_reliquary"
+
+[node name="GearPickup5" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(432, 512)
+script = ExtResource("4_xtom4")
+kind = "pouch"
+gear_id = "bloodbound_coffer"
+
+[node name="GearPickup6" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(592, 512)
+script = ExtResource("4_xtom4")
+gear_id = "scar_lantern"
+
+[node name="GearPickup7" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(720, 512)
+script = ExtResource("4_xtom4")
+gear_id = "quickening_hourglass"
+
+[node name="GearPickup8" type="Node2D" parent="Objects" instance=ExtResource("3_04s86")]
+z_index = 2
+position = Vector2(848, 512)
+script = ExtResource("4_xtom4")
+gear_id = "brimming_crest"
+
+[node name="Checkpoint1" type="Node2D" parent="Objects" instance=ExtResource("5_c8og6")]
+z_index = 1
+position = Vector2(976, 512)
+script = ExtResource("6_vrf0d")
+prompt = "Save"
+interact_size = Vector2(56, 64)
+
+[node name="Door1" type="Node2D" parent="Objects" instance=ExtResource("7_n64ys")]
+position = Vector2(1152, 576)
+script = ExtResource("8_4mtns")
+door_id = "floor"
+target_room = "test_room"
+target_door = "ceiling_west"
+vertical = 1
+trigger_size = Vector2(128, 40)

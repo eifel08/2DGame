@@ -34,6 +34,8 @@ const TS := 32
 ## keyed by the "col,row" of the cell.
 ## Movement items (AbilityPickup): 'j' Double Jump, 'd' Dash, 'c' Wall Climb,
 ## 'g' Grappling Hook. A new game has none of them.
+## 'p' a pouch, 't' a tool (GearPickup): the room's "gear" entry ("col,row":
+## GearRegistry id) names it. Taken with E, like every item.
 ## 'M' a zone's map (MapPickup): the room's "maps" entry ("col,row": zone_id)
 ## names the zone. Taking it outlines that zone's base map.
 ## Two spike pits (rows 21-22): touching them deals damage and respawns the
@@ -47,7 +49,7 @@ const TS := 32
 ## around a hidden pocket (Type 1) behind the west wall. The camera only goes
 ## there once the pocket is found.
 const ROOM_LAYOUT := [
-	"#####################################O...##############################",
+	"########J...#########################O...##############################",
 	"########..............................................................#",
 	"########..............................................................#",
 	"########..............................................................#",
@@ -166,6 +168,33 @@ const UPPER_LAYOUT := [
 	"X..$.......AE......M...G..g...E.I..*E*.#",
 	"####....################################",
 	"####O...################################",
+]
+
+## Tinker's Loft: a test room up and to the left of the Testing Halls. Its
+## floor gap ('O', cols 34-37) meets the Halls' upper-left ceiling gap ('J'):
+## jump up from the platform over the Halls' left shaft and you are ejected
+## beside the gap here (Rule B); drop back down and you land on that platform
+## (Rule A). Every pouch ('p') and tool ('t') lies here, on the floor or the
+## low platform, plus a checkpoint to equip them at (Inventory, Gear tab).
+const GEAR_LAYOUT := [
+	"##########################################",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#........................................#",
+	"#.......t...t............................#",
+	"#.....=========..........................#",
+	"#........................................#",
+	"#....p...p...p....t...t...t...C..........#",
+	"##################################....####",
+	"##################################O...####",
 ]
 
 ## Hidden Vault: a secret room behind the Upper Galleries' west wall (at
@@ -307,6 +336,8 @@ const ROOMS := {
 			"D": {"door_id": "east", "target_room": "boss_room", "target_door": "west", "inward": -1},
 			"O": {"door_id": "ceiling", "target_room": "upper_room", "target_door": "floor", "vertical": -1, "width": 4},
 			"Y": {"door_id": "floor", "target_room": "bestiary", "target_door": "ceiling", "vertical": 1, "width": 2},
+			# Upper-left ceiling gap above the left shaft's platform: up into the Tinker's Loft.
+			"J": {"door_id": "ceiling_west", "target_room": "gear_room", "target_door": "floor", "vertical": -1, "width": 4},
 		},
 		# Type 1: the west wall hides a pocket beyond the room's normal area.
 		"hidden_pocket": {"secret_id": "halls_west_alcove", "pass_dir": -1},
@@ -352,6 +383,18 @@ const ROOMS := {
 		"scrolls": {"35,5": "spirit_volley"},
 		"altars": {"11,15": "side"},
 		"maps": {"19,15": "reaches"}, # The zone map, on the floor right of the altar.
+	},
+	"gear_room": {
+		"name": "GearRoom", "layout": GEAR_LAYOUT, "path": "res://world/gear_room.tscn",
+		"doors": {
+			"O": {"door_id": "floor", "target_room": "test_room", "target_door": "ceiling_west", "vertical": 1, "width": 4},
+		},
+		# Pouches ('p') and tools ('t'): "col,row" -> GearRegistry id.
+		"gear": {
+			"5,15": "patched_satchel", "9,15": "hollow_reliquary", "13,15": "bloodbound_coffer",
+			"8,12": "longreach_ribbon", "12,12": "wayfarer_anklet",
+			"18,15": "scar_lantern", "22,15": "quickening_hourglass", "26,15": "brimming_crest",
+		},
 	},
 	"hidden_vault": {
 		"name": "HiddenVault", "layout": VAULT_LAYOUT, "path": "res://world/hidden_vault.tscn",
@@ -479,11 +522,12 @@ const SCROLL_SCENE := "res://world/objects/spell_scroll.tscn"
 const ALTAR_SCENE := "res://world/objects/meditation_altar.tscn"
 const ABILITY_PICKUP_SCENE := "res://world/objects/ability_pickup.tscn"
 const MAP_PICKUP_SCENE := "res://world/objects/map_pickup.tscn"
+const GEAR_PICKUP_SCENE := "res://world/objects/gear_pickup.tscn"
 const ABILITY_LETTERS := {"j": "double_jump", "d": "dash", "c": "wall_climb", "g": "grapple"}
 const SIGN_SCENE := "res://world/objects/chamber_sign.tscn"
-## Ceiling / floor gap letters. 'O' is the usual one; 'Y' is a second gap in
-## the same room (each letter has its own door entry).
-const GAP_LETTERS := ["O", "Y"]
+## Ceiling / floor gap letters. 'O' is the usual one; 'Y' and 'J' are more
+## gaps in the same room (each letter has its own door entry).
+const GAP_LETTERS := ["O", "Y", "J"]
 ## Enemy kinds that fly (their spawn markers get meta "flying").
 const FLYING_KINDS := ["flyer", "swooper", "orb_sentry", "spearman"]
 
@@ -1251,7 +1295,7 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 					_add_object(root, objects, counts, LORE_SCENE, "Lore", feet, {"dialogue": load(LORE[ch])})
 				"D", "H":
 					_add_object(root, objects, counts, DOOR_SCENE, "Door", feet, def.doors[ch])
-				"O", "Y":
+				"O", "Y", "J":
 					var door_def: Dictionary = def.doors[ch].duplicate()
 					var w: float = door_def.get("width", 1) * TS
 					door_def.erase("width")
@@ -1278,6 +1322,10 @@ func _build_room(room_id: String, def: Dictionary) -> void:
 				"j", "d", "c", "g":
 					_add_object(root, objects, counts, ABILITY_PICKUP_SCENE, "AbilityPickup", feet,
 						{"ability": ABILITY_LETTERS[ch]})
+				"p", "t": # A pouch or a tool (GearPickup); its id is in the room's "gear" entry.
+					var gear_id: String = def.gear["%d,%d" % [x, y]]
+					_add_object(root, objects, counts, GEAR_PICKUP_SCENE, "GearPickup", feet,
+						{"kind": "pouch" if ch == "p" else "tool", "gear_id": gear_id})
 				"A":
 					_add_object(root, objects, counts, ALTAR_SCENE, "MeditationAltar", feet,
 						{"slot_name": def.altars["%d,%d" % [x, y]]})
@@ -1349,7 +1397,7 @@ func _check_room_rules(room_id: String, def: Dictionary) -> void:
 			var edge := y == 0 or y == layout.size() - 1 or x == 0 or x == row.length() - 1
 			if not edge:
 				continue
-			if not (row[x] in ["#", "O", "Y", ".", "D", "H", "Z", "z", "X", "x"]):
+			if not (row[x] in ["#", ".", "D", "H", "Z", "z", "X", "x"] or row[x] in GAP_LETTERS):
 				push_error("Rule D violated in %s: '%s' on the outer edge at (%d, %d)" % [room_id, row[x], x, y])
 			elif row[x] == "." and not _is_doorway_cell(layout, def, x, y):
 				push_error("Rule D violated in %s: open edge cell at (%d, %d) is not part of a transition" % [room_id, x, y])

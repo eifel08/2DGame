@@ -1,6 +1,6 @@
 class_name Potion
 extends Relic
-## A consumable upgrade lying in the world. Touching it drinks it at once:
+## A consumable upgrade lying in the world. Taking it (E) drinks it at once:
 ##   Health Potion (stat "max_health")  raises max health for good (and heals fully)
 ##   Mana Potion   (stat "max_energy")  raises max energy for good
 ## It works like a Relic (WorldState.relics keeps it collected, by relic_id),

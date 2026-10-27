@@ -1,6 +1,6 @@
 class_name Relic
-extends Node2D
-## A permanent upgrade pickup (e.g. hidden in a secret room). Touching it
+extends Collectible
+## A permanent upgrade pickup (e.g. hidden in a secret room). Taking it (E)
 ## raises max health or max energy for the rest of the save. Collected relics
 ## never reappear (WorldState.relics). No autoloads here.
 ## Art: the Visual node and the AnimationPlayer "idle" clip are placeholders;
@@ -10,13 +10,6 @@ extends Node2D
 @export_enum("max_health", "max_energy") var stat := "max_health"
 @export var amount := 25.0
 
-var collected := false
-
 
 func get_rect() -> Rect2:
 	return Rect2(global_position - Vector2(14, 40), Vector2(28, 40))
-
-
-func collect() -> void:
-	collected = true
-	visible = false

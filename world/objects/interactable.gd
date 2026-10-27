@@ -31,12 +31,15 @@ func interact(_game: Node) -> void:
 
 ## Small "E  Read" prompt above the object while the player is in range.
 func _draw() -> void:
-	if not highlighted:
-		return
+	if highlighted:
+		draw_prompt(self, "E  " + prompt, -interact_size.y)
+
+
+## Draws a prompt box centred above local height `top` (also Collectible).
+static func draw_prompt(canvas: CanvasItem, text: String, top: float) -> void:
 	var font := ThemeDB.fallback_font
-	var text := "E  " + prompt
 	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 12.0
-	var box := Rect2(-width / 2.0, -interact_size.y - 22.0, width, 17.0)
-	draw_rect(box, Color(0.04, 0.05, 0.1, 0.85))
-	draw_rect(box, Color(1, 1, 1, 0.35), false, 1.0)
-	draw_string(font, box.position + Vector2(0, 13), text, HORIZONTAL_ALIGNMENT_CENTER, width, 11, Color.WHITE)
+	var box := Rect2(-width / 2.0, top - 22.0, width, 17.0)
+	canvas.draw_rect(box, Color(0.04, 0.05, 0.1, 0.85))
+	canvas.draw_rect(box, Color(1, 1, 1, 0.35), false, 1.0)
+	canvas.draw_string(font, box.position + Vector2(0, 13), text, HORIZONTAL_ALIGNMENT_CENTER, width, 11, Color.WHITE)

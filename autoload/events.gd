@@ -152,6 +152,7 @@ signal map_closed(reason: String) ## "released", "damage" or "interrupted".
 @warning_ignore("unused_signal")
 signal anim_event(owner: Node, event_name: String)
 signal gear_changed() ## Pouches or tools were equipped, slotted or removed (GearManager).
+signal gear_collected(kind: String, gear_id: String, position: Vector2) ## A pouch or tool was taken (GearPickup).
 signal tool_shockwave(position: Vector2, direction: Vector2) ## A tool's full-energy shockwave left a swing.
 signal platform_crumbled(position: Vector2) ## A breakable platform gave way (it comes back later).
 signal peg_crumbled(position: Vector2) ## A breakable grapple peg gave way (it comes back later).

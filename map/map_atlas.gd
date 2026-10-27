@@ -34,6 +34,11 @@ const WORLD := {
 				{"door": "east", "side": "right", "at": 1, "to": "boss_room", "to_door": "west"},
 				{"door": "ceiling", "side": "top", "at": 2, "to": "upper_room", "to_door": "floor"},
 				{"door": "floor", "side": "bottom", "at": 2, "to": "bestiary", "to_door": "ceiling"},
+				{"door": "ceiling_west", "side": "top", "at": 0, "to": "gear_room", "to_door": "floor"},
+			]},
+			# Tinker's Loft: up and to the left of the Halls, its floor gap over their west end.
+			"gear_room": {"name": "Tinker's Loft", "rect": [-2, -1, 3, 1], "exits": [
+				{"door": "floor", "side": "bottom", "at": 2, "to": "test_room", "to_door": "ceiling_west"},
 			]},
 			"boss_room": {"name": "Sentinel's Arena", "rect": [5, 1, 3, 1], "exits": [
 				{"door": "west", "side": "left", "to": "test_room", "to_door": "east"},
@@ -66,7 +71,8 @@ const WORLD := {
 			# Was a spatial anomaly (linked to the Ember Crossing on its west
 			# side too); that doorway is walled up in both layouts. The secret
 			# doorway is its only entrance.
-			"hidden_vault": {"name": "Hidden Vault", "rect": [0, 1, 2, 1], "hidden": true, "exits": [
+			# One cell wide, so it never overlaps the Tinker's Loft below-left of it on the world grid.
+			"hidden_vault": {"name": "Hidden Vault", "rect": [1, 1, 1, 1], "hidden": true, "exits": [
 				{"door": "east", "side": "right", "to": "upper_room", "to_door": "west", "secret": true},
 			]},
 			"lava_room": {"name": "Ember Crossing", "rect": [5, 1, 4, 1], "exits": [

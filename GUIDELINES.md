@@ -171,6 +171,7 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 - A slot takes its own tier or lower (Strong ⊃ Medium ⊃ Weak). Keep this rule in `GearTier.can_hold()` only.
 - Hazards stay hazards: gear does not scale hazard damage, and nothing protects against it (see *Damage sources*).
 - Taking or equipping gear is not a celebration (Rule F).
+- Gear is worn at the saved checkpoint only (Inventory → Gear), like spells.
 
 ## Map — every room on one zone map
 
@@ -191,7 +192,7 @@ A secret wall is a piece of "wall" the player can walk through **without attacki
 7. A way back out of a secret room looks like an ordinary open doorway (**Rule E**).
 8. No celebration when anything in the room is won or found (**Rule F**).
 9. Lava? Floor only, ledges at the doorways (see "Lava" above).
-10. Progression objects? Potions (`h`, `e`), scrolls (`?`), altars (`A`) and movement items (`j`, `d`, `c`, `g`) and zone maps (`M`) sit on standable floor or a platform. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell and one item per movement ability in the whole world, and make sure each is reachable with what the player can have found before it.
+10. Progression objects? Potions (`h`, `e`), scrolls (`?`), altars (`A`), movement items (`j`, `d`, `c`, `g`), zone maps (`M`), pouches (`p`) and tools (`t`) sit on standable floor or a platform. Every item is taken with Interact (E), never on touch (shards are the only exception): extend `Collectible`, and keep items far enough apart that one prompt shows at a time. An altar needs room to kneel and must not overlap another interactable (checkpoint, tablet, NPC). Keep one scroll per equippable spell and one item per movement ability in the whole world, and make sure each is reachable with what the player can have found before it.
 11. Secret wall? Decide the type first. A pocket of this room: Type 1 (`I`, pocket closed on all other sides, shards as `*`). A way to another room: Type 2 (`X`/`x` in both rooms, `"secret_doorway": "entry"` on the discovery side, `"exit"` in the secret room).
 12. Rebuild with `godot --headless --path . --script res://tools/build_assets.gd` (delete the room's `.tscn` first). Look for `Rule … violated` errors.
 13. Map: add the room to its zone in `map/map_atlas.gd`, with one exit per door (see "Map" above).

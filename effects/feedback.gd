@@ -31,6 +31,10 @@ func setup(p_camera: CameraRig, p_effects: Effects) -> void:
 	# Tool shockwave (Brimming Crest): a burst along the swing, no extra sound.
 	Events.tool_shockwave.connect(func(pos: Vector2, dir: Vector2) -> void:
 		effects.play("tool_shockwave", pos, {"rotation": dir.angle()}))
+	# Pouches and tools: a soft pickup sound and a small puff (Rule F).
+	Events.gear_collected.connect(func(_kind: String, _id: String, pos: Vector2) -> void:
+		Sfx.play("pickup")
+		effects.play("scroll_pickup", pos + Vector2(0, -18)))
 	Events.player_hurt.connect(_on_player_hurt)
 	Events.player_hazard_respawn.connect(_on_hazard_respawn)
 	Events.player_jumped.connect(_on_player_jumped)

@@ -57,6 +57,19 @@ func get_pouch(pouch_id: String) -> PouchData:
 	return pouches.get(pouch_id)
 
 
+## A tool's tier, or a pouch's strongest slot (pickup art, UI colours).
+func tier_of(kind: String, gear_id: String) -> GearTier.Tier:
+	if kind == "pouch":
+		var pouch := get_pouch(gear_id)
+		var top := 0
+		if pouch:
+			for slot_tier in pouch.slots:
+				top = maxi(top, slot_tier)
+		return top as GearTier.Tier
+	var tool := get_tool(gear_id)
+	return tool.tier if tool else GearTier.Tier.WEAK
+
+
 func max_pouches() -> int:
 	return int(Config.gear.max_equipped_pouches)
 

@@ -1,7 +1,7 @@
 class_name AbilityPickup
-extends Node2D
+extends Collectible
 ## A movement ability lying in the world: Double Jump, Dash, Wall Climb (wall
-## slide + wall jumps) or the Grappling Hook. Touching it learns the ability
+## slide + wall jumps) or the Grappling Hook. Taking it (E) learns the ability
 ## for good (PlayerData.movement); the first time, a tutorial popup explains it.
 ## A pickup is gone once its ability is known, so nothing extra is saved.
 ## No autoloads here (see Interactable).
@@ -10,7 +10,6 @@ extends Node2D
 
 @export_enum("double_jump", "dash", "wall_climb", "grapple") var ability := "double_jump"
 
-var collected := false
 var _t := 0.0
 
 @onready var visual: Node2D = get_node_or_null("Visual")
@@ -27,17 +26,8 @@ func get_rect() -> Rect2:
 	return Rect2(global_position - Vector2(16, 44), Vector2(32, 44))
 
 
-func collect() -> void:
-	collected = true
-	visible = false
-
-
-func restore() -> void:
-	collected = false
-	visible = true
-
-
 func _draw() -> void:
+	draw_prompt()
 	if visual and visual.get_child_count() > 0:
 		return
 	var col: Color = AbilityArt.COLORS.get(ability, Color.WHITE)

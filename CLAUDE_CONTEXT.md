@@ -35,7 +35,7 @@ When this file and the code disagree, the code wins — update this file.
 ### Scenes
 - `scenes/game.tscn` (root `Main`, script `core/game.gd`): `BackgroundLayer/Background`, `RoomRoot`, `Enemies`, `Pickups`, `Ultimates`, `Player` (instance), `Combat` → `Projectiles`, `Grapple` (instance), `Effects`, `Feedback`, `Camera`, `HudLayer/Hud`, `FadeLayer/Fade`, `DialogueBox`, `Inventory`, `PauseMenu`, `DebugOverlay`.
 - `player/player.tscn`: `Player` (CharacterBody2D) → `CollisionShape2D`, `Flip/Rig`, `AnimationPlayer`, `HealthEnergy`, `Animator`.
-- Rooms (`Game.ROOM_SCENES`, ids → files): `test_room` Testing Halls (start), `boss_room` Sentinel's Arena, `arena_room` Proving Grounds, `secret_room` Hidden Shrine, `upper_room` Upper Galleries, `hidden_vault` Hidden Vault, `lava_room` Ember Crossing, `bestiary` Bestiary. Each room: `Room` script, `Tiles` (TileMapLayer), `Objects/...` (doors, checkpoints, pickups, `Arena` with `Waves/WaveN` markers), spawn markers with meta `kind`.
+- Rooms (`Game.ROOM_SCENES`, ids → files): `test_room` Testing Halls (start), `gear_room` Tinker's Loft (up-left of the Halls via the Halls' second ceiling gap `ceiling_west`, layout letter `J`; holds all pouches/tools + a checkpoint), `boss_room` Sentinel's Arena, `arena_room` Proving Grounds, `secret_room` Hidden Shrine, `upper_room` Upper Galleries, `hidden_vault` Hidden Vault, `lava_room` Ember Crossing, `bestiary` Bestiary. Each room: `Room` script, `Tiles` (TileMapLayer), `Objects/...` (doors, checkpoints, pickups, `Arena` with `Waves/WaveN` markers), spawn markers with meta `kind`.
 
 World graph:
 ```
@@ -141,6 +141,10 @@ Map zones: `halls` (Testing Halls, Arena, Proving Grounds, Hidden Shrine [secret
 - Effects are `GearEffect` resources: `stat_mods()` merged into one **persistent** player modifier `"gear"` (`Player.persistent_modifiers`, survives `reset()`, read through `Player.stat()`), plus `on_player_damaged` (from `Events.health_damaged`) and `on_attack_swung` (from `Events.attack_swung`) hooks.
 - Stat keys read by gameplay: `attack_range_mul` (melee hitbox), `run_speed_mul` (normal/dash-exit run cap only), `cooldown_mul` (dash, hook), `energy_cost_mul` (`UltimateAbility.get_cost` via `cost_scale`, `HealthEnergy.heal_chunk_cost`), `energy_leak_mul` (× `Config.vitals.energy_leak_rate`, default 0), `damage_taken_mul` (`Player.receive_hit`, not hazards).
 - Fusion: `ToolFusion.fuse(...)` concatenates part effects (highest tier, `fused_from`); fused tools are plain `ToolData`.
+- UI: Inventory tab `GEAR_TAB` (index 2; Map is 3) = `ui/gear_tab.gd` (`GearCard`s, `GearArt`), keyboard flow like spells; changes only when `player.at_checkpoint`. Pickups: `GearPickup` (`p`/`t`, room `"gear"` entry), tier set by Game from `GearManager.tier_of`.
+
+### Items (`Collectible`)
+- Relic/Potion, SpellScroll, AbilityPickup, MapPickup, GearPickup extend `world/objects/collectible.gd`. They are **taken with E**: `Game._update_interaction` merges `interactables` + `collectibles`, nearest in reach gets `highlighted` ("E  Take" prompt via `Interactable.draw_prompt`), Interact calls `Game.collect_item()`. Only shards (`Coin`) are taken on touch. Interaction needs the player's normal state.
 
 ### Map & fog of war (`map/`)
 - `MapAtlas.WORLD` is data: zones (`world_origin`, `color`), rooms (rect in map cells, `base`, `hidden`), exits (one per door: `door_id`, target room/door, `secret`). `MapState`: owned maps, outlined/filled/pending rooms. Without a zone's map nothing of that zone is shown ("No Map").
@@ -197,5 +201,4 @@ Exit code 0 = all pass. Writes only to `user://test_saves`. Older checks run wit
 5. Update `README.md` (and this file if architecture changes).
 
 ## Known small gaps noticed during mapping
-- `Saves.ROOM_NAMES` lacks `hidden_vault` and `lava_room`, so slot summaries for saves in those rooms show `?`.
 - `README.md` project layout says GUIDELINES covers "rules A-D"; it actually defines A–F.

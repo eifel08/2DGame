@@ -302,6 +302,9 @@ func _run() -> void:
 	# --- Pouches and tools: tiers, slots, limit, effects, curses, saves, fusion ---
 	await _test_gear()
 
+	# --- Tinker's Loft: the way up (Rules A and B), every pouch and tool taken with E, the Gear tab ---
+	await _test_gear_room()
+
 	# --- Contact damage + i-frames ---
 	await _reset()
 	var toucher: DummyEnemy = _first_enemy(false)
@@ -1216,6 +1219,8 @@ func _run() -> void:
 	var relic: Relic = game.relics.filter(func(r: Relic) -> bool: return not r is Potion)[0]
 	p.global_position = relic.global_position
 	await _frames(5)
+	_check("walking onto the relic does not take it", not relic.collected)
+	await _hold(&"interact", 2)
 	_check("the relic raises max health", relic.collected and is_equal_approx(p.health.get_max_health(), base_max + 25.0),
 		[relic.collected, p.health.get_max_health()])
 	game.load_room("arena_room", "east")
@@ -2161,6 +2166,14 @@ func _place_galleries(wall: HiddenPocketWall, dx: float) -> void:
 	p.velocity = Vector2.ZERO
 	p.health.iframe_timer = 0.0
 	await _frames(8)
+
+
+## Presses Interact (E) for two frames, as a player taking an item does.
+func _press_interact() -> void:
+	Input.action_press(&"interact")
+	await _frames(2)
+	Input.action_release(&"interact")
+	await _frames(1)
 
 
 func _hold(action: StringName, frames: int) -> void:
@@ -3174,6 +3187,8 @@ func _test_lava_room() -> void:
 	Input.action_release(&"jump")
 	await _until(func() -> bool: return p.global_position.x >= 61 * 32.0, 240)
 	Input.action_release(&"move_right")
+	await _frames(4)
+	await _hold(&"interact", 2) # Items are taken with E.
 	steps["8 P3 -> E / east ledge -> relic"] = landed and game.world.has_relic("ember_heart")
 	steps["no fall into the lava on the way"] = fell[0] == 0
 	Events.player_hazard_respawn.disconnect(on_fall)
@@ -3656,12 +3671,15 @@ func _test_progression() -> void:
 	var max_hp := h.get_max_health()
 	p.global_position = hp_potion.global_position
 	await _frames(4)
+	_check("walking onto a potion does not drink it", not hp_potion.collected and game.focused_interactable == hp_potion)
+	await _hold(&"interact", 2)
 	_check("a Health Potion raises max health for good and heals fully",
 		hp_potion.collected and is_equal_approx(h.get_max_health(), max_hp + Config.progression.health_potion_amount)
 		and is_equal_approx(h.health, h.get_max_health()) and game.world.has_relic(hp_potion.relic_id), [h.get_max_health(), h.health])
 	var max_en := h.get_max_energy()
 	p.global_position = mp_potion.global_position
 	await _frames(4)
+	await _hold(&"interact", 2)
 	_check("a Mana Potion raises max energy for good",
 		mp_potion.collected and is_equal_approx(h.get_max_energy(), max_en + Config.progression.mana_potion_amount), h.get_max_energy())
 	var hp_id := hp_potion.relic_id
@@ -3687,6 +3705,8 @@ func _test_progression() -> void:
 	Events.spell_learned.connect(on_learned)
 	p.global_position = scroll.global_position
 	await _frames(4)
+	_check("walking onto a scroll does not take it", not scroll.collected and learned.is_empty())
+	await _hold(&"interact", 2)
 	Events.spell_learned.disconnect(on_learned)
 	_check("collecting a scroll teaches its spell for good",
 		scroll.collected and not scroll.visible and data.is_unlocked("nova_burst") and learned == ["nova_burst"]
@@ -3914,6 +3934,11 @@ func _test_tutorials() -> void:
 		var pk := _pickup_for(ability)
 		p.global_position = pk.global_position
 		await _frames(3)
+		_check("walking onto the %s item does not take it" % ability, not pk.collected and not data.has_movement(ability))
+		Input.action_press(&"interact")
+		await _frames(2)
+		Input.action_release(&"interact")
+		await _frames(1)
 		_check("collecting the item teaches %s" % ability, pk.collected and data.has_movement(ability) and p.can_use(ability))
 		await _expect_tutorial(ability, "the %s item" % ability)
 	# The guard: a key pressed right away does not skip the popup unseen.
@@ -3935,6 +3960,7 @@ func _test_tutorials() -> void:
 	await _reset()
 	p.global_position = _pickup_for("dash").global_position
 	await _frames(3)
+	await _hold(&"interact", 2)
 	_check("the second time, no popup", data.has_movement("dash") and not pop.is_open())
 	await _reset()
 	await _hold(&"dash", 2)
@@ -3945,9 +3971,18 @@ func _test_tutorials() -> void:
 	game.load_room("upper_room", "floor")
 	await _frames(60)
 	var hook := _pickup_for("grapple")
-	p.global_position = hook.global_position
+	Config.upgrades.god_mode = true # The room's dummies must not knock the player out of reach.
+	_put(hook.global_position) # Out of the arrival arc: items are taken in the normal state.
 	await _frames(3)
-	_check("collecting the Grappling Hook item teaches the hook", data.has_movement("grapple") and p.can_use("grapple"))
+	var hook_focus: Node = game.focused_interactable
+	var hook_state := p.state_name()
+	Input.action_press(&"interact")
+	await _frames(2)
+	Input.action_release(&"interact")
+	await _frames(1)
+	Config.upgrades.god_mode = false
+	_check("collecting the Grappling Hook item teaches the hook", data.has_movement("grapple") and p.can_use("grapple"),
+		[hook_state, hook_focus, hook.collected, game.tutorial.blocks_step()])
 	await _expect_tutorial("grapple", "the Grappling Hook item")
 
 	# --- Potions, scroll and altar (fresh progression in the Testing Halls) ---
@@ -3961,18 +3996,21 @@ func _test_tutorials() -> void:
 			p.global_position = relic.global_position
 			break
 	await _frames(3)
+	await _press_interact()
 	await _expect_tutorial("health_potion", "the first Health Potion")
 	for relic in game.relics:
 		if relic is Potion and relic.stat == "max_energy":
 			p.global_position = relic.global_position
 			break
 	await _frames(3)
+	await _press_interact()
 	await _expect_tutorial("mana_potion", "the first Mana Potion")
 	await _reset()
 	for s in game.scrolls:
 		if s.spell_id == "nova_burst":
 			p.global_position = s.global_position
 	await _frames(3)
+	await _press_interact()
 	await _expect_tutorial("spell_scroll", "the first Spell Scroll")
 	await _reset()
 	var altar: MeditationAltar = game.altars[0]
@@ -4956,8 +4994,10 @@ func _test_map() -> void:
 	Events.map_acquired.connect(on_acquired)
 	p.global_position = pickups[0].global_position
 	await _frames(3)
+	_check("map: walking onto the map does not take it", not pickups[0].collected and not state.has_map("halls"))
+	await _hold(&"interact", 2)
 	Events.map_acquired.disconnect(on_acquired)
-	_check("map: touching the map takes it (base map acquired)", pickups[0].collected and state.has_map("halls"))
+	_check("map: pressing E at the map takes it (base map acquired)", pickups[0].collected and state.has_map("halls"))
 	_check("map: taking the map at once shows every room explored before it, filled in",
 		state.visible_reveal("boss_room") == reveal.FILLED and state.visible_reveal("test_room") == reveal.FILLED and revealed_at.size() == 1)
 	_check("map: the base map outlines the rest of its rooms (not explored yet)",
@@ -5046,6 +5086,7 @@ func _test_map() -> void:
 	var reaches_map: MapPickup = game.map_pickups[0]
 	p.global_position = reaches_map.global_position
 	await _frames(3)
+	await _hold(&"interact", 2)
 	_check("map: taking the Upper Reaches map shows the vault and the Galleries at once, the Ember Crossing outlined",
 		state.has_map("reaches") and state.visible_reveal("hidden_vault") == reveal.FILLED and state.visible_reveal("upper_room") == reveal.FILLED
 		and state.visible_reveal("lava_room") == reveal.OUTLINED)
@@ -5148,7 +5189,7 @@ func _test_map() -> void:
 			fitted = Rect2(atlas.world_rect(r)) if not fitted.has_area() else fitted.merge(Rect2(atlas.world_rect(r)))
 	_check("inventory map: a zone's frame fits the rooms its map shows (no hint of undiscovered ones)", halls_box == fitted, [halls_box, fitted])
 	_check("inventory: a Map tab that opens zoomed out on the whole world, your zone selected",
-		inv.tabs.get_tab_count() == 3 and mv.is_visible_in_tree() and mv.mode == MapView.Mode.WORLD and mv.zone_id == "halls"
+		inv.tabs.get_tab_count() == 4 and mv.is_visible_in_tree() and mv.mode == MapView.Mode.WORLD and mv.zone_id == "halls"
 		and mv.listed_zones() == ["halls", "reaches"], [mv.mode, mv.zone_id, mv.listed_zones()])
 	var view_box := Rect2(mv._view_rect())
 	_check("inventory map: the world view shows every zone in full",
@@ -5388,3 +5429,232 @@ func _test_gear() -> void:
 	gear.refresh()
 	_check("cleared gear leaves no modifier", not p.persistent_modifiers.has(GearManager.MODIFIER_ID))
 	await _reset()
+
+
+# ---------- Tinker's Loft (gear room), press-E items, the Gear tab ----------
+
+func _test_gear_room() -> void:
+	var p: Player = game.player
+	var gear: GearManager = game.gear
+	var data: PlayerData = game.player_data
+	var atlas: MapAtlas = game.atlas
+	await _reset()
+	gear.clear_all()
+	data.owned_tools.clear()
+	data.owned_pouches.clear()
+	data.pouch_contents.clear()
+	gear.refresh()
+
+	# --- The way up: the Halls' upper-left ceiling gap ---
+	var gap: Door = _door("ceiling_west")
+	_check("the Testing Halls have a second ceiling gap, at their upper left, up to the Tinker's Loft",
+		gap != null and gap.target_room == "gear_room" and gap.vertical == -1 and gap.global_position.x < 200.0, gap)
+	var ledge := Vector2(gap.global_position.x, 5.0 * 32.0)
+	_put(ledge)
+	await _frames(10)
+	_check("a platform right under the gap holds the player (Rule A ground)", p.grounded and absf(p.global_position.y - ledge.y) < 1.0, p.global_position)
+	Input.action_press(&"jump")
+	var entered := await _until(func() -> bool: return game.room_id == "gear_room", 60)
+	Input.action_release(&"jump")
+	_check("jumping up through the gap enters the Tinker's Loft, seamlessly", entered and game.transition.is_empty(), game.room_id)
+	var floor_gap: Door = _door("floor")
+	var floor_y: float = floor_gap.global_position.y - 64.0
+	_check("Rule B: you come up through the Loft's floor gap and are ejected", p.state_name() == "eject" and not game.last_ejection.is_empty(), p.state_name())
+	var landed := await _until(func() -> bool: return p.grounded and p.state_name() == "normal", 120)
+	_check("Rule B: you land on the floor beside the gap, not back in it", landed and game.room_id == "gear_room"
+		and absf(p.global_position.y - floor_y) < 1.0 and (p.global_position.x < floor_gap.gap_left() or p.global_position.x > floor_gap.gap_right()), p.global_position)
+	var bounds: Rect2 = game.room.get_bounds()
+	_check("the Loft is at least one screen in size", bounds.size.x >= 960.0 and bounds.size.y >= 540.0, bounds)
+	_put(Vector2(floor_gap.global_position.x, floor_y - 70.0))
+	p.velocity = Vector2(0, 200)
+	var back := await _until(func() -> bool: return game.room_id == "test_room", 60)
+	_check("dropping through the floor gap falls back into the Testing Halls", back, game.room_id)
+	_check("Rule A: the drop lands on the platform under the gap",
+		await _until(func() -> bool: return p.grounded, 90) and absf(p.global_position.y - ledge.y) < 2.0, p.global_position)
+	var rule_a := true
+	for along in [-60.0, -20.0, 20.0, 60.0]:
+		game.load_room("test_room", "ceiling_west", along, Vector2(0, 100))
+		await _frames(2) # Let the arrival leave the old ground first.
+		var ok := await _until(func() -> bool: return p.grounded, 60)
+		rule_a = rule_a and ok and absf(p.global_position.y - ledge.y) < 2.0
+	_check("Rule A: every point of the upper-left gap has ground right below it", rule_a, p.global_position)
+
+	# --- Map: up and to the left of the Halls, on the Halls map ---
+	var loft := atlas.get_room("gear_room")
+	var halls := atlas.get_room("test_room")
+	var lr := atlas.world_rect(loft)
+	var hr := atlas.world_rect(halls)
+	_check("map: the Loft is on the Testing Halls map, up and to the left of the Halls",
+		atlas.zone_of("gear_room").zone_id == "halls" and lr.end.y == hr.position.y and lr.position.x < hr.position.x, [lr, hr])
+	var overlaps := []
+	var all_rooms: Array[MapRoom] = []
+	for zone in atlas.zones:
+		all_rooms.append_array(zone.rooms)
+	for i in all_rooms.size():
+		for j in range(i + 1, all_rooms.size()):
+			if atlas.world_rect(all_rooms[i]).intersects(atlas.world_rect(all_rooms[j])):
+				overlaps.append([all_rooms[i].room_id, all_rooms[j].room_id])
+	_check("map: no two rooms overlap on the world grid", overlaps.is_empty(), overlaps)
+	var adjacent := true
+	for e in loft.exits + halls.exits:
+		if e.target_room == "gear_room" or e.target_room == "test_room":
+			adjacent = adjacent and atlas.exit_is_adjacent(loft if e.target_room == "test_room" else halls, e)
+	_check("map: the gap's exits touch on the map", adjacent)
+
+	# --- Every pouch and tool lies in the Loft; walking over one does nothing, E takes it ---
+	game.load_room("gear_room", "floor")
+	await _frames(3)
+	var pouch_ids := []
+	var tool_ids := []
+	for pk in game.gear_pickups:
+		(pouch_ids if pk.kind == "pouch" else tool_ids).append(pk.gear_id)
+	pouch_ids.sort()
+	tool_ids.sort()
+	var want_pouches: Array = gear.pouches.keys()
+	var want_tools: Array = gear.tools.keys()
+	want_pouches.sort()
+	want_tools.sort()
+	_check("the Loft holds all 3 pouches and all 5 tools", pouch_ids == want_pouches and tool_ids == want_tools, [pouch_ids, tool_ids])
+	_check("pickups are coloured by tier", game.gear_pickups.any(func(pk: GearPickup) -> bool: return pk.tier == GearTier.Tier.STRONG))
+	var first: GearPickup = game.gear_pickups[0]
+	_put(first.global_position)
+	await _frames(8)
+	_check("walking onto a tool does not take it", not first.collected and not data.owned_tools.has(first.gear_id))
+	_check("standing at it shows its E prompt", game.focused_interactable == first and first.highlighted)
+	var grounded_all := true
+	var taken_all := true
+	for pk in game.gear_pickups:
+		_put(pk.global_position)
+		await _frames(8)
+		grounded_all = grounded_all and p.grounded
+		await _hold(&"interact", 2)
+		taken_all = taken_all and pk.collected and game.owns_gear(pk)
+	_check("every pouch and tool sits on standable floor", grounded_all)
+	_check("pressing E takes each pouch and tool for good", taken_all and data.owned_pouches.size() == 3 and data.owned_tools.size() == 5,
+		[data.owned_pouches, data.owned_tools])
+	game.load_room("gear_room", "floor")
+	await _frames(3)
+	_check("taken gear does not come back", game.gear_pickups.all(func(pk: GearPickup) -> bool: return pk.collected and not pk.visible))
+
+	# --- The Gear tab, keyboard only, at the saved checkpoint ---
+	var cp: Checkpoint = game.checkpoints[0]
+	_put(cp.global_position)
+	await _frames(5)
+	await _hold(&"interact", 2)
+	p.fsm.change("normal") # Wake from the trance.
+	await _frames(3)
+	_check("the Loft's checkpoint saves and you stand at it", game.current_checkpoint == cp and p.at_checkpoint)
+	var inv: InventoryMenu = game.inventory
+	await _hold(&"inventory", 2)
+	_check("the inventory opens", inv.is_open())
+	inv.tabs.current_tab = InventoryMenu.STATUS_TAB
+	inv.tab_bar.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_right")
+	await _ui_action(&"ui_right")
+	_check("right, right on the tab row: the Gear tab", inv.tabs.current_tab == InventoryMenu.GEAR_TAB, inv.tabs.current_tab)
+	var tab: GearTab = inv.gear_tab
+	await _ui_action(&"ui_down")
+	_check("down enters the pouch row", get_viewport().gui_get_focus_owner() == tab.pouch_cards[0], get_viewport().gui_get_focus_owner())
+	await _ui_action(&"ui_up")
+	_check("up from the pouch row returns to the tabs", get_viewport().gui_get_focus_owner() == inv.tab_bar)
+	await _ui_action(&"ui_down")
+	await _ui_action(&"ui_accept")
+	_check("confirm on a pouch wears it", data.equipped_pouches.size() == 1 and tab.slot_cards.size() == tab.pouch_cards[0].pouch.slot_count(), data.equipped_pouches)
+	_check("the focus stays on that pouch", get_viewport().gui_get_focus_owner() is GearCard
+		and (get_viewport().gui_get_focus_owner() as GearCard).kind == GearCard.Kind.POUCH)
+	Config.gear.max_equipped_pouches = 1
+	await _ui_action(&"ui_right")
+	await _ui_action(&"ui_accept")
+	_check("with the pouch limit reached another pouch is refused", data.equipped_pouches.size() == 1, data.equipped_pouches)
+	Config.gear.max_equipped_pouches = 4
+	await _ui_action(&"ui_accept")
+	await _ui_action(&"ui_right")
+	await _ui_action(&"ui_accept")
+	_check("right + confirm wears the other pouches too", data.equipped_pouches.size() == 3, data.equipped_pouches)
+	_check("one slot card per slot of every worn pouch", tab.slot_cards.size() == 7, tab.slot_cards.size())
+
+	var crest := _gear_card(tab.tool_cards, "brimming_crest")
+	crest.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	var focus: Control = get_viewport().gui_get_focus_owner()
+	_check("confirm on the strong tool: the focus jumps to the only strong slot", tab.pending_tool_id == "brimming_crest"
+		and focus is GearCard and (focus as GearCard).kind == GearCard.Kind.SLOT and (focus as GearCard).slot_tier == GearTier.Tier.STRONG, focus)
+	await _ui_action(&"ui_accept")
+	_check("confirm on the slot puts the tool there", gear.tool_in("bloodbound_coffer", 0) != null and gear.tool_in("bloodbound_coffer", 0).id == "brimming_crest"
+		and tab.pending_tool_id == "", tab.pending_tool_id)
+	var lantern := _gear_card(tab.tool_cards, "scar_lantern")
+	lantern.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	var weak_slot: GearCard = null
+	for card in tab.slot_cards:
+		if card.slot_tier == GearTier.Tier.WEAK and card.tool == null:
+			weak_slot = card
+	weak_slot.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	_check("a weak slot refuses a medium tool", weak_slot.pouch != null and gear.tool_in(weak_slot.pouch.id, weak_slot.slot_index) == null
+		and tab.pending_tool_id == "scar_lantern")
+	await _ui_action(&"menu_clear")
+	_check("Backspace cancels the slot choice", tab.pending_tool_id == "")
+	var ribbon := _gear_card(tab.tool_cards, "longreach_ribbon")
+	ribbon.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	await _ui_action(&"ui_accept")
+	var ribbon_at: Dictionary = gear.find_tool("longreach_ribbon")
+	_check("a weak tool goes into the first empty slot that holds it", not ribbon_at.is_empty(), ribbon_at)
+	_check("worn gear works at once", is_equal_approx(p.stat("attack_range_mul"), 1.1), p.stat("attack_range_mul"))
+	for card in tab.slot_cards:
+		if card.pouch.id == ribbon_at.pouch and card.slot_index == ribbon_at.slot:
+			card.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	_check("confirm on a filled slot empties it", gear.find_tool("longreach_ribbon").is_empty())
+	crest = _gear_card(tab.tool_cards, "brimming_crest")
+	crest.grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	_check("confirm on a slotted tool takes it out", gear.find_tool("brimming_crest").is_empty())
+	var texts := ""
+	for card in tab.pouch_cards + tab.tool_cards + tab.slot_cards:
+		card.grab_focus()
+		await _frames(1)
+		texts += tab.detail_name.text + tab.detail_kind.text + tab.detail_text.text + card.text
+	_check("the Gear tab shows names, lore and curses but never a number", RegEx.create_from_string("[0-9%]").search(texts) == null)
+	await _hold(&"inventory", 2)
+	_check("the inventory closes", not inv.is_open())
+
+	# Away from the checkpoint you can look, not change.
+	_put(cp.global_position + Vector2(-300, 0))
+	await _frames(5)
+	await _hold(&"inventory", 2)
+	inv.tabs.current_tab = InventoryMenu.GEAR_TAB
+	await _frames(1)
+	tab.pouch_cards[0].grab_focus()
+	await _frames(1)
+	var worn := data.equipped_pouches.duplicate()
+	await _ui_action(&"ui_accept")
+	_check("away from the saved checkpoint the Gear tab changes nothing", data.equipped_pouches == worn and tab.notice_label.text.contains("checkpoint"), tab.notice_label.text)
+	await _hold(&"inventory", 2)
+
+	# Saves keep worn gear.
+	var saved: Dictionary = game.make_save_data()
+	_check("the save stores the gear taken and worn", (saved.gear.pouches as Array).size() == 3 and (saved.gear.equipped as Array).size() == 3)
+
+	# Clean up: no gear for the checks that follow.
+	gear.clear_all()
+	data.owned_tools.clear()
+	data.owned_pouches.clear()
+	data.pouch_contents.clear()
+	gear.refresh()
+	await _reset()
+
+
+func _gear_card(cards: Array[GearCard], tool_id: String) -> GearCard:
+	for card in cards:
+		if card.tool and card.tool.id == tool_id:
+			return card
+	return null

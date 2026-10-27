@@ -31,6 +31,7 @@ const ROOM_SCENES := {
 	"hidden_vault": preload("res://world/hidden_vault.tscn"),
 	"lava_room": preload("res://world/lava_room.tscn"),
 	"bestiary": preload("res://world/bestiary.tscn"), # Testing mega-hall below the Testing Halls.
+	"gear_room": preload("res://world/gear_room.tscn"), # Tinker's Loft: up-left of the Testing Halls, every pouch and tool.
 }
 const START_ROOM := "test_room"
 const ENEMY_SCENES := {
@@ -110,6 +111,10 @@ var scrolls: Array[SpellScroll] = []
 var altars: Array[MeditationAltar] = []
 var ability_pickups: Array[AbilityPickup] = []
 var map_pickups: Array[MapPickup] = [] ## Zone maps lying in this room (layout letter 'M').
+var gear_pickups: Array[GearPickup] = [] ## Pouches and tools lying in this room ('p', 't').
+## Every item in this room taken with Interact (relics, potions, scrolls,
+## movement items, maps, gear). Walking over them does nothing.
+var collectibles: Array[Collectible] = []
 var sealed_doors: Array[Door] = [] ## Doorways sealed in this room (spatial anomalies, MapAtlas).
 var map_overlay: MapOverlay ## The quick view (hold the Map key).
 ## Full-screen tutorial popups (created in _ready). Set tutorials_enabled
@@ -124,7 +129,7 @@ var start_in_trance := true
 var current_checkpoint: Checkpoint ## The saved checkpoint, if it is in this room.
 ## Where death respawns the player: {room, checkpoint (node name), position}.
 var respawn := {}
-var focused_interactable: Interactable
+var focused_interactable: Node2D ## The Interactable or Collectible whose prompt shows.
 var pending_respawn := false
 var _pending_door := {} ## {room, door}: a doorway was entered this step.
 var last_ejection := {} ## The last upward arrival (Rule B): {side, target, start}. Tests, debug.
@@ -173,6 +178,7 @@ func _ready() -> void:
 
 	Events.boss_defeated.connect(func(_b: Node) -> void: write_save())
 	Events.loadout_changed.connect(_refresh_progression_objects)
+	Events.gear_changed.connect(_refresh_progression_objects)
 	Events.arena_cleared.connect(func(_id: String) -> void: write_save())
 
 	_load_room_scene(START_ROOM)
@@ -304,6 +310,8 @@ func _load_room_scene(id: String) -> void:
 	altars.clear()
 	ability_pickups.clear()
 	map_pickups.clear()
+	gear_pickups.clear()
+	collectibles.clear()
 	sealed_doors.clear()
 	platforms.clear()
 	grapple_pegs.clear()
@@ -362,6 +370,13 @@ func _load_room_scene(id: String) -> void:
 			ability_pickups.append(node)
 			if player_data.has_movement(node.ability):
 				node.collect() # Already learned: the item is gone.
+		if node is GearPickup:
+			gear_pickups.append(node)
+			node.tier = gear.tier_of(node.kind, node.gear_id)
+			if owns_gear(node):
+				node.collect() # Already owned: the pouch or tool is gone.
+		if node is Collectible:
+			collectibles.append(node)
 		if node is MeditationAltar:
 			altars.append(node)
 			node.set_spent(player_data.is_slot_open(node.get_slot()))
@@ -703,17 +718,22 @@ func save_at_checkpoint(cp: Checkpoint) -> void:
 
 # ---------- Interaction & dialogue ----------
 
+## The nearest interactable (NPC, tablet, checkpoint, altar) or collectible
+## item in reach gets the prompt; Interact (E) uses or takes it.
 func _update_interaction() -> void:
-	var best: Interactable = null
+	var best: Node2D = null
 	var best_d := INF
 	var pr := player.get_rect()
-	for it in interactables:
+	var candidates: Array[Node2D] = []
+	candidates.append_array(interactables)
+	candidates.append_array(collectibles)
+	for it in candidates:
 		if it.can_interact() and it.get_interact_rect().intersects(pr):
 			var d := it.global_position.distance_squared_to(player.global_position)
 			if d < best_d:
 				best_d = d
 				best = it
-	for it in interactables:
+	for it in candidates:
 		it.highlighted = it == best
 	focused_interactable = best
 	if best == null or not player.can_attack():
@@ -721,7 +741,24 @@ func _update_interaction() -> void:
 	# Checkpoints also save with Down while standing on the ground.
 	var down_save := best is Checkpoint and player.grounded and input.was_pressed(&"move_down")
 	if input.was_pressed(&"interact") or down_save:
-		best.interact(self)
+		if best is Collectible:
+			collect_item(best)
+		else:
+			best.interact(self)
+
+
+## Takes an item the player pressed Interact at.
+func collect_item(item: Collectible) -> void:
+	if item is Relic:
+		collect_relic(item)
+	elif item is SpellScroll:
+		collect_scroll(item)
+	elif item is AbilityPickup:
+		collect_ability(item)
+	elif item is MapPickup:
+		collect_map(item)
+	elif item is GearPickup:
+		collect_gear(item)
 
 
 func open_dialogue(data: DialogueData) -> void:
@@ -751,18 +788,7 @@ func _update_pickups(delta: float) -> void:
 		if coin.dropped and coin.collected:
 			coins.erase(coin)
 			coin.queue_free()
-	for relic in relics:
-		if not relic.collected and relic.get_rect().intersects(pr):
-			collect_relic(relic)
-	for scroll in scrolls:
-		if not scroll.collected and scroll.get_rect().intersects(pr):
-			collect_scroll(scroll)
-	for pickup in ability_pickups:
-		if not pickup.collected and pickup.get_rect().intersects(pr):
-			collect_ability(pickup)
-	for pickup in map_pickups:
-		if not pickup.collected and pickup.get_rect().intersects(pr):
-			collect_map(pickup)
+	# Every other item waits for Interact (_update_interaction, collect_item).
 
 
 ## Permanent upgrade: raises max health or max energy for this save. Potions
@@ -803,6 +829,23 @@ func collect_ability(pickup: AbilityPickup) -> void:
 	Events.movement_learned.emit(pickup.ability, pickup.global_position)
 	show_tutorial(pickup.ability)
 	write_save()
+
+
+## A pouch or a tool: it joins the owned gear, to be equipped at the saved
+## checkpoint (Inventory, Gear tab). No celebration (Rule F).
+func collect_gear(pickup: GearPickup) -> void:
+	pickup.collect()
+	if pickup.kind == "pouch":
+		gear.grant_pouch(pickup.gear_id)
+	else:
+		gear.grant_tool(pickup.gear_id)
+	Events.gear_collected.emit(pickup.kind, pickup.gear_id, pickup.global_position)
+	Events.gear_changed.emit()
+	write_save()
+
+
+func owns_gear(pickup: GearPickup) -> bool:
+	return (player_data.owned_pouches if pickup.kind == "pouch" else player_data.owned_tools).has(pickup.gear_id)
 
 
 # ---------- Map ----------
@@ -916,12 +959,17 @@ func _refresh_progression_objects() -> void:
 		if player_data.is_unlocked(scroll.spell_id) and not scroll.collected:
 			scroll.collect()
 		elif not player_data.is_unlocked(scroll.spell_id) and scroll.collected:
-			scroll.collected = false
-			scroll.visible = true
+			scroll.restore()
 	for altar in altars:
 		altar.set_spent(player_data.is_slot_open(altar.get_slot()))
 	for pickup in ability_pickups:
 		if player_data.has_movement(pickup.ability) != pickup.collected:
+			if pickup.collected:
+				pickup.restore()
+			else:
+				pickup.collect()
+	for pickup in gear_pickups:
+		if owns_gear(pickup) != pickup.collected:
 			if pickup.collected:
 				pickup.restore()
 			else:

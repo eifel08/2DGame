@@ -34,7 +34,7 @@ To pull later changes: `git pull` inside the `2DGame` folder, then reopen the pr
 | Grappling hook (Left / Right or Up to aim; Down in the air = swing) | H | L3 |
 | Spell: Mana Discharge (no direction held) | U | Y |
 | Spell: Up / Side / Down slot | U + Up, Left or Right, Down | Y + direction |
-| Interact (talk, read, save, meditate at an altar) | E (checkpoints: also Down) | B |
+| Interact (talk, read, save, meditate at an altar, **take an item**) | E (checkpoints: also Down) | B |
 | Pause menu | Esc | Start |
 | Inventory | I | Back / Select |
 | Map quick view (hold) | Tab | R3 |
@@ -175,11 +175,11 @@ A new game starts weak. Everything else is found in the world.
 | Spell slots (Up, Side, Down) | all **locked** |
 | Neutral input | **Mana Discharge**, fixed for good. It works at any energy (see above). |
 
-- **Health Potion** (`world/objects/health_potion.tscn`, layout letter `h`): a red, round flask. Touch it: max health rises for good (`Config.progression.health_potion_amount`, 15) and you are fully healed.
-- **Mana Potion** (`mana_potion.tscn`, letter `e`): a **blue**, tall, angular bottle with a long thin neck, so it never looks like a Health Potion. Touch it: max energy rises for good (`mana_potion_amount`, 15).
+- **Health Potion** (`world/objects/health_potion.tscn`, layout letter `h`): a red, round flask. Take it (E): max health rises for good (`Config.progression.health_potion_amount`, 15) and you are fully healed.
+- **Mana Potion** (`mana_potion.tscn`, letter `e`): a **blue**, tall, angular bottle with a long thin neck, so it never looks like a Health Potion. Take it (E): max energy rises for good (`mana_potion_amount`, 15).
   - Both are `Potion` (a `Relic`), saved by id like relics, and never come back. The bar frames in the inventory grow with them.
   - Placed: Health Potions in the Testing Halls (left platforms), the Upper Galleries and the Hidden Shrine. Mana Potions in the Testing Halls (upper right), the Hidden Vault and the Proving Grounds.
-- **Spell Scrolls** (`spell_scroll.tscn`, letter `?`, spell id in the room's `"scrolls"` entry): touch one and its spell is **learned for good**. It joins the inventory pool and can go on an **open** slot at your saved checkpoint. There is one scroll per equippable spell:
+- **Spell Scrolls** (`spell_scroll.tscn`, letter `?`, spell id in the room's `"scrolls"` entry): take one (E) and its spell is **learned for good**. It joins the inventory pool and can go on an **open** slot at your saved checkpoint. There is one scroll per equippable spell:
 
   | Room | Scroll |
   | --- | --- |
@@ -203,7 +203,7 @@ A new game starts weak. Everything else is found in the world.
 - Debug overlay, *Spells*: *Open All Slots* and *Full Kit* (every spell, every slot, the default loadout). *Know All Spells* and the checkboxes still teach or forget single spells.
 
 ### Movement items
-Each movement ability is a glowing orb with its symbol (`world/objects/ability_pickup.tscn`, `AbilityPickup`). Touch it and the ability works from then on, for good (`PlayerData.movement`, saved).
+Each movement ability is a glowing orb with its symbol (`world/objects/ability_pickup.tscn`, `AbilityPickup`). Take it (E) and the ability works from then on, for good (`PlayerData.movement`, saved).
 
 | Item | Letter | Where | Needs first |
 | --- | --- | --- | --- |
@@ -216,8 +216,11 @@ Each movement ability is a glowing orb with its symbol (`world/objects/ability_p
 - A save from before the items keeps every movement ability.
 - Debug overlay: *Learn Movement*, and *Full Kit* (movement, spells and slots).
 
+### Items are taken with E
+Walking over an item no longer takes it. Stand at it: an **"E  Take"** prompt appears above it, as at a checkpoint or a tablet. Press **E** (Interact) to take it. This holds for every item lying in the world: relics, Health and Mana Potions, Spell Scrolls, movement items, zone maps, pouches and tools (`world/objects/collectible.gd`, base class `Collectible`; `Game._update_interaction` picks the nearest interactable or item). **Shards** are currency, not items: they are still taken on touch, also when enemies drop them. Items are taken in the normal state only (not while hurt, dashing or casting).
+
 ### Pouches and tools (gear)
-> **Foundation only:** the data, rules, effects, saves and debug controls are in. There is no pickup or inventory screen for gear yet; use the debug overlay (*Pouches & Tools*).
+Every pouch and tool lies in the **Tinker's Loft** (see *Rooms and openings*): take them with E, then rest at the Loft's checkpoint (or any saved checkpoint) and wear them in **Inventory → Gear**.
 
 **Tools** are small charms with a tier: **Weak**, **Medium** or **Strong**. Each has a hidden effect and a lore text that never states a number (`gear/gear_registry.gd`):
 
@@ -240,6 +243,12 @@ Each movement ability is a glowing orb with its symbol (`world/objects/ability_p
 - Up to `Config.gear.max_equipped_pouches` pouches can be equipped at once: **4** by default, 1–5 in the debug overlay. If the limit is lowered below what is equipped, only the first pouches in equip order count.
 - A tool sits in one slot at a time; slotting it again moves it. Tools stay in a pouch when it is unequipped, but only work while their pouch is equipped.
 - Saved in the slot as `"gear"` (owned tools and pouches, equipped pouches, slot contents). An older save loads with no gear.
+- **Inventory → Gear tab** (keyboard only, like the spell loadout): the **Pouches** row (every owned pouch), the **Tools** row (every owned tool) and one row of **slot cards** per worn pouch, framed in their tier's colour (W / M / S).
+  - Down from the tab row enters the Pouches row; Up from the top row returns to the tabs; arrows move between cards.
+  - Confirm on a pouch: wear it (up to the limit) or take it off. Confirm on a free tool: the focus jumps to the first empty slot that can hold it; confirm on a slot to put it there (a slot too weak for it refuses it; an occupied slot has its tool replaced). Confirm on a slotted tool, or on a filled slot, takes the tool out. Backspace cancels the slot choice or empties the focused slot.
+  - Cards show icons only; the focused card's name, tier, lore and (for a pouch) its slots and curse appear below it, never a number.
+  - **Changes only work at the checkpoint where you saved**; elsewhere you can browse (`ui/gear_tab.gd`, `ui/gear_card.gd`, art in `ui/gear_art.gd`).
+- Pickups: `world/objects/gear_pickup.tscn` (`GearPickup`, layout letters `p` pouch / `t` tool, ids in the room's `"gear"` entry). A taken pouch or tool never comes back; owning it is the record (saved with the gear).
 - Debug overlay, *Pouches & Tools*: *Max Pouches* slider, *Grant All Gear*, *Equip All Pouches*, *Auto-Fill Tools*, *Clear Gear*; the live readout shows the active pouches and their slots. *Vitals & Energy* has *Energy Leak /s*.
 - **Fusion (future):** a tool's whole gameplay is a list of `GearEffect` resources. `ToolFusion.fuse(id, name, lore, parts)` makes a fused `ToolData` with every part's effects, at the highest part tier, remembering its parts in `fused_from`. It slots and works like any tool; nothing calls it in the game yet.
 - **New tool or pouch:** add it to `GearRegistry` (or make a `.tres` in the editor and `GearManager.add_tool` / `add_pouch` it). Reuse `StatGearEffect` for a stat multiplier, or extend `GearEffect` with an `on_*` hook. Keep lore and curse texts free of numbers (the smoke test checks it).
@@ -256,7 +265,7 @@ The first time something new happens, a **full-screen** window explains it with 
 | use a meditation altar | `meditation` | kneeling at the altar, a ring fills, a padlock on the cross opens; Interact |
 | take a Health Potion | `health_potion` | the red flask, then the health bar frame grows |
 | take a Mana Potion | `mana_potion` | the blue bottle, then the energy bar frame grows |
-| take a Spell Scroll | `spell_scroll` | 1 learn (touch the scroll), 2 equip at your flame (Inventory, the cross), 3 cast (Spell + Up) |
+| take a Spell Scroll | `spell_scroll` | 1 learn (take the scroll with E), 2 equip at your flame (Inventory, the cross), 3 cast (Spell + Up) |
 
 - **Any key closes it**: any keyboard key, also unbound ones (a gamepad button or a click works too). Presses in the first 0.25 s are ignored, so a key already on its way down does not skip it unseen. The closing key never acts in the game (the next two steps are skipped).
 - The game is paused while it is open. The altar's meditation waits and runs after it closes.
@@ -284,11 +293,12 @@ The camera follows the player and never shows anything outside the room. **Look 
 ### Rooms and openings
 > **Design rules:** read [`GUIDELINES.md`](GUIDELINES.md) before changing any room, exit or feedback. Rule A: ground right below every downward exit. Rule B: an upward exit puts you beside the gap, on floor. Rule C: secret walls stay breakable and open during arena fights. Rule D: every room and hidden pocket is closed by solid walls wherever there is no transition. Rule E: the way out of a secret room looks like an ordinary open doorway. Rule F: no celebrations anywhere.
 
-The world map has eight rooms:
+The world map has nine rooms:
 
 ```
  Hidden Vault  ⇄ (secret doorway) ⇄  Upper Galleries  ⇄  Ember Crossing (lava, dead end; its old doorway to the Hidden Vault is walled up)
-                                          ⇅ (gap in the ceiling)
+ Tinker's Loft (gear)                     ⇅ (gap in the ceiling)
+   ⇅ (upper-left ceiling gap)
                                     Testing Halls  ⇄  Sentinel's Arena  ⇄  Proving Grounds  ⇄ (breakable wall) ⇄  Hidden Shrine
                                           ⇅ (plank over a floor gap: Down + Jump)
                                     Bestiary (one chamber per enemy type)
@@ -296,6 +306,7 @@ The world map has eight rooms:
 
 - **Seamless transitions.** A room exit is simply a place where the wall is missing. There is no light, arrow, sound, fade or pause. Walk, jump or fall through the opening and you are in the next room, at the same height (or the same spot along a ceiling gap), with the same speed.
 - **Ceiling gap:** in the Testing Halls, the ceiling is open above the central hanging wall. Climb the wall (or wall-jump up its side) and jump. You come up **through** a gap in the floor of the **Upper Galleries**: you rise out of the opening, then an arc throws you onto the floor to its left or right (Rule B), a side room with ordinary enemies (weak and strong dummies, flyers), shards and platforms. No boss and no arena. Drop back through the floor gap to return; you land on the wall cap, which spans the whole ceiling gap (Rule A).
+- **Tinker's Loft** (`world/gear_room.tscn`, test room): **up and to the left** of the Testing Halls. Climb the left shaft (wall climb) onto the platform at its top, then jump up through the gap in the ceiling right above it. You rise out of the Loft's floor gap and an arc throws you onto the floor beside it (Rule B). Drop back through the gap and you land on that platform (Rule A). The Loft holds **all 3 pouches and all 5 tools** (floor and a low platform) and a checkpoint where you can wear them. On the map it sits up-left of the Halls, in the Testing Halls zone.
 - **Proving Grounds** is a dedicated arena room with its own checkpoint and three waves. Once cleared, it stays cleared.
 - **Secret passage:** at the far east end of the Proving Grounds, the outer wall has a section that is really a breakable wall. It sits exactly where the solid wall would be and looks like it, apart from faint cracks. Strike it three times. This works even while the arena fight runs, and the passage is never locked by it (Rule C). It crumbles at once (debris and a crash, no jingle, flash or message), and opens the way to the **Hidden Shrine**. The shrine holds a lore tablet, shards, a **relic** that raises max health for this save, a Health Potion, the Stasis Field scroll and the meditation altar of the **Down** slot. The broken wall and the relic are saved.
 - **Secret walls (walk through, no attack).** There are two types; [`GUIDELINES.md`](GUIDELINES.md) ("Secret walls") is the binding description.
@@ -446,7 +457,7 @@ The world is split into **zones**, each with its own map. A room belongs to one 
 
 | Zone | Rooms | Its map lies |
 | --- | --- | --- |
-| Testing Halls (`halls`) | Testing Halls, Sentinel's Arena, Proving Grounds, Hidden Shrine (secret), Bestiary (not on the base map) | Testing Halls floor, two steps right of the start flame (`MapPickup1` in `world/test_room.tscn`) |
+| Testing Halls (`halls`) | Testing Halls, Tinker's Loft, Sentinel's Arena, Proving Grounds, Hidden Shrine (secret), Bestiary (not on the base map) | Testing Halls floor, two steps right of the start flame (`MapPickup1` in `world/test_room.tscn`) |
 | Upper Reaches (`reaches`) | Upper Galleries, Hidden Vault (secret), Ember Crossing | Upper Galleries floor, right of the altar, just past where you arrive from the ceiling gap (`MapPickup1` in `world/upper_room.tscn`) |
 
 - **No map, no rooms.** Without a zone's map, the map shows **not a single room** of that zone, not even the ones you have explored. Exploring is still remembered.
@@ -464,7 +475,7 @@ The world is split into **zones**, each with its own map. A room belongs to one 
 - No celebration (Rule F): taking a map plays the soft pickup sound and a small puff.
 
 ### Inventory and loadout (I)
-The game pauses while the inventory is open. It has three tabs (switch with Q / E): Status, Abilities and Map (see *Map and fog of war*).
+The game pauses while the inventory is open. It has four tabs (switch with Q / E): Status, Abilities, Gear (see *Pouches and tools*) and Map (see *Map and fog of war*).
 - **Status:** shards (the only number), plus health and energy as bars. A bar's frame grows when its maximum increases (`max_health_bonus` / `max_energy_bonus`; the debug overlay has buttons to test this).
 - **Abilities:** the spell cross on the left (the same D-pad as the HUD, as large focusable cards), and every known equippable spell on the right. Equipped spells in the pool carry their direction (Up, Side, Down).
   - A **locked** slot shows a padlock (in the HUD too). It takes no spell until a meditation altar opens it. With no spell known or no slot open, the notice points to scrolls and altars.
@@ -524,6 +535,7 @@ The HUD is clean by default: health and energy bars, threshold marks, the spell 
 | Secret doorway (Type 2) | Upper Galleries, west wall at floor level: a faint, semi-transparent section. Walk into it: you are in the Hidden Vault. Its east side has an ordinary open doorway (Rule E): walk through it to go back. Repeat as often as you like. |
 | Solid boundaries (Rule D) | After breaking into the Testing Halls' west pocket, keep walking left: you stop at a solid wall, and that wall is on screen. |
 | Spawn portal | Debug overlay → spawn an enemy, or enter an arena: enemies fade in through a portal and cannot hurt you yet. |
+| Tinker's Loft and gear | Testing Halls: wall-climb the left shaft onto the platform at its top, jump up into the ceiling gap: you arc out beside the Loft's floor gap. Walk onto a pouch: nothing happens; press E: it is yours. Take all 8 items, press E at the flame, then I → Gear: Down, Enter wears a pouch; pick a tool, Enter on a slot puts it in. Away from the flame nothing can change. |
 | Seamless exit | Run to the far east end of the Test Room: you keep running into the Boss Room, with no fade. Run back left to return. |
 | Ceiling gap | Climb the central hanging wall, jump from its top: you rise out of the floor gap of the Upper Galleries and arc onto the floor beside it. Fall back through the floor gap to return. |
 | Look up / down | Stand still at the start and hold Up: the view pans up. Climb the central hanging wall and hold Down: it pans down. Walk: it snaps back. |
@@ -601,17 +613,20 @@ world/
   boss_room.tscn         boss room: arena with waves and the Hollow Sentinel
   arena_room.tscn        Proving Grounds: arena room with a cracked wall
   secret_room.tscn       Hidden Shrine: relic, tablet, shards
+  gear_room.tscn         Tinker's Loft: up-left of the test room, every pouch and tool, a checkpoint
   objects/               interactable base, checkpoint, lore stone, NPC, coin, door, breakable wall, relic,
                          secret walls: secret_wall (base), hidden_pocket_wall (Type 1), secret_doorway (Type 2),
                          grapple_peg (hook-only anchor: hold or swing; standard / moving / breakable scenes),
                          platform (one-way object: standard / moving / breakable), mover (back-and-forth path),
                          lava (floor-only hazard, never pogoed),
                          potion (Health / Mana Potion), spell_scroll, meditation_altar, ability_pickup (progression),
-                         map_pickup (a zone's map)
+                         map_pickup (a zone's map), gear_pickup (a pouch or tool),
+                         collectible (base of every item taken with E)
 dialogue/                DialogueData resources (NPC + lore texts)
 ui/                      HUD, dialogue box, inventory, debug overlay, title, pause and settings menus,
                          tutorial_popup (full-screen discovery popups), ability_art (shared placeholder drawings),
                          map_view (one zone map with its fog of war), map_overlay (the hold-Tab quick view)
+                         gear_tab, gear_card, gear_art (the inventory's Gear tab)
 tools/build_assets.gd    regenerates rigs, animations, TileSet, room and input map
 core/world_state.gd      dead enemies, bosses, arenas, collected shards
 gear/                    pouches and tools: GearTier, ToolData, PouchData, GearRegistry (the tools and pouches),
