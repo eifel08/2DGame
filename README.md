@@ -243,11 +243,16 @@ Every pouch and tool lies in the **Tinker's Loft** (see *Rooms and openings*): t
 - Up to `Config.gear.max_equipped_pouches` pouches can be equipped at once: **4** by default, 1–5 in the debug overlay. If the limit is lowered below what is equipped, only the first pouches in equip order count.
 - A tool sits in one slot at a time; slotting it again moves it. Tools stay in a pouch when it is unequipped, but only work while their pouch is equipped.
 - Saved in the slot as `"gear"` (owned tools and pouches, equipped pouches, slot contents). An older save loads with no gear.
-- **Inventory → Gear tab** (keyboard only, like the spell loadout): the **Pouches** row (every owned pouch), the **Tools** row (every owned tool) and one row of **slot cards** per worn pouch, framed in their tier's colour (W / M / S).
-  - Down from the tab row enters the Pouches row; Up from the top row returns to the tabs; arrows move between cards.
-  - Confirm on a pouch: wear it (up to the limit) or take it off. Confirm on a free tool: the focus jumps to the first empty slot that can hold it; confirm on a slot to put it there (a slot too weak for it refuses it; an occupied slot has its tool replaced). Confirm on a slotted tool, or on a filled slot, takes the tool out. Backspace cancels the slot choice or empties the focused slot.
-  - Cards show icons only; the focused card's name, tier, lore and (for a pouch) its slots and curse appear below it, never a number.
-  - **Changes only work at the checkpoint where you saved**; elsewhere you can browse (`ui/gear_tab.gd`, `ui/gear_card.gd`, art in `ui/gear_art.gd`).
+- **Inventory → Gear tab** (keyboard only, like the spell loadout), top to bottom:
+  - **Pouches**: every owned pouch.
+  - **Belt**: a leather belt with **5 loops** (`GearBelt.LOOPS`). A worn pouch hangs in its loop, drawn large, with its **tool slots on it** (framed in the slot's tier colour, W / M / S); a slotted tool is drawn **inside its slot**. Loops past the pouch limit show a padlock (with the default limit of 4, the fifth).
+  - **Tools**: every owned tool.
+  - Down from the tab row enters the Pouches row; Up from it returns to the tabs; arrows move between cards (pouches → belt → a pouch's slots → tools).
+  - Confirm on a free pouch, then on a belt loop, to hang it there (the focus jumps to the first free loop; an occupied loop has its pouch swapped out). Confirm on a worn pouch (in the row or on the belt) takes it off. Confirm on a free tool: the focus jumps to the first empty slot that can hold it; confirm on a slot to put it there (a slot too weak for it refuses it; an occupied slot has its tool replaced). Confirm on a slotted tool, or on a filled slot, takes the tool out. Backspace cancels the choice or empties the focused slot / loop.
+  - **Visual states, as for spells:** a free item is drawn normally; an item in use (a worn pouch, a slotted tool) is **half greyed** in its row with a corner tag (*On*, *In*); the item waiting for a place is drawn pressed; the focused card has the gold frame, and the card that shows the same item elsewhere (row ↔ belt) gets the dim mirror frame.
+  - **Every pouch and tool has its own drawing** (`ui/gear_art.gd`, also used by the pickups): Longreach Ribbon a swing running on into an arrow, Wayfarer's Anklet a winged boot with speed lines, Scar Lantern a lantern turning a blood drop into a bolt, Quickening Hourglass an hourglass with rising sand, Brimming Crest a brimming crest spilling into wave rings; Patched Satchel a patched bag leaking a bolt, Hollow Reliquary a twin-chambered box dripping energy, Bloodbound Coffer a three-lock coffer bound with blood.
+  - Cards show icons only; the focused card's name, tier, lore and (for a pouch) its slots and curse appear below, never a number.
+  - **Changes only work at the checkpoint where you saved**; elsewhere you can browse (`ui/gear_tab.gd`, `ui/gear_belt.gd`, `ui/gear_card.gd`).
 - Pickups: `world/objects/gear_pickup.tscn` (`GearPickup`, layout letters `p` pouch / `t` tool, ids in the room's `"gear"` entry). A taken pouch or tool never comes back; owning it is the record (saved with the gear).
 - Debug overlay, *Pouches & Tools*: *Max Pouches* slider, *Grant All Gear*, *Equip All Pouches*, *Auto-Fill Tools*, *Clear Gear*; the live readout shows the active pouches and their slots. *Vitals & Energy* has *Energy Leak /s*.
 - **Fusion (future):** a tool's whole gameplay is a list of `GearEffect` resources. `ToolFusion.fuse(id, name, lore, parts)` makes a fused `ToolData` with every part's effects, at the highest part tier, remembering its parts in `fused_from`. It slots and works like any tool; nothing calls it in the game yet.
@@ -626,7 +631,7 @@ dialogue/                DialogueData resources (NPC + lore texts)
 ui/                      HUD, dialogue box, inventory, debug overlay, title, pause and settings menus,
                          tutorial_popup (full-screen discovery popups), ability_art (shared placeholder drawings),
                          map_view (one zone map with its fog of war), map_overlay (the hold-Tab quick view)
-                         gear_tab, gear_card, gear_art (the inventory's Gear tab)
+                         gear_tab, gear_belt, gear_card, gear_art (the inventory's Gear tab: pouches, belt, tools)
 tools/build_assets.gd    regenerates rigs, animations, TileSet, room and input map
 core/world_state.gd      dead enemies, bosses, arenas, collected shards
 gear/                    pouches and tools: GearTier, ToolData, PouchData, GearRegistry (the tools and pouches),

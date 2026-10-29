@@ -123,6 +123,25 @@ func equip_pouch(pouch_id: String) -> bool:
 	return true
 
 
+## Wears a pouch on belt loop `index` (its place in equip order). A loop
+## past the worn pouches takes it at the end; an occupied loop swaps the
+## worn pouch out (its tools stay inside it). Refused past the pouch limit.
+func equip_pouch_at(pouch_id: String, index: int) -> bool:
+	if not data.owned_pouches.has(pouch_id) or index < 0 or index >= max_pouches():
+		return false
+	var worn := data.equipped_pouches
+	if worn.has(pouch_id):
+		worn.erase(pouch_id) # Moving a worn pouch to another loop.
+	if index < worn.size():
+		worn[index] = pouch_id
+	elif worn.size() < max_pouches():
+		worn.append(pouch_id)
+	else:
+		return false
+	refresh()
+	return true
+
+
 ## The pouch leaves the loadout; its tools stay inside it.
 func unequip_pouch(pouch_id: String) -> bool:
 	if not is_equipped(pouch_id):

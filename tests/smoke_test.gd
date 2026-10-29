@@ -5554,25 +5554,58 @@ func _test_gear_room() -> void:
 	await _ui_action(&"ui_right")
 	_check("right, right on the tab row: the Gear tab", inv.tabs.current_tab == InventoryMenu.GEAR_TAB, inv.tabs.current_tab)
 	var tab: GearTab = inv.gear_tab
+	_check("the Gear tab: pouches on top, the belt in the middle, tools at the bottom",
+		tab.pouch_row.global_position.y < tab.belt.global_position.y and tab.belt.global_position.y < tab.tool_row.global_position.y)
+	_check("the belt has 5 loops; with the default limit of 4 the fifth is locked",
+		tab.belt_cards.size() == 5 and not tab.belt_cards[3].locked and tab.belt_cards[4].locked)
+	var art_src: String = (load("res://ui/gear_art.gd") as GDScript).source_code
+	var missing := []
+	for id in gear.tools.keys() + gear.pouches.keys():
+		if not art_src.contains("\"%s\":" % id):
+			missing.append(id)
+	_check("every pouch and every tool has its own drawing", missing.is_empty(), missing)
 	await _ui_action(&"ui_down")
 	_check("down enters the pouch row", get_viewport().gui_get_focus_owner() == tab.pouch_cards[0], get_viewport().gui_get_focus_owner())
 	await _ui_action(&"ui_up")
 	_check("up from the pouch row returns to the tabs", get_viewport().gui_get_focus_owner() == inv.tab_bar)
 	await _ui_action(&"ui_down")
 	await _ui_action(&"ui_accept")
-	_check("confirm on a pouch wears it", data.equipped_pouches.size() == 1 and tab.slot_cards.size() == tab.pouch_cards[0].pouch.slot_count(), data.equipped_pouches)
-	_check("the focus stays on that pouch", get_viewport().gui_get_focus_owner() is GearCard
-		and (get_viewport().gui_get_focus_owner() as GearCard).kind == GearCard.Kind.POUCH)
+	_check("confirm on a free pouch asks for a belt loop (focus: the first free one)", tab.pending_pouch_id == tab.pouch_cards[0].pouch.id
+		and get_viewport().gui_get_focus_owner() == tab.belt_cards[0] and tab.pouch_cards[0].button_pressed, tab.pending_pouch_id)
+	await _ui_action(&"ui_accept")
+	_check("confirm on the loop hangs the pouch on the belt, with its slots",
+		data.equipped_pouches.size() == 1 and tab.belt_cards[0].pouch != null and tab.slot_cards.size() == tab.belt_cards[0].pouch.slot_count(), data.equipped_pouches)
+	_check("a worn pouch is half greyed in the row, tagged On", tab.pouch_cards[0].dim and tab.pouch_cards[0].tag == "On" and not tab.pouch_cards[1].dim)
+	_check("focusing the pouch on the belt gives its row card the dim mirror frame", tab.pouch_cards[0].mirror and not tab.belt_cards[0].mirror)
 	Config.gear.max_equipped_pouches = 1
-	await _ui_action(&"ui_right")
+	tab.pouch_cards[1].grab_focus()
+	await _frames(1)
 	await _ui_action(&"ui_accept")
-	_check("with the pouch limit reached another pouch is refused", data.equipped_pouches.size() == 1, data.equipped_pouches)
+	await _frames(2)
+	_check("with the pouch limit at one, every other loop is locked", tab.belt_cards[1].locked and tab.belt_cards[4].locked)
+	tab.belt_cards[1].grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	_check("a locked loop refuses a pouch", data.equipped_pouches.size() == 1, data.equipped_pouches)
 	Config.gear.max_equipped_pouches = 4
-	await _ui_action(&"ui_accept")
-	await _ui_action(&"ui_right")
-	await _ui_action(&"ui_accept")
-	_check("right + confirm wears the other pouches too", data.equipped_pouches.size() == 3, data.equipped_pouches)
-	_check("one slot card per slot of every worn pouch", tab.slot_cards.size() == 7, tab.slot_cards.size())
+	await _frames(2)
+	await _ui_action(&"menu_clear")
+	for i in [1, 2]:
+		tab.pouch_cards[i].grab_focus()
+		await _frames(1)
+		await _ui_action(&"ui_accept") # Choose a loop: the focus jumps to the next free one.
+		await _ui_action(&"ui_accept")
+	_check("the other pouches hang on the next loops", data.equipped_pouches.size() == 3 and tab.belt_cards[2].pouch != null, data.equipped_pouches)
+	_check("one slot card per slot of every worn pouch, drawn on the belt", tab.slot_cards.size() == 7
+		and tab.slot_cards.all(func(c: GearCard) -> bool: return tab.belt.is_ancestor_of(c)), tab.slot_cards.size())
+	tab.belt_cards[0].grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_down")
+	var below: Control = get_viewport().gui_get_focus_owner()
+	_check("down from a pouch on the belt reaches its slots", below is GearCard and (below as GearCard).kind == GearCard.Kind.SLOT, below)
+	await _ui_action(&"ui_down")
+	below = get_viewport().gui_get_focus_owner()
+	_check("down from the slots reaches the tool row", below is GearCard and (below as GearCard).kind == GearCard.Kind.TOOL, below)
 
 	var crest := _gear_card(tab.tool_cards, "brimming_crest")
 	crest.grab_focus()
@@ -5580,22 +5613,30 @@ func _test_gear_room() -> void:
 	await _ui_action(&"ui_accept")
 	var focus: Control = get_viewport().gui_get_focus_owner()
 	_check("confirm on the strong tool: the focus jumps to the only strong slot", tab.pending_tool_id == "brimming_crest"
-		and focus is GearCard and (focus as GearCard).kind == GearCard.Kind.SLOT and (focus as GearCard).slot_tier == GearTier.Tier.STRONG, focus)
+		and focus is GearCard and (focus as GearCard).kind == GearCard.Kind.SLOT and (focus as GearCard).tier == GearTier.Tier.STRONG, focus)
 	await _ui_action(&"ui_accept")
 	_check("confirm on the slot puts the tool there", gear.tool_in("bloodbound_coffer", 0) != null and gear.tool_in("bloodbound_coffer", 0).id == "brimming_crest"
 		and tab.pending_tool_id == "", tab.pending_tool_id)
+	var crest_slot: GearCard = null
+	for card in tab.slot_cards:
+		if card.tool and card.tool.id == "brimming_crest":
+			crest_slot = card
+	crest = _gear_card(tab.tool_cards, "brimming_crest")
+	_check("the tool is drawn inside its slot on the pouch, and half greyed in the row, tagged In",
+		crest_slot != null and crest.dim and crest.tag == "In")
+	_check("focusing the tool gives its slot the dim mirror frame", crest.has_focus() and crest_slot.mirror)
 	var lantern := _gear_card(tab.tool_cards, "scar_lantern")
 	lantern.grab_focus()
 	await _frames(1)
 	await _ui_action(&"ui_accept")
 	var weak_slot: GearCard = null
 	for card in tab.slot_cards:
-		if card.slot_tier == GearTier.Tier.WEAK and card.tool == null:
+		if card.tier == GearTier.Tier.WEAK and card.tool == null:
 			weak_slot = card
 	weak_slot.grab_focus()
 	await _frames(1)
 	await _ui_action(&"ui_accept")
-	_check("a weak slot refuses a medium tool", weak_slot.pouch != null and gear.tool_in(weak_slot.pouch.id, weak_slot.slot_index) == null
+	_check("a weak slot refuses a medium tool", weak_slot.pouch != null and gear.tool_in(weak_slot.pouch.id, weak_slot.index) == null
 		and tab.pending_tool_id == "scar_lantern")
 	await _ui_action(&"menu_clear")
 	_check("Backspace cancels the slot choice", tab.pending_tool_id == "")
@@ -5608,7 +5649,7 @@ func _test_gear_room() -> void:
 	_check("a weak tool goes into the first empty slot that holds it", not ribbon_at.is_empty(), ribbon_at)
 	_check("worn gear works at once", is_equal_approx(p.stat("attack_range_mul"), 1.1), p.stat("attack_range_mul"))
 	for card in tab.slot_cards:
-		if card.pouch.id == ribbon_at.pouch and card.slot_index == ribbon_at.slot:
+		if card.pouch.id == ribbon_at.pouch and card.index == ribbon_at.slot:
 			card.grab_focus()
 	await _frames(1)
 	await _ui_action(&"ui_accept")
@@ -5619,11 +5660,21 @@ func _test_gear_room() -> void:
 	await _ui_action(&"ui_accept")
 	_check("confirm on a slotted tool takes it out", gear.find_tool("brimming_crest").is_empty())
 	var texts := ""
-	for card in tab.pouch_cards + tab.tool_cards + tab.slot_cards:
+	for card in tab.pouch_cards + tab.belt_cards + tab.tool_cards + tab.slot_cards:
 		card.grab_focus()
 		await _frames(1)
 		texts += tab.detail_name.text + tab.detail_kind.text + tab.detail_text.text + card.text
 	_check("the Gear tab shows names, lore and curses but never a number", RegEx.create_from_string("[0-9%]").search(texts) == null)
+	var worn_before := data.equipped_pouches.duplicate()
+	tab.belt_cards[2].grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	_check("confirm on a pouch on the belt takes it off", data.equipped_pouches.size() == worn_before.size() - 1, data.equipped_pouches)
+	tab.pouch_cards[2].grab_focus()
+	await _frames(1)
+	await _ui_action(&"ui_accept")
+	await _ui_action(&"ui_accept")
+	_check("and it can hang there again", data.equipped_pouches.size() == worn_before.size(), data.equipped_pouches)
 	await _hold(&"inventory", 2)
 	_check("the inventory closes", not inv.is_open())
 

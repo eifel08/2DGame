@@ -35,6 +35,6 @@ func _draw() -> void:
 	var center := Vector2(0, -20.0 + sin(_t * 2.6) * 2.0)
 	draw_circle(center, 17.0 * (1.0 + sin(_t * 3.5) * 0.06), Color(col, 0.14))
 	if kind == "pouch":
-		GearArt.pouch(self, center, 10.0, col)
+		GearArt.pouch(self, center, 12.0, col, false, gear_id)
 	else:
-		GearArt.tool(self, center, 10.0, col)
+		GearArt.tool(self, center, 11.0, col, false, gear_id)
